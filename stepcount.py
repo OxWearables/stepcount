@@ -5,16 +5,22 @@ import pandas as pd
 import datetime
 import glob
 import os
+import argparse
 
 # Step 1 - Create CSV from .cwa file
-acc_data, info = pywear.read_device("elena.cwa", lowpass_hz=20, calibrate_gravity=True, detect_nonwear=True, resample_hz=100)
+parser = argparse.ArgumentParser()
+parser.add_argument("cwa", help = "Enter location of .cwa filename to be processed")
+parser.add_argument("predictions", help = "Enter location of .csv timeseries file from Biobank Accelerometer Analysis Tool")
+args = parser.parse_args()
+
+acc_data, info = pywear.read_device(args.cwa, lowpass_hz=20, calibrate_gravity=True, detect_nonwear=True, resample_hz=100)
 acc_data['time'] = acc_data.index
 acc_data = acc_data.reset_index(drop=True)
 
 #Step 2 - Import epoch data from BAAT
 
-step_epochs = pd.read_csv("elena-timeSeries.csv")
-poi = "elena"
+step_epochs = pd.read_csv(args.predictions)
+poi = args.predictions[:-15]
 
 # Define data type to analyze
 epoch_length = 15 # Number of seconds in each epoch -- defined
