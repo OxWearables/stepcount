@@ -4,4 +4,4 @@ Development and implementation of a step counting algorithm using Biobank Accele
 
 To run:
 
-python stepcount.py ".cwa_file_to_process" "timeSeries_csv_from_BBAT_classification"
+python stepcount.py ".cwa_file_to_process" "timeSeries_csv_from_BBAT_classification" --sampleRate
