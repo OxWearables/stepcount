@@ -7,6 +7,7 @@ import glob
 import os
 import argparse
 
+print(datetime.datetime.now())
 # Step 1 - Create CSV from .cwa file
 parser = argparse.ArgumentParser()
 parser.add_argument("cwa", help = "Enter location of .cwa filename to be processed")
@@ -16,6 +17,8 @@ args = parser.parse_args()
 acc_data, info = pywear.read_device(args.cwa, lowpass_hz=20, calibrate_gravity=True, detect_nonwear=True, resample_hz=100)
 acc_data['time'] = acc_data.index
 acc_data = acc_data.reset_index(drop=True)
+print(datetime.datetime.now())
+
 
 #Step 2 - Import epoch data from BAAT
 
@@ -56,33 +59,33 @@ print("Prominence is:", prominence_list[0])
 steps, _ = find_peaks(acc_data['ENMO'], distance = distance_list[0], prominence = prominence_list[0])
 print("Peak-detection-only step count:", len(steps), "steps")
 whole_file_steps = len(steps)
-
+print(datetime.datetime.now())
 
 ## Separate classified walking epochs
 walking_epochs = step_epochs[(step_epochs['walk'] >0.5)].reset_index(drop = True)
 time_walking = len(walking_epochs)*epoch_length/60 #minutes
 print("Total walking time:", time_walking, "min")
+print(datetime.datetime.now())
 
-# For loop to count steps over each epoch
-       
-
-total = 0
-for count in range(1,len(walking_epochs)): #Ignore the first epoch, because sometimes it starts/ends too early
-    epoch_window_start = walking_epochs['time'][count]
-    epoch_window_end = epoch_window_start + datetime.timedelta(seconds = epoch_length)
-    window = acc_data['time'][(acc_data['time']>= epoch_window_start) & (acc_data['time'] < epoch_window_end)]
-    window_rows = window.index.tolist()
-    epoch_steps = steps[(steps >= min(window_rows)) & (steps < max(window_rows))]
-    #print("Epoch Start:", epoch_window_start, "Epoch End:", epoch_window_end)
-    #print("The total number of steps in this epoch is:", len(epoch_steps))
-    total = total +len(epoch_steps)
-print("RF/HMM + Peak Detection Calculated Steps:", total, "steps", "\n")
+merged = pd.merge_asof(acc_data, step_epochs, on = 'time')
+all_steps=merged.iloc[steps,]
+counted_steps = all_steps[all_steps['walk'] == 1]
+print(len(counted_steps))
+print(datetime.datetime.now())
 
 
+# Sum steps by hour
+hourly = counted_steps.resample('H', on = 'time').walk.sum()
+print(hourly)
 
-d.append({'participant': poi,'Peak_Only_Steps': len(steps),'Walking_Time': time_walking,'RFF/HMM+Peak_Steps':total})
-            
-            
-final_output = pd.DataFrame(d)
-output_path = "{}_total_steps.csv".format(poi)
-final_output.to_csv(output_path, index= False)
+# Output hourly stepcounts
+hourly_output_path = "{}_HourlySteps.csv".format(poi)
+hourly.to_csv(hourly_output_path)
+
+#Sum steps by day
+daily = counted_steps.resample('D', on = 'time').walk.sum()
+print(daily)
+
+# Output daily stepcounts
+daily_output_path = "{}_DailySteps.csv".format(poi)
+daily.to_csv(daily_output_path)
