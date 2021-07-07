@@ -7,6 +7,67 @@ import glob
 import os
 import argparse
 import time
+import pytz
+import re
+
+
+def check_and_fix_dst(t, tz='Europe/London'):
+    """ Check if there's a DST crossover. If so, fix the local times
+    before converting to UTC.
+
+        Notes:
+         - Non-existent times are due to a push forward, so it is in DST
+         - Ambiguous times are assumed to be in DST, i.e. before the pull back
+
+    This works only for one DST crossover
+
+    """
+
+    tz = pytz.timezone(tz)
+
+    t_start = t[0].tz_localize(tz, ambiguous=True)
+    t_end = t[-1].tz_localize(tz, ambiguous=True, nonexistent='shift_forward')
+    dst_shift = t_end.dst() - t_start.dst()
+
+    if not (dst_shift > datetime.timedelta(0)):
+        # Nothing to do. Just convert to UTC
+        return t.tz_localize(tz, ambiguous=True).tz_convert("UTC")
+
+    # Convert to UTC. This is only correct up till the DST transition
+    t_utc = (t.tz_localize(tz, ambiguous=True, nonexistent='NaT')
+             .tz_convert("UTC")
+             .tz_convert(None))
+
+    # Find when transition happens
+    t_trans = tz._utc_transition_times[np.searchsorted(tz._utc_transition_times, t_utc[0])]
+
+    # Now correct the local times after transition
+    t = t.to_series(t.name)
+    whr_befor_trans = ~(t_utc < t_trans)  # not the same as t_utc >= t_trans due to NaTs
+    t[whr_befor_trans] += dst_shift
+
+    # Finally convert to UTC
+    start_is_dst = t_start.dst() > t_end.dst()
+    end_is_dst = not start_is_dst
+    t_before = t[~whr_befor_trans].dt.tz_localize(tz, ambiguous=start_is_dst).dt.tz_convert("UTC")
+    t_after = t[whr_befor_trans].dt.tz_localize(tz, ambiguous=end_is_dst).dt.tz_convert("UTC")
+
+    t = pd.concat((t_before, t_after))
+
+    return t
+
+
+def date_parser(t):
+    '''
+    Parse date a date string of the form e.g.
+    2020-06-14 19:01:15.123+0100 [Europe/London]
+    '''
+    tz = re.search(r'(?<=\[).+?(?=\])', t)
+    if tz is not None:
+        tz = tz.group()
+    t = re.sub(r'\[(.*?)\]', '', t)
+    return pd.to_datetime(t, utc=True).tz_convert(tz)
+
 
 # Computational timing
 start = time.time()
@@ -47,7 +108,7 @@ acc_data['ENMO'] = ((acc_data['x']**2 + acc_data['y']**2 + acc_data['z']**2)**0.
 acc_data.loc[acc_data['ENMO'] < 0, 'ENMO'] = 0
 print("This is data for participant:", poi)
 
-    
+
 ## Make timestamps workable
 step_epochs['time'] = step_epochs['time'].str[:23]
 step_epochs['time'] = pd.to_datetime(step_epochs['time'], format= "%Y-%m-%d %H:%M:%S.%f")
@@ -55,7 +116,7 @@ acc_data['time'] = pd.to_datetime(acc_data['time'], format= "%Y-%m-%d %H:%M:%S.%
 
 #print("Distance is:", distance_list[0])
 #print("Prominence is:", prominence_list[0])
-           
+
 # Step Counting across all accelerometer data, to give a rough step count without RF/HMM walking classification
 steps, _ = find_peaks(acc_data['ENMO'], distance = distance_list[0], prominence = prominence_list[0])
 print("Peak-detection-only step count:", len(steps), "steps")
@@ -93,3 +154,4 @@ daily.to_csv(daily_output_path)
 # Computational Timing
 end = time.time()
 print(f"Done! ({round(end - start,2)}s)")
+
