@@ -15,7 +15,7 @@ def main(args):
     start = time.time()
 
     # Step 1 - Create CSV from .cwa file
-    acc_data, info = pywear.read_device(args.cwa, lowpass_hz=20, calibrate_gravity=True, detect_nonwear=True, resample_hz=args.sampleRate)
+    acc_data, info = pywear.read_device(args.cwa, lowpass_hz=args.lowpass_hz, calibrate_gravity=True, detect_nonwear=True)
     acc_data.index = machine2utc(acc_data.index)
     acc_data['time'] = acc_data.index
     acc_data = acc_data.reset_index(drop=True)
@@ -29,7 +29,7 @@ def main(args):
     # Define data type to analyze
     epoch_length = 15  # Number of seconds in each epoch -- defined
     steps_per_epoch = 5  # Number of steps per epoch in defined walking classification
-    samplerate = args.sampleRate  # Hz
+    samplerate = info['SampleRate']  # Hz
 
     # Setting peak parameters
     distance_list = [35*(samplerate/100)]  # a distance of 0.35 seconds
@@ -142,7 +142,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("cwa", help="Enter location of .cwa filename to be processed")
     parser.add_argument("predictions", help="Enter location of .csv timeseries file from Biobank Accelerometer Analysis Tool")
-    parser.add_argument('--sampleRate', default=100, type=int, help="Enter sample rate of accelerometer data")
+    parser.add_argument('--lowpass_hz', default=False, type = int, help = "Enter lowpass filter Hz if one is desired")
     args = parser.parse_args()
 
     main(args)
