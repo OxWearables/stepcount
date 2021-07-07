@@ -16,12 +16,14 @@ def main(args):
 
     # Step 1 - Create CSV from .cwa file
     acc_data, info = pywear.read_device(args.cwa, lowpass_hz=20, calibrate_gravity=True, detect_nonwear=True, resample_hz=args.sampleRate)
+    acc_data.index = machine2utc(acc_data.index)
     acc_data['time'] = acc_data.index
     acc_data = acc_data.reset_index(drop=True)
 
     #Step 2 - Import epoch data from BAAT
 
-    step_epochs = pd.read_csv(args.predictions)
+    step_epochs = pd.read_csv(args.predictions, parse_dates=['time'], date_parser=date_parser)
+    step_epochs['time'] = step_epochs['time'].dt.tz_convert('UTC')
     poi = args.predictions[:-15]
 
     # Define data type to analyze
@@ -40,11 +42,6 @@ def main(args):
     acc_data['ENMO'] = ((acc_data['x']**2 + acc_data['y']** 2 + acc_data['z']**2)**0.5)-1
     acc_data.loc[acc_data['ENMO'] < 0, 'ENMO'] = 0
     print("This is data for participant:", poi)
-
-    # Make timestamps workable
-    step_epochs['time'] = step_epochs['time'].str[:23]
-    step_epochs['time'] = pd.to_datetime(step_epochs['time'], format="%Y-%m-%d %H:%M:%S.%f")
-    acc_data['time'] = pd.to_datetime(acc_data['time'], format="%Y-%m-%d %H:%M:%S.%f")
 
     #print("Distance is:", distance_list[0])
     #print("Prominence is:", prominence_list[0])
@@ -85,15 +82,13 @@ def main(args):
     print(f"Done! ({round(end - start,2)}s)")
 
 
-def check_and_fix_dst(t, tz='Europe/London'):
-    """ Check if there's a DST crossover. If so, fix the local times
-    before converting to UTC.
+def machine2utc(t, tz='Europe/London'):
+    """ Convert machine time to UTC time, fixing for DST crossovers if any.
 
-        Notes:
-         - Non-existent times are due to a push forward, so it is in DST
-         - Ambiguous times are assumed to be in DST, i.e. before the pull back
-
-    This works only for one DST crossover
+    Notes:
+        - Non-existent times are due to a push forward, so it is in DST
+        - Ambiguous times are assumed to be in DST, i.e. before the pull back
+        - Only fixes one DST crossover
 
     """
 
