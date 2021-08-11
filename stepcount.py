@@ -27,13 +27,13 @@ def main(args):
     poi = args.predictions[:-15]
 
     # Define data type to analyze
-    epoch_length = 15  # Number of seconds in each epoch -- defined
-    steps_per_epoch = 5  # Number of steps per epoch in defined walking classification
+    epoch_length = 5  # Number of seconds in each epoch, optimized in iterative parameter testing
+    steps_per_epoch = 2  # Number of steps per epoch in defined walking classification, optimized in iterative parameter testing
     samplerate = info['SampleRate']  # Hz
 
     # Setting peak parameters
-    distance_list = [35*(samplerate/100)]  # a distance of 0.35 seconds
-    prominence_list = [.175]  # gravitational units
+    distance_list = [32*(samplerate/100)]  # a distance of 0.32 seconds, optimized in iterative parameter testing for 100 Hz AX3 
+    prominence_list = [.140]  # gravitational units, optimized in iterative parameter testing for 100 Hz AX3
 
     # Setting up data collection dataframe
     d = []
