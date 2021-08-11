@@ -1,6 +1,6 @@
 # stepcount
 Development and implementation of a step counting algorithm using Biobank Accelerometer Analysis Tool
-15 second epoch classifications, and step counting associated raw accelerometer data.
+5 second epoch classifications, and step counting associated raw accelerometer data.
 
 To run:
 
