@@ -76,6 +76,10 @@ def main(args):
     # Output daily stepcounts
     daily_output_path = "{}_DailySteps.csv".format(poi)
     daily.to_csv(daily_output_path)
+    
+    # Output step info for all counted steps
+    step_output_path = "{}_StepInfo.csv".format(poi)
+    counted_steps.to_csv(step_output_path)
 
     # Computational Timing
     end = time.time()
