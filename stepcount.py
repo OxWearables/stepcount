@@ -1,4 +1,4 @@
-import pywear
+import actipy
 import numpy as np
 from scipy.signal import find_peaks
 import pandas as pd
@@ -15,7 +15,7 @@ def main(args):
     start = time.time()
 
     # Step 1 - Create CSV from .cwa file
-    acc_data, info = pywear.read_device(args.cwa, lowpass_hz=args.lowpass_hz, calibrate_gravity=True, detect_nonwear=True)
+    acc_data, info = actipy.read_device(args.cwa, lowpass_hz=args.lowpass_hz, calibrate_gravity=True, detect_nonwear=True)
     acc_data.index = machine2utc(acc_data.index)
     acc_data['time'] = acc_data.index
     acc_data = acc_data.reset_index(drop=True)
