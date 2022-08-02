@@ -20,7 +20,7 @@ def main(args):
     acc_data['time'] = acc_data.index
     acc_data = acc_data.reset_index(drop=True)
 
-    #Step 2 - Import epoch data from BAAT
+    # Step 2 - Import epoch data from BAAT
 
     step_epochs = pd.read_csv(args.predictions, parse_dates=['time'], date_parser=date_parser)
     step_epochs['time'] = step_epochs['time'].dt.tz_convert('UTC')
@@ -32,7 +32,8 @@ def main(args):
     samplerate = info['SampleRate']  # Hz
 
     # Setting peak parameters
-    distance_list = [32*(samplerate/100)]  # a distance of 0.32 seconds, optimized in iterative parameter testing for 100 Hz AX3 
+    # a distance of 0.32 seconds, optimized in iterative parameter testing for 100 Hz AX3
+    distance_list = [32 * (samplerate / 100)]
     prominence_list = [.140]  # gravitational units, optimized in iterative parameter testing for 100 Hz AX3
 
     # Setting up data collection dataframe
@@ -43,9 +44,6 @@ def main(args):
     acc_data.loc[acc_data['ENMO'] < 0, 'ENMO'] = 0
     print("This is data for participant:", poi)
 
-    #print("Distance is:", distance_list[0])
-    #print("Prominence is:", prominence_list[0])
-
     # Step Counting across all accelerometer data, to give a rough step count without RF/HMM walking classification
     steps, _ = find_peaks(acc_data['ENMO'], distance=distance_list[0], prominence=prominence_list[0])
     print("Peak-detection-only step count:", len(steps), "steps")
@@ -53,7 +51,7 @@ def main(args):
 
     # Separate classified walking epochs
     walking_epochs = step_epochs[(step_epochs['walk'] > 0.5)].reset_index(drop=True)
-    time_walking = len(walking_epochs)*epoch_length/60  # minutes
+    time_walking = len(walking_epochs) * epoch_length / 60  # minutes
     print("Total classified step time:", time_walking, "min")
 
     merged = pd.merge_asof(acc_data, step_epochs, on='time')
@@ -63,7 +61,6 @@ def main(args):
 
     # Sum steps by hour
     hourly = counted_steps.resample('H', on='time').walk.sum()
-    #print(hourly)
 
     # Output hourly stepcounts
     hourly_output_path = "{}_HourlySteps.csv".format(poi)
@@ -71,12 +68,11 @@ def main(args):
 
     # Sum steps by day
     daily = counted_steps.resample('D', on='time').walk.sum()
-    #print(daily)
 
     # Output daily stepcounts
     daily_output_path = "{}_DailySteps.csv".format(poi)
     daily.to_csv(daily_output_path)
-    
+
     # Output step info for all counted steps
     step_output_path = "{}_StepInfo.csv".format(poi)
     counted_steps.to_csv(step_output_path)
@@ -146,7 +142,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument("cwa", help="Enter location of .cwa filename to be processed")
     parser.add_argument("predictions", help="Enter location of .csv timeseries file from Biobank Accelerometer Analysis Tool")
-    parser.add_argument('--lowpass_hz', default=False, type = int, help = "Enter lowpass filter Hz if one is desired")
+    parser.add_argument('--lowpass_hz', default=False, type=int, help="Enter lowpass filter Hz if one is desired")
     args = parser.parse_args()
 
     main(args)
