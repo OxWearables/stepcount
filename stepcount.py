@@ -40,7 +40,7 @@ def main(args):
     d = []
 
     # Import acceleration data and calculate unfiltered ENMO Trunc
-    acc_data['ENMO'] = ((acc_data['x']**2 + acc_data['y']** 2 + acc_data['z']**2)**0.5)-1
+    acc_data['ENMO'] = np.linalg.norm(acc_data[['x', 'y', 'z']].to_numpy(), axis=1) - 1
     acc_data.loc[acc_data['ENMO'] < 0, 'ENMO'] = 0
     print("This is data for participant:", poi)
 
