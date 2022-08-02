@@ -102,7 +102,7 @@ def machine2utc(t, tz='Europe/London'):
     t_end = t[-1].tz_localize(tz, ambiguous=True, nonexistent='shift_forward')
     dst_shift = t_end.dst() - t_start.dst()
 
-    if not (dst_shift > datetime.timedelta(0)):
+    if not (abs(dst_shift) > datetime.timedelta(0)):
         # Nothing to do. Just convert to UTC
         return t.tz_localize(tz, ambiguous=True).tz_convert("UTC")
 
