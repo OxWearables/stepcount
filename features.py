@@ -12,6 +12,9 @@ def extract_features(xyz, sample_rate=100):
     v = v - 1  # detrend: "remove gravity"
     v = np.clip(v, -2, 2)  # clip abnormaly high values
 
+    # Moments features
+    feats.update(moments_features(v, sample_rate))
+
     # Quantile features
     feats.update(quantile_features(v, sample_rate))
 
@@ -21,9 +24,23 @@ def extract_features(xyz, sample_rate=100):
     # Spectral features
     feats.update(spectral_features(v, sample_rate))
 
+    # FFT features
+    feats.update(fft_features(v, sample_rate))
+
     # Peak features
     feats.update(peaks_features(v, sample_rate))
 
+    return feats
+
+
+def moments_features(v, sample_rate=None):
+    """ Statistical moments """
+    feats = {
+        'avg': np.mean(v),
+        'std': np.std(v),
+        'skew': stats.skew(v),
+        'kurt': stats.kurtosis(v),
+    }
     return feats
 
 
@@ -48,7 +65,7 @@ def autocorr_features(v, sample_rate):
 
 
 def spectral_features(v, sample_rate):
-    """ Spectral entropy, 1st & 2nd dominant frequencies """
+    """ Spectral entropy, average power, dominant frequencies """
 
     feats = {}
 
@@ -64,21 +81,36 @@ def spectral_features(v, sample_rate):
     with np.errstate(divide='ignore', invalid='ignore'):  # ignore div by 0 warnings
         feats['pentropy'] = np.nan_to_num(stats.entropy(powers + 1e-16))
 
+    feats['avgpow'] = np.mean(powers)
+
     peaks, _ = signal.find_peaks(powers)
     peak_powers = powers[peaks]
     peak_freqs = freqs[peaks]
     peak_ranks = np.argsort(peak_powers)[::-1]
-    if len(peaks) >= 2:
-        feats['f1'] = peak_freqs[peak_ranks[0]]
-        feats['f2'] = peak_freqs[peak_ranks[1]]
-        feats['p1'] = peak_powers[peak_ranks[0]]
-        feats['p2'] = peak_powers[peak_ranks[1]]
-    elif len(peaks) == 1:
-        feats['f1'] = feats['f2'] = peak_freqs[peak_ranks[0]]
-        feats['p1'] = feats['p2'] = peak_powers[peak_ranks[0]]
-    else:
-        feats['f1'] = feats['f2'] = 0
-        feats['p1'] = feats['p2'] = 0
+
+    TOPN = 3
+    feats = {}
+    feats.update({f"f{i + 1}": 0 for i in range(TOPN)})
+    feats.update({f"p{i + 1}": 0 for i in range(TOPN)})
+    for i, j in enumerate(peak_ranks[:TOPN]):
+        feats[f"f{i + 1}"] = peak_freqs[j]
+        feats[f"p{i + 1}"] = peak_powers[j]
+
+    return feats
+
+
+def fft_features(v, sample_rate, nfreqs=5):
+    """ Power of frequencies 0Hz, 1Hz, 2Hz, ... using Welch's method """
+
+    _, powers = signal.welch(
+        v, fs=sample_rate,
+        nperseg=sample_rate,
+        noverlap=sample_rate // 2,
+        detrend='constant',
+        average='median'
+    )
+
+    feats = {f"fft{i}": powers[i] for i in range(nfreqs + 1)}
 
     return feats
 
@@ -91,10 +123,11 @@ def peaks_features(v, sample_rate):
     peaks, peak_props = signal.find_peaks(u, distance=0.2 * sample_rate, prominence=0.25)
     feats['npeaks'] = len(peaks)
     if len(peak_props['prominences']) > 0:
-        feats['peaks_med_promin'], feats['peaks_min_promin'], feats['peaks_max_promin'] = \
-            np.quantile(peak_props['prominences'], (0, .5, 1))
+        feats['peaks_avg_promin'] = np.mean(peak_props['prominences'])
+        feats['peaks_min_promin'] = np.min(peak_props['prominences'])
+        feats['peaks_max_promin'] = np.max(peak_props['prominences'])
     else:
-        feats['peaks_med_promin'] = feats['peaks_min_promin'] = feats['peaks_max_promin'] = 0
+        feats['peaks_avg_promin'] = feats['peaks_min_promin'] = feats['peaks_max_promin'] = 0
 
     return feats
 
