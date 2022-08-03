@@ -123,7 +123,7 @@ doc/tmp.sv
 env/
 doc/source/savefig/
 
-# Sample wearable files
+# Misc
 data/
 *.cwa
 *.cwa.gz
@@ -132,3 +132,4 @@ data/
 *.bin
 *.bin.gz
 *.npy
+*.pkl
