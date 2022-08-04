@@ -3,60 +3,69 @@ from hmmlearn import hmm
 
 
 class HMMSmoother():
-    """ HMM model based on hmmlearn """
 
-    def __init__(self, transition=None, **hmm_params) -> None:
+    def __init__(self, use_hmmlearn=False, **hmmlearn_params) -> None:
+        self.use_hmmlearn = use_hmmlearn
+        self.hmmlearn_params = hmmlearn_params
 
-        self.transition = transition
-        self.hmm_params = hmm_params
-
-        self.h3m = None
-        self.labels = None
-        self.n_components = None
-        self.emission = None
-
-    def fit(self, clf, Y_true):
-        self.h3m = None
+    def fit(self, Y_pred, Y_true, groups=None):
         self.labels = np.unique(Y_true)
         self.n_components = len(self.labels)
-        self.emission = HMMSmoother.calc_clf_emission(clf, Y_true, self.labels)
+        self.prior = compute_prior(Y_true, self.labels)
+        self.emission = compute_emission(Y_pred, Y_true, self.labels)
+        self.transition = compute_transition(Y_true, self.labels, groups)
         return self
 
-    def _h3m_fit(self, Y):
-
-        if self.h3m is not None:
-            return self.h3m
-
-        Y = HMMSmoother.reshapeY(Y)
-
-        h3m = hmm.MultinomialHMM(
-            n_components=self.n_components,
-            params="st",
-            init_params="st" if self.transition is None else "s",
-            **self.hmm_params,
-        )
-        h3m.emissionprob_ = self.emission
-
-        if self.transition is not None:
-            h3m.transmat_ = self.transition
-
-        h3m.fit(Y)
-
-        return h3m
-
-    def predict(self, Y):
-        Y = HMMSmoother.reshapeY(Y)
-        return self._h3m_fit(Y).predict(Y)
+    def predict(self, Y, groups=None):
+        if self.use_hmmlearn:
+            return self._hmmlearn_fit_predict(Y, groups=None)
+        return self.viterbi(Y, groups)
 
     def predict_proba(self, Y):
-        Y = HMMSmoother.reshapeY(Y)
-        return self._h3m_fit(Y).predict_proba(Y)
+        if self.use_hmmlearn:
+            return self._hmmlearn_fit_predict(Y, groups=None, method='predict_proba')
+        raise NotImplementedError
 
-    def reset(self):
-        self.h3m = None
-        self.labels = None
-        self.n_components = None
-        self.emission = None
+    def viterbi(self, Y, groups=None):
+        params = {
+            'prior': self.prior,
+            'emission': self.emission,
+            'transition': self.transition,
+            'labels': self.labels,
+        }
+        if groups is None:
+            Y_vit = viterbi(Y, params)
+        else:
+            Y_vit = np.concatenate([
+                viterbi(Y[groups == g], params)
+                for g in ordered_unique(groups)
+            ])
+        return Y_vit
+
+    def _hmmlearn_fit_predict(self, Y, groups=None, method='predict'):
+
+        Y = HMMSmoother.reshapeY(Y)
+
+        hmm_ = hmm.MultinomialHMM(
+            n_components=self.n_components,
+            params="t",
+            init_params="",
+            **self.hmmlearn_params,
+        )
+        hmm_.startprob_ = self.prior
+        hmm_.emissionprob_ = self.emission
+        hmm_.transmat_ = self.transition
+
+        lengths = None
+        if groups is not None:
+            _, ind, cnt = np.unique(groups, return_index=True, return_counts=True)
+            lengths = cnt[np.argsort(ind)]
+
+        hmm_.fit(Y, lengths)
+
+        if method == 'predict_proba':
+            return hmm_.predict_proba(Y, lengths)
+        return hmm_.predict(Y, lengths)
 
     @staticmethod
     def reshapeY(Y):
@@ -64,48 +73,29 @@ class HMMSmoother():
             Y = Y[:, None]
         return Y
 
-    @staticmethod
-    def calc_clf_emission(clf, Y_true, labels=None):
-        if labels is None:
-            labels = np.unique(Y_true)
-        Y_prob = clf.oob_decision_function_
-        emission = np.vstack(
-            [np.mean(Y_prob[Y_true == label], axis=0) for label in labels]
-        )
-        return emission
 
-
-def train_hmm(Y_pred, Y_true, labels=None, uniform_prior=True):
-    """ Estimate prior, transition, and emission matrices based on the true
-    sequence of labels and the model's corresponding predictions """
-
-    if labels is None:
-        labels = np.unique(Y_true)
-
-    prior = compute_prior(Y_true, labels, uniform=uniform_prior)
-    emission = compute_emission(Y_pred, Y_true, labels)
-    transition = compute_transition(Y_true, labels)
-
-    params = {
-        'prior': prior,
-        'emission': emission,
-        'transition': transition,
-        'labels': labels
-    }
-
-    return params
-
-
-def compute_transition(Y_true, labels=None):
+def compute_transition(Y, labels=None, groups=None):
     """ Compute transition matrix from sequence """
 
     if labels is None:
-        labels = np.unique(Y_true)
+        labels = np.unique(Y)
 
-    transition = np.vstack([
-        np.mean(Y_true[1:][(Y_true == label)[:-1]].reshape(-1, 1) == labels, axis=0)
-        for label in labels
-    ])
+    def _compute_transition(Y):
+        transition = np.vstack([
+            np.sum(Y[1:][(Y == label)[:-1]].reshape(-1, 1) == labels, axis=0)
+            for label in labels
+        ])
+        return transition
+
+    if groups is None:
+        transition = _compute_transition(Y)
+    else:
+        transition = sum((
+            _compute_transition(Y[groups == g])
+            for g in ordered_unique(groups)
+        ))
+
+    transition = transition / np.sum(transition, axis=1).reshape(-1, 1)
 
     return transition
 
@@ -140,7 +130,7 @@ def compute_prior(Y_true, labels=None, uniform=True):
     return prior
 
 
-def viterbi(Y_obs, hmm_params):
+def viterbi(Y, hmm_params):
     ''' https://en.wikipedia.org/wiki/Viterbi_algorithm '''
 
     def log(x):
@@ -152,20 +142,20 @@ def viterbi(Y_obs, hmm_params):
     transition = hmm_params['transition']
     labels = hmm_params['labels']
 
-    nobs = len(Y_obs)
+    nobs = len(Y)
     nlabels = len(labels)
 
-    Y_obs = np.where(Y_obs.reshape(-1, 1) == labels)[1]  # to numeric
+    Y = np.where(Y.reshape(-1, 1) == labels)[1]  # to numeric
 
     probs = np.zeros((nobs, nlabels))
-    probs[0, :] = log(prior) + log(emission[:, Y_obs[0]])
+    probs[0, :] = log(prior) + log(emission[:, Y[0]])
     for j in range(1, nobs):
         for i in range(nlabels):
             probs[j, i] = np.max(
-                log(emission[i, Y_obs[j]]) +
+                log(emission[i, Y[j]]) +
                 log(transition[:, i]) +
                 probs[j - 1, :])  # probs already in log scale
-    viterbi_path = np.zeros_like(Y_obs)
+    viterbi_path = np.zeros_like(Y)
     viterbi_path[-1] = np.argmax(probs[-1, :])
     for j in reversed(range(nobs - 1)):
         viterbi_path[j] = np.argmax(
@@ -175,3 +165,8 @@ def viterbi(Y_obs, hmm_params):
     viterbi_path = labels[viterbi_path]  # to labels
 
     return viterbi_path
+
+
+def ordered_unique(x):
+    """ np.unique without sorting """
+    return x[np.sort(np.unique(x, return_index=True)[1])]
