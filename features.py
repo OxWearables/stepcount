@@ -121,7 +121,7 @@ def peaks_features(v, sample_rate):
     feats = {}
     u = butterfilt(v, 5, fs=sample_rate)  # lowpass 5Hz
     peaks, peak_props = signal.find_peaks(u, distance=0.2 * sample_rate, prominence=0.25)
-    feats['npeaks'] = len(peaks)
+    feats['npeaks'] = len(peaks) / (len(v) / sample_rate)  # peaks/sec
     if len(peak_props['prominences']) > 0:
         feats['peaks_avg_promin'] = np.mean(peak_props['prominences'])
         feats['peaks_min_promin'] = np.min(peak_props['prominences'])
