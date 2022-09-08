@@ -23,7 +23,7 @@ setuptools.setup(
     name="stepcount",
     python_requires=">=3.9",
     version=get_string("__version__"),
-    description="Step counter for wrist-worn accelerometer data",
+    description="Step counter for wrist-worn accelerometers compatible with the UK Biobank Accelerometer Dataset",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/OxWearables/stepcount",
