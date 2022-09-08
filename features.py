@@ -3,8 +3,17 @@ import scipy.stats as stats
 import scipy.signal as signal
 
 
+MIN_WINDOW_SEC = 2  # seconds
+
+
 def extract_features(xyz, sample_rate=100):
     ''' Extract commonly used HAR time-series features. xyz is a window of shape (N,3) '''
+
+    if np.isnan(xyz).any():
+        return {}
+
+    if len(xyz) <= MIN_WINDOW_SEC * sample_rate:
+        return {}
 
     feats = {}
 
