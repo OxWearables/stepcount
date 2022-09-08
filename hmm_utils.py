@@ -106,6 +106,12 @@ def compute_emission(Y_pred, Y_true, labels=None):
     if labels is None:
         labels = np.unique(Y_true)
 
+    if Y_pred.ndim == 1:
+        Y_pred = np.hstack([
+            (Y_pred == label).astype('float')[:, None]
+            for label in labels
+        ])
+
     emission = np.vstack(
         [np.mean(Y_pred[Y_true == label], axis=0) for label in labels]
     )
