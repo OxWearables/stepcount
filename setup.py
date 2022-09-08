@@ -36,7 +36,7 @@ setuptools.setup(
         "Operating System :: Unix",
     ],
     packages=setuptools.find_packages(exclude=("test",)),
-    include_package_data=True,
+    include_package_data=False,
     install_requires=[
         "actipy==1.0.0",
         "numpy==1.21.6",
