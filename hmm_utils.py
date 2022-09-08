@@ -48,7 +48,7 @@ class HMMSmoother():
 
         hmm_ = hmm.MultinomialHMM(
             n_components=self.n_components,
-            params="t",
+            params="te",
             init_params="",
             **self.hmmlearn_params,
         )
