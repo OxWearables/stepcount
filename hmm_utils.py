@@ -44,6 +44,12 @@ class HMMSmoother():
 
     def _hmmlearn_fit_predict(self, Y, groups=None, method='predict'):
 
+        if len(np.unique(Y)) < 2:
+            if method == 'predict_proba':
+                # TODO:
+                raise NotImplementedError
+            return Y
+
         Y = HMMSmoother.reshapeY(Y)
 
         hmm_ = hmm.MultinomialHMM(
