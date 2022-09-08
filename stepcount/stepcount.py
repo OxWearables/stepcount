@@ -1,3 +1,4 @@
+import os
 import pathlib
 import urllib
 import shutil
@@ -21,6 +22,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("filepath", help="Enter location the file to be processed")
+    parser.add_argument("--outdir", "-o", help="Enter location to save output files", default="outputs/")
     args = parser.parse_args()
 
     # Computational timing
@@ -30,7 +32,9 @@ def main():
     data, info = read(args.filepath)
 
     # Output paths
-    outdir, basename, _ = resolve_path(args.filepath)
+    basename = resolve_path(args.filepath)[1]
+    outdir = os.path.join(args.outdir, basename)
+    os.makedirs(outdir, exist_ok=True)
 
     # Run model
     model = load_model()
@@ -165,8 +169,8 @@ def resolve_path(path):
     p = pathlib.Path(path)
     extension = p.suffixes[0]
     filename = p.name.rsplit(extension)[0]
-    parent = p.parent
-    return parent, filename, extension
+    dirname = p.parent
+    return dirname, filename, extension
 
 
 def load_model():
