@@ -6,8 +6,8 @@ from scipy.optimize import minimize
 from joblib import Parallel, delayed
 from sklearn import metrics
 from imblearn.ensemble import BalancedRandomForestClassifier
-import hmm_utils
-import features
+from stepcount import hmm_utils
+from stepcount import features
 from tqdm.auto import tqdm
 
 

@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 import actipy
 
-MODEL_PATH = "stepcounter.joblib"
+MODEL_PATH = pathlib.Path(__file__).parent / "stepcounter.joblib"
 
 
 def main():
