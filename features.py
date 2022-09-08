@@ -78,14 +78,7 @@ def spectral_features(v, sample_rate):
 
     feats = {}
 
-    # Spectrum using Welch's method with 3s chunks and 2s overlaps
-    freqs, powers = signal.welch(
-        v, fs=sample_rate,
-        nperseg=3 * sample_rate,
-        noverlap=2 * sample_rate,
-        detrend='constant',
-        average='median'
-    )
+    freqs, powers = signal.periodogram(v, fs=sample_rate, detrend='constant')
 
     with np.errstate(divide='ignore', invalid='ignore'):  # ignore div by 0 warnings
         feats['pentropy'] = np.nan_to_num(stats.entropy(powers + 1e-16))
