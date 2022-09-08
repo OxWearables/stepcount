@@ -28,7 +28,7 @@ $ pip install stepcount
 $ stepcount sample.cwa
 
 # Or a CSV file
-$ stepcount sample.cwa
+$ stepcount sample.csv
 
 # Or an ActiGraph file
 $ stepcount sample.gt3x
