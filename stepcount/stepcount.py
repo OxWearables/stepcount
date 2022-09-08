@@ -1,4 +1,6 @@
 import pathlib
+import urllib
+import shutil
 import time
 import argparse
 import json
@@ -10,7 +12,9 @@ from tqdm.auto import tqdm
 
 import actipy
 
-MODEL_PATH = pathlib.Path(__file__).parent / "stepcounter.joblib"
+from stepcount import __model_version__
+
+MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib"
 
 
 def main():
@@ -29,12 +33,12 @@ def main():
     outdir, basename, _ = resolve_path(args.filepath)
 
     # Run model
-    sc = joblib.load(MODEL_PATH)
-    window_sec = sc.window_sec
+    model = load_model()
+    window_sec = model.window_sec
     print("Splitting data into windows...")
     X, T = make_windows(data, window_sec=window_sec)
     print("Running step counter...")
-    Y = sc.predict(X)
+    Y = model.predict(X)
     Y = pd.DataFrame({'steps': Y}, index=T)
     Y.index.name = 'time'
 
@@ -163,6 +167,23 @@ def resolve_path(path):
     filename = p.name.rsplit(extension)[0]
     parent = p.parent
     return parent, filename, extension
+
+
+def load_model():
+    """ Load trained model. Download if not exists. """
+
+    pth = pathlib.Path(MODEL_PATH)
+
+    if not pth.exists():
+
+        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib"
+
+        print(f"Downloading {url}...")
+
+        with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
+            shutil.copyfileobj(f_src, f_dst)
+
+    return joblib.load(pth)
 
 
 
