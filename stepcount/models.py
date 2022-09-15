@@ -44,12 +44,12 @@ class StepCounter():
 
         Xw, Yw = X[Wp], Y[Wp]
 
-        def rmse(x):
-            Ywp = batch_count_peaks(Xw, self.sample_rate, self.lowpass_hz, to_params(x))
-            err = metrics.mean_squared_error(Ywp, Yw, squared=False)
+        def mae(x):
+            Ywp = batch_count_peaks(Xw, self.sample_rate, self.lowpass_hz, to_ticks_params(x))
+            err = metrics.mean_absolute_error(Ywp, Yw)
             return err
 
-        def to_params(x):
+        def to_ticks_params(x):
             params = {
                 "distance": x[0] * self.sample_rate,
                 "max_width": x[1] * self.sample_rate,
@@ -61,7 +61,7 @@ class StepCounter():
         if self.verbose:
             print("Tuning step counter...")
         res = minimize(
-            rmse,
+            mae,
             x0=[.5, .5, .5, .5],
             bounds=[
                 (1 / self.sample_rate, 1),
@@ -72,7 +72,7 @@ class StepCounter():
             method='Nelder-Mead'
         )
 
-        self.find_peaks_params = to_params(res.x)
+        self.find_peaks_params = to_ticks_params(res.x)
 
         return self
 
