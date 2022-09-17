@@ -13,14 +13,32 @@ from tqdm.auto import tqdm
 
 class StepCounter():
 
-    def __init__(self, window_sec=5, sample_rate=100, lowpass_hz=5, steptol=3, wd_params=None, verbose=False):
+    def __init__(
+        self,
+        window_sec=5,
+        sample_rate=100,
+        lowpass_hz=5,
+        steptol=3,
+        n_jobs=-1,
+        wd_params=None,
+        verbose=False
+    ):
         self.window_sec = window_sec
         self.sample_rate = sample_rate
         self.lowpass_hz = lowpass_hz
         self.steptol = steptol
-        wd_params = wd_params or dict()
-        self.wd = WalkDetector(**wd_params)
+        self.n_jobs = n_jobs
         self.verbose = verbose
+
+        wd_params = wd_params or dict()
+        wd_defaults = dict(sample_rate=sample_rate, n_jobs=n_jobs, verbose=verbose)
+        for key, value in wd_defaults.items():
+            if key not in wd_params:
+                wd_params[key] = value
+        self.wd_params = wd_params
+        self.wd = WalkDetector(**self.wd_params)
+
+        self.window_len = int(np.ceil(window_sec * sample_rate))
         self.find_peaks_params = None
 
     def fit(self, X, Y, groups=None):
@@ -32,20 +50,23 @@ class StepCounter():
         # train walk detector & cross-val-predict
         if self.verbose:
             print("Running cross_val_predict...")
+        self.wd.n_jobs = 1
         Wp = cvp(
             self.wd, X, W, groups=groups,
             fit_predict_groups=True,
-            n_jobs=-1,
+            n_jobs=self.n_jobs,
         ).astype('bool')
+        self.wd.n_jobs = self.n_jobs
 
         if self.verbose:
             print("Fitting walk detector...")
         self.wd.fit(X, W, groups=groups)
 
         Xw, Yw = X[Wp], Y[Wp]
+        Vw = toV(Xw, self.sample_rate, self.lowpass_hz)
 
         def mae(x):
-            Ywp = batch_count_peaks(Xw, self.sample_rate, self.lowpass_hz, to_ticks_params(x))
+            Ywp = batch_count_peaks_from_V(Vw, to_ticks_params(x))
             err = metrics.mean_absolute_error(Ywp, Yw)
             return err
 
@@ -83,21 +104,37 @@ class StepCounter():
             return
 
         # check X quality
-        is_ok = ~(np.asarray([np.isnan(x).any() for x in X]))
+        whr_ok = ~(np.asarray([np.isnan(x).any() for x in X]))
 
-        X_ = X[is_ok]
+        X_ = X[whr_ok]
         W_ = self.wd.predict(X_, groups).astype('bool')
         Y_ = np.zeros_like(W_, dtype='float')
         Y_[W_] = batch_count_peaks(X_[W_], self.sample_rate, self.lowpass_hz, self.find_peaks_params)
 
         Y = np.full(len(X), fill_value=np.nan)
-        Y[is_ok] = Y_
-        W = np.full(len(X), fill_value=np.nan)
-        W[is_ok] = W_
+        Y[whr_ok] = Y_
 
         if return_walk:
+            W = np.full(len(X), fill_value=np.nan)
+            W[whr_ok] = W_
             return Y, W
+
         return Y
+
+    def predict_from_frame(self, data, **kwargs):
+
+        def fn(chunk):
+            """ Process the chunk. Apply padding if length is not enough. """
+            n = len(chunk)
+            x = chunk[['x', 'y', 'z']].to_numpy()
+            if n < self.window_len:
+                m = self.window_len - n
+                x = np.pad(x, ((0, m), (0, 0)), mode='wrap')
+            return x
+
+        X = make_windows(data, self.window_sec, fn=fn)
+        X = np.asarray(X)
+        return self.predict(X, **kwargs)
 
 
 class WalkDetector():
@@ -106,13 +143,14 @@ class WalkDetector():
 
         self.sample_rate = kwargs['sample_rate']
         self.n_jobs = kwargs.get('n_jobs', -1)
+        self.verbose = kwargs.get('verbose', 0)
+
         self.clf = BalancedRandomForestClassifier(
             n_estimators=kwargs.get('n_estimators', 1000),
             replacement=kwargs.get('replacement', True),
             sampling_strategy=kwargs.get('sampling_strategy', 'not minority'),
             random_state=kwargs.get('random_state', 42),
-            verbose=kwargs.get('verbose', 0),
-            n_jobs=1,
+            verbose=0, n_jobs=1,
         )
 
         self.hmms = hmm_utils.HMMSmoother(
@@ -124,23 +162,51 @@ class WalkDetector():
 
         X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
 
+        whr_ok = ~(np.isnan(X_feats).any(1))
+        X_feats = X_feats[whr_ok]
+        Y = Y[whr_ok]
+        groups = groups[whr_ok]
+
         Yp = cvp(
             self.clf, X_feats, Y, groups,
             method='predict_proba',
             fit_predict_groups=False,
-            n_jobs=self.kwargs.get('n_jobs', -1),
+            n_jobs=self.n_jobs,
         )
+        self.clf.n_jobs = self.n_jobs
         self.clf.fit(X_feats, Y)
+        self.clf.n_jobs = 1
         self.hmms.fit(Yp, Y, groups=groups)
         return self
 
     def predict(self, X, groups=None):
         X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
-        is_ok = ~(np.isnan(X_feats).any(1))
+        whr_ok = ~(np.isnan(X_feats).any(1))
         W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
-        W[is_ok] = self.clf.predict(X_feats[is_ok])
+        W[whr_ok] = self.clf.predict(X_feats[whr_ok])
         W = self.hmms.predict(W, groups=groups)
         return W
+
+
+def make_windows(data, window_sec, fn=None, return_index=False):
+    """ Split data into windows """
+
+    if fn is None:
+        def fn(x):
+            return x
+
+    X = [fn(x) for _, x in data.resample(f"{window_sec}s", origin="start")]
+
+    if return_index:
+        T = (
+            data.index
+            .to_series()
+            .resample(f"{window_sec}s", origin="start")
+            .first()
+        )
+        return X, T
+
+    return X
 
 
 def cvp(
@@ -207,27 +273,32 @@ def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=Fals
 
 
 def batch_count_peaks(X, sample_rate, lowpass_hz, params):
-    """ Count number of peaks for a list of signals """
-    return np.asarray([
-        count_peaks(x, sample_rate, lowpass_hz, params)
-        for x in X
+    """ Count number of peaks for an array of signals """
+    V = toV(X, sample_rate, lowpass_hz)
+    return batch_count_peaks_from_V(V, params)
+
+
+def batch_count_peaks_from_V(V, params):
+    """ Count number of peaks for an array of signals """
+    Y = np.asarray([
+        len(find_peaks(
+            v,
+            distance=params["distance"],
+            width=(1, params["max_width"]),
+            plateau_size=(1, params["max_plateau"]),
+            prominence=params["prominence"],
+        )[0]) for v in V
     ])
+    return Y
 
 
-def count_peaks(x, sample_rate, lowpass_hz, params):
-    """ Count number of peaks in signal """
-    v = np.linalg.norm(x, axis=-1)
-    v = v - 1
-    v = np.clip(v, -2, 2)
-    v = features.butterfilt(v, lowpass_hz, sample_rate)
-    y = len(find_peaks(
-        v,
-        distance=params["distance"],
-        width=(1, params["max_width"]),
-        plateau_size=(1, params["max_plateau"]),
-        prominence=params["prominence"],
-    )[0])
-    return y
+def toV(x, sample_rate, lowpass_hz):
+    V = np.linalg.norm(x, axis=-1)
+    V = V - 1
+    V = np.clip(V, -2, 2)
+    V = features.butterfilt(V, lowpass_hz, sample_rate, axis=-1)
+    return V
+
 
 
 def print_report():
