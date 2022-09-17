@@ -8,8 +8,6 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
-from joblib import Parallel, delayed
-from tqdm.auto import tqdm
 
 import actipy
 
@@ -40,12 +38,8 @@ def main():
     # Run model
     model = load_model(args.model_path or MODEL_PATH)
     window_sec = model.window_sec
-    print("Splitting data into windows...")
-    X, T = make_windows(data, window_sec=window_sec)
     print("Running step counter...")
-    Y = model.predict(X)
-    Y = pd.DataFrame({'steps': Y}, index=T)
-    Y.index.name = 'time'
+    Y = model.predict_from_frame(data)
 
     # Total walking mins
     total_walking = (Y > 0).sum().item() * window_sec / 60  # minutes
@@ -85,30 +79,6 @@ def main():
     end = time.time()
     print(f"Done! ({round(end - start,2)}s)")
 
-
-def make_windows(data, window_sec, n_jobs=1, verbose=True):  # Note: n_jobs>1 not working
-    """ Split data into windows """
-
-    X = np.asarray(
-        Parallel(n_jobs=n_jobs)(
-            delayed(extract_xyz)(w)
-            for i, w in tqdm(data.resample(f"{window_sec}s"), disable=not verbose)
-        ),
-        dtype='object'
-    )
-
-    T = (
-        data.index
-        .to_series()
-        .resample(f"{window_sec}s")
-        .nearest()
-    )
-
-    return X, T
-
-
-def extract_xyz(w):
-    return w[['x', 'y', 'z']].to_numpy()
 
 
 class NpEncoder(json.JSONEncoder):
