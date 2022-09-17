@@ -132,9 +132,11 @@ class StepCounter():
                 x = np.pad(x, ((0, m), (0, 0)), mode='wrap')
             return x
 
-        X = make_windows(data, self.window_sec, fn=fn)
+        X, T = make_windows(data, self.window_sec, fn=fn, return_index=True)
         X = np.asarray(X)
-        return self.predict(X, **kwargs)
+        Y = self.predict(X, **kwargs)
+        Y = pd.Series(Y, index=T)
+        return Y
 
 
 class WalkDetector():
