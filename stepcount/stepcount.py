@@ -19,9 +19,9 @@ MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib"
 def main():
 
     parser = argparse.ArgumentParser()
-    parser.add_argument("filepath", help="Enter location the file to be processed")
-    parser.add_argument("--outdir", "-o", help="Enter location to save output files", default="outputs/")
-    parser.add_argument("--model_path", "-m", help="Enter location of model file", default=None)
+    parser.add_argument("filepath", help="Enter file location to be processed")
+    parser.add_argument("--outdir", "-o", help="Enter folder location to save output files", default="outputs/")
+    parser.add_argument("--model_path", "-m", help="Enter file location to custom model to use", default=None)
     args = parser.parse_args()
 
     # Computational timing
@@ -78,7 +78,6 @@ def main():
     # Computational Timing
     end = time.time()
     print(f"Done! ({round(end - start,2)}s)")
-
 
 
 class NpEncoder(json.JSONEncoder):
