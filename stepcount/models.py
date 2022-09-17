@@ -104,6 +104,8 @@ class WalkDetector():
     def __init__(self, **kwargs):
         self.kwargs = kwargs
 
+        self.sample_rate = kwargs['sample_rate']
+        self.n_jobs = kwargs.get('n_jobs', -1)
         self.clf = BalancedRandomForestClassifier(
             n_estimators=kwargs.get('n_estimators', 1000),
             replacement=kwargs.get('replacement', True),
@@ -119,7 +121,9 @@ class WalkDetector():
         )
 
     def fit(self, X, Y, groups=None):
-        X_feats = batch_extract_features(X)
+
+        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
+
         Yp = cvp(
             self.clf, X_feats, Y, groups,
             method='predict_proba',
@@ -131,7 +135,7 @@ class WalkDetector():
         return self
 
     def predict(self, X, groups=None):
-        X_feats = batch_extract_features(X, n_jobs=4, verbose=True)
+        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
         is_ok = ~(np.isnan(X_feats).any(1))
         W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
         W[is_ok] = self.clf.predict(X_feats[is_ok])
@@ -188,11 +192,11 @@ def groupkfold(groups, n_splits=5):
         yield train_idxs, test_idxs
 
 
-def batch_extract_features(X, to_numpy=True, n_jobs=1, verbose=False):
+def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=False):
     """ Extract features for a list or array of windows """
 
     X_feats = Parallel(n_jobs=n_jobs)(
-        delayed(features.extract_features)(x)
+        delayed(features.extract_features)(x, sample_rate)
         for x in tqdm(X, disable=not verbose)
     )
     X_feats = pd.DataFrame(X_feats)
