@@ -23,6 +23,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("filepath", help="Enter location the file to be processed")
     parser.add_argument("--outdir", "-o", help="Enter location to save output files", default="outputs/")
+    parser.add_argument("--model_path", "-m", help="Enter location of model file", default=None)
     args = parser.parse_args()
 
     # Computational timing
@@ -37,7 +38,7 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     # Run model
-    model = load_model()
+    model = load_model(args.model_path or MODEL_PATH)
     window_sec = model.window_sec
     print("Splitting data into windows...")
     X, T = make_windows(data, window_sec=window_sec)
@@ -173,10 +174,10 @@ def resolve_path(path):
     return dirname, filename, extension
 
 
-def load_model():
+def load_model(model_path=MODEL_PATH):
     """ Load trained model. Download if not exists. """
 
-    pth = pathlib.Path(MODEL_PATH)
+    pth = pathlib.Path(model_path)
 
     if not pth.exists():
 
