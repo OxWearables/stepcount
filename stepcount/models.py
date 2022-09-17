@@ -148,6 +148,9 @@ def cvp(
 ):
     """ Like cross_val_predict with custom tweaks """
 
+    if isinstance(X, pd.DataFrame):
+        X = X.to_numpy()
+
     def worker(train_idxs, test_idxs):
         X_train, Y_train, groups_train = X[train_idxs], Y[train_idxs], groups[train_idxs]
         X_test, Y_test, groups_test = X[test_idxs], Y[test_idxs], groups[test_idxs]
