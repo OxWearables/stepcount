@@ -1,4 +1,5 @@
 from copy import deepcopy
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
@@ -43,6 +44,7 @@ class StepCounter():
 
         self.window_len = int(np.ceil(window_sec * sample_rate))
         self.find_peaks_params = None
+        self.cv_scores = None
 
     def fit(self, X, Y, groups=None):
 
@@ -54,17 +56,21 @@ class StepCounter():
         if self.verbose:
             print("Running cross_val_predict...")
         self.wd.n_jobs = 1
-        Wp = cvp(
+        Wp, list_of_idxs = cvp(
             self.wd, X, W, groups=groups,
             fit_predict_groups=True,
             n_jobs=self.n_jobs,
-        ).astype('bool')
+            return_indices=True,
+        )
         self.wd.n_jobs = self.n_jobs
+
+        Wp = Wp.astype('bool')
 
         if self.verbose:
             print("Fitting walk detector...")
         self.wd.fit(X, W, groups=groups)
 
+        # train step counter
         Xw, Yw = X[Wp], Y[Wp]
         Vw = toV(Xw, self.sample_rate, self.lowpass_hz)
 
@@ -98,6 +104,27 @@ class StepCounter():
         )
 
         self.find_peaks_params = to_params(res.x)
+
+        # performance -- walk detector
+        wd_cv_scores, wd_cv_summary = get_cv_scores(
+            W, Wp, list_of_idxs,
+            sample_weight=sample_weight,
+            scorer_type='classification'
+        )
+
+        # performance -- step count
+        Yp = np.zeros_like(Y)
+        Yp[Wp] = batch_count_peaks_from_V(Vw, self.sample_rate, self.find_peaks_params)
+        sc_cv_scores, sc_cv_summary = get_cv_scores(
+            Y, Yp, list_of_idxs,
+            sample_weight=sample_weight,
+            scorer_type='regression'
+        )
+
+        self.cv_scores = {
+            'wd': {'scores': wd_cv_scores, 'summary': wd_cv_summary},
+            'sc': {'scores': sc_cv_scores, 'summary': sc_cv_summary},
+        }
 
         return self
 
@@ -141,7 +168,6 @@ class StepCounter():
         Y = self.predict(X, **kwargs)
         Y = pd.Series(Y, index=T)
         return Y
-
 
 class WalkDetector():
     def __init__(self, **kwargs):
@@ -238,8 +264,9 @@ def cvp(
     model, X, Y, groups,
     method='predict',
     fit_predict_groups=False,
+    return_indices=False,
     n_splits=5,
-    n_jobs=-1
+    n_jobs=-1,
 ):
     """ Like cross_val_predict with custom tweaks """
 
@@ -262,15 +289,20 @@ def cvp(
             m.fit(X_train, Y_train)
             Y_test_pred = getattr(m, method)(X_test)
 
-        return Y_test_pred
+        return Y_test_pred, test_idxs
 
-    Y_out = Parallel(n_jobs=n_jobs)(
+    results = Parallel(n_jobs=n_jobs)(
         delayed(worker)(train_idxs, test_idxs)
         for train_idxs, test_idxs in groupkfold(groups, n_splits)
     )
-    Y_out = np.concatenate(Y_out)
 
-    return Y_out
+    Y_pred = np.concatenate([r[0] for r in results])
+    list_of_idxs = [r[1] for r in results]
+
+    if return_indices:
+        return Y_pred, list_of_idxs
+
+    return Y_pred
 
 
 def groupkfold(groups, n_splits=5):
@@ -284,6 +316,46 @@ def groupkfold(groups, n_splits=5):
         test_idxs = np.nonzero(mask)
         train_idxs = np.nonzero(~mask)
         yield train_idxs, test_idxs
+
+
+def get_cv_scores(yt, yp, list_of_idxs, sample_weight=None, scorer_type='classification'):
+
+    classif_scorers = {
+        'accuracy': metrics.accuracy_score,
+        'f1': lambda yt, yp, sample_weight=None: metrics.f1_score(yt, yp, sample_weight=sample_weight, zero_division=0),
+        'precision': lambda yt, yp, sample_weight=None: metrics.precision_score(yt, yp, sample_weight=sample_weight, zero_division=0),
+        'recall': lambda yt, yp, sample_weight=None: metrics.recall_score(yt, yp, sample_weight=sample_weight, zero_division=0),
+    }
+
+    regress_scorers = {
+        'mae': metrics.mean_absolute_error,
+        'rmse': lambda yt, yp, sample_weight: metrics.mean_squared_error(yt, yp, sample_weight=sample_weight, squared=False),
+    }
+
+    if scorer_type == 'classification':
+        scorers = classif_scorers
+    elif scorer_type == 'regression':
+        scorers = regress_scorers
+    else:
+        raise ValueError(f"Unknown {scorer_type=}")
+
+    raw_scores = defaultdict(list)
+
+    for idxs in list_of_idxs:
+        yt_, yp_, sample_weight_ = yt[idxs], yp[idxs], sample_weight[idxs]
+        for scorer_name, scorer_fn in scorers.items():
+            raw_scores[scorer_name].append(scorer_fn(yt_, yp_, sample_weight=sample_weight_))
+
+    summary = {}
+    for key, val in raw_scores.items():
+        q0, q25, q50, q75, q100 = np.quantile(val, (0, .25, .5, .75, 1))
+        avg, std = np.mean(val), np.std(val)
+        summary[key] = {
+            'min': q0, 'Q1': q25, 'med': q50, 'Q3': q75, 'max': q100,
+            'mean': avg, 'std': std,
+        }
+
+    return raw_scores, summary
 
 
 def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=False):
