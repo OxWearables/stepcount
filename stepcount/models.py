@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 from scipy.optimize import minimize
+from scipy import stats
 from joblib import Parallel, delayed
 from sklearn import metrics
 from imblearn.ensemble import BalancedRandomForestClassifier
@@ -19,6 +20,7 @@ class StepCounter():
         sample_rate=100,
         lowpass_hz=5,
         steptol=3,
+        pnr=0.1,
         n_jobs=-1,
         wd_params=None,
         verbose=False
@@ -27,11 +29,12 @@ class StepCounter():
         self.sample_rate = sample_rate
         self.lowpass_hz = lowpass_hz
         self.steptol = steptol
+        self.pnr = pnr
         self.n_jobs = n_jobs
         self.verbose = verbose
 
         wd_params = wd_params or dict()
-        wd_defaults = dict(sample_rate=sample_rate, n_jobs=n_jobs, verbose=verbose)
+        wd_defaults = dict(sample_rate=sample_rate, n_jobs=n_jobs, verbose=verbose, pnr=pnr)
         for key, value in wd_defaults.items():
             if key not in wd_params:
                 wd_params[key] = value
@@ -65,9 +68,12 @@ class StepCounter():
         Xw, Yw = X[Wp], Y[Wp]
         Vw = toV(Xw, self.sample_rate, self.lowpass_hz)
 
+        sample_weight = calc_sample_weight(W, self.pnr)
+        sample_weight_w = sample_weight[Wp]
+
         def mae(x):
             Ywp = batch_count_peaks_from_V(Vw, to_ticks_params(x))
-            err = metrics.mean_absolute_error(Ywp, Yw)
+            err = metrics.mean_absolute_error(Ywp, Yw, sample_weight=sample_weight_w)
             return err
 
         def to_ticks_params(x):
@@ -147,6 +153,10 @@ class WalkDetector():
         self.n_jobs = kwargs.get('n_jobs', -1)
         self.verbose = kwargs.get('verbose', 0)
 
+        self.pnr = kwargs.get('pnr', 0.1)
+        self.calib_method = kwargs.get('calib_method', 'precision')
+        self.precision_tol = kwargs.get('precision_tol', 0.9)
+
         self.clf = BalancedRandomForestClassifier(
             n_estimators=kwargs.get('n_estimators', 1000),
             replacement=kwargs.get('replacement', True),
@@ -159,6 +169,8 @@ class WalkDetector():
             use_hmmlearn=kwargs.get('use_hmmlearn', True),
             n_iter=kwargs.get('n_iter', 10),
         )
+
+        self.thresh = 0.5
 
     def fit(self, X, Y, groups=None):
 
@@ -175,17 +187,30 @@ class WalkDetector():
             fit_predict_groups=False,
             n_jobs=self.n_jobs,
         )
+
         self.clf.n_jobs = self.n_jobs
         self.clf.fit(X_feats, Y)
         self.clf.n_jobs = 1
-        self.hmms.fit(Yp, Y, groups=groups)
+
+        if self.calib_method is not None:
+            calib_ops = calibrate(Yp[:, 1], Y, self.pnr, self.precision_tol)
+            self.thresh = calib_ops['best_f1']['thresh']
+            Ypp = calib_ops['best_f1']['predicted']
+
+            if self.calib_method == 'precision':
+                if calib_ops['best_f1']['precision'] < self.precision_tol:
+                    self.thresh = calib_ops['best_precision']['thresh']
+                    Ypp = calib_ops['best_precision']['predicted']
+
+        self.hmms.fit(Ypp, Y, groups=groups)
+
         return self
 
     def predict(self, X, groups=None):
         X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
         whr_ok = ~(np.isnan(X_feats).any(1))
         W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
-        W[whr_ok] = self.clf.predict(X_feats[whr_ok])
+        W[whr_ok] = (self.clf.predict_proba(X_feats[whr_ok])[:, 1] > self.thresh).astype('int')
         W = self.hmms.predict(W, groups=groups)
         return W
 
@@ -304,6 +329,60 @@ def toV(x, sample_rate, lowpass_hz):
     V = features.butterfilt(V, lowpass_hz, sample_rate, axis=-1)
     return V
 
+
+def calc_sample_weight(yt, pnr=0.1):
+    sample_weight = np.ones_like(yt)
+    sample_weight[yt == 0] = (yt == 1).sum() / (pnr * (yt == 0).sum())
+    return sample_weight
+
+
+def classification_report(yt, yp, pnr=0.1):
+    return metrics.classification_report(yt, yp, sample_weight=calc_sample_weight(yt, pnr=pnr))
+
+
+def calibrate(yp, yt, pnr=0.1, precision_tol=0.9):
+    sample_weight = calc_sample_weight(yt, pnr)
+    precision, recall, thresholds = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
+    f1 = stats.hmean(np.asarray([precision, recall]), axis=0)
+
+    # optimize for F1
+    f1_idx = np.argmax(f1)
+    f1_thresh = thresholds[f1_idx]
+    f1_f1 = f1[f1_idx]
+    f1_precision = precision[f1_idx]
+    f1_recall = recall[f1_idx]
+    f1_pred = (yp > f1_thresh).astype('int')
+
+    # optimize for precision
+    precision_idx = np.argmax(precision > precision_tol)
+    precision_thresh = thresholds[precision_idx]
+    precision_f1 = f1[precision_idx]
+    precision_precision = precision[precision_idx]
+    precision_recall = recall[precision_idx]
+    precision_pred = (yp > precision_thresh).astype('int')
+
+    results = {
+        'precision': precision,
+        'recall': recall,
+        'f1': f1,
+        'thresholds': thresholds,
+        'best_f1': {
+            'thresh': f1_thresh,
+            'f1': f1_f1,
+            'precision': f1_precision,
+            'recall': f1_recall,
+            'predicted': f1_pred,
+        },
+        'best_precision': {
+            'thresh': precision_thresh,
+            'f1': precision_f1,
+            'precision': precision_precision,
+            'recall': precision_recall,
+            'predicted': precision_pred,
+        },
+    }
+
+    return results
 
 
 def print_report():
