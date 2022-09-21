@@ -184,7 +184,7 @@ class WalkDetector():
         self,
         sample_rate=100,
         pnr=0.1,
-        calib_method='precision',
+        calib_method='f1',
         precision_tol=.9,
         recall_tol=.9,
         cv=5,
