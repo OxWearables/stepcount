@@ -220,6 +220,9 @@ def cvp(
 ):
     """ Like cross_val_predict with custom tweaks """
 
+    if n_splits == -1:
+        n_splits = len(np.unique(groups))
+
     if isinstance(X, pd.DataFrame):
         X = X.to_numpy()
 
