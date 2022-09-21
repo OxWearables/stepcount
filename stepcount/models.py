@@ -72,14 +72,14 @@ class StepCounter():
         sample_weight_w = sample_weight[Wp]
 
         def mae(x):
-            Ywp = batch_count_peaks_from_V(Vw, to_ticks_params(x))
+            Ywp = batch_count_peaks_from_V(Vw, self.sample_rate, to_params(x))
             err = metrics.mean_absolute_error(Ywp, Yw, sample_weight=sample_weight_w)
             return err
 
-        def to_ticks_params(x):
+        def to_params(x):
             params = {
-                "distance": x[0] * self.sample_rate,
-                "max_width": x[1] * self.sample_rate,
+                "distance": x[0],
+                "max_width": x[1],
                 "prominence": x[2],
             }
             return params
@@ -97,7 +97,7 @@ class StepCounter():
             method='Nelder-Mead'
         )
 
-        self.find_peaks_params = to_ticks_params(res.x)
+        self.find_peaks_params = to_params(res.x)
 
         return self
 
@@ -303,16 +303,16 @@ def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=Fals
 def batch_count_peaks(X, sample_rate, lowpass_hz, params):
     """ Count number of peaks for an array of signals """
     V = toV(X, sample_rate, lowpass_hz)
-    return batch_count_peaks_from_V(V, params)
+    return batch_count_peaks_from_V(V, sample_rate, params)
 
 
-def batch_count_peaks_from_V(V, params):
+def batch_count_peaks_from_V(V, sample_rate, params):
     """ Count number of peaks for an array of signals """
     Y = np.asarray([
         len(find_peaks(
             v,
-            distance=params["distance"],
-            width=(1, params["max_width"]),
+            distance=params["distance"] * sample_rate,
+            width=(1, params["max_width"] * sample_rate),
             prominence=params["prominence"],
         )[0]) for v in V
     ])
