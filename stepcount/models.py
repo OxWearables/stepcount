@@ -169,6 +169,7 @@ class StepCounter():
         Y = pd.Series(Y, index=T)
         return Y
 
+
 class WalkDetector():
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -180,6 +181,7 @@ class WalkDetector():
         self.pnr = kwargs.get('pnr', 0.1)
         self.calib_method = kwargs.get('calib_method', 'precision')
         self.precision_tol = kwargs.get('precision_tol', 0.9)
+        self.recall_tol = kwargs.get('recall_tol', 0.9)
 
         self.clf = BalancedRandomForestClassifier(
             n_estimators=kwargs.get('n_estimators', 1000),
@@ -225,6 +227,11 @@ class WalkDetector():
                 if calib_ops['best_f1']['precision'] < self.precision_tol:
                     self.thresh = calib_ops['best_precision']['thresh']
                     Ypp = calib_ops['best_precision']['predicted']
+
+            if self.calib_method == 'recall':
+                if calib_ops['best_f1']['recall'] < self.recall_tol:
+                    self.thresh = calib_ops['best_recall']['thresh']
+                    Ypp = calib_ops['best_recall']['predicted']
 
         self.hmms.fit(Ypp, Y, groups=groups)
 
@@ -409,7 +416,7 @@ def classification_report(yt, yp, pnr=0.1):
     return metrics.classification_report(yt, yp, sample_weight=calc_sample_weight(yt, pnr=pnr))
 
 
-def calibrate(yp, yt, pnr=0.1, precision_tol=0.9):
+def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
     sample_weight = calc_sample_weight(yt, pnr)
     precision, recall, thresholds = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
     f1 = stats.hmean(np.asarray([precision, recall]), axis=0)
@@ -417,38 +424,44 @@ def calibrate(yp, yt, pnr=0.1, precision_tol=0.9):
     # optimize for F1
     f1_idx = np.argmax(f1)
     f1_thresh = thresholds[f1_idx]
-    f1_f1 = f1[f1_idx]
-    f1_precision = precision[f1_idx]
-    f1_recall = recall[f1_idx]
-    f1_pred = (yp > f1_thresh).astype('int')
+    best_f1 = {
+        'thresh': f1_thresh,
+        'f1': f1[f1_idx],
+        'precision': precision[f1_idx],
+        'recall': recall[f1_idx],
+        'predicted': (yp > f1_thresh).astype('int'),
+    }
 
     # optimize for precision
     precision_idx = np.argmax(precision > precision_tol)
     precision_thresh = thresholds[precision_idx]
-    precision_f1 = f1[precision_idx]
-    precision_precision = precision[precision_idx]
-    precision_recall = recall[precision_idx]
-    precision_pred = (yp > precision_thresh).astype('int')
+    best_precision = {
+        'thresh': precision_thresh,
+        'f1': f1[precision_idx],
+        'precision': precision[precision_idx],
+        'recall': recall[precision_idx],
+        'predicted': (yp > precision_thresh).astype('int'),
+    }
+
+    # optimize for recall
+    recall_idx = np.argmax(recall > recall_tol)
+    recall_thresh = thresholds[recall_idx]
+    best_recall = {
+        'thresh': recall_thresh,
+        'f1': f1[recall_idx],
+        'precision': precision[recall_idx],
+        'recall': recall[recall_idx],
+        'predicted': (yp > recall_thresh).astype('int'),
+    }
 
     results = {
         'precision': precision,
         'recall': recall,
         'f1': f1,
         'thresholds': thresholds,
-        'best_f1': {
-            'thresh': f1_thresh,
-            'f1': f1_f1,
-            'precision': f1_precision,
-            'recall': f1_recall,
-            'predicted': f1_pred,
-        },
-        'best_precision': {
-            'thresh': precision_thresh,
-            'f1': precision_f1,
-            'precision': precision_precision,
-            'recall': precision_recall,
-            'predicted': precision_pred,
-        },
+        'best_precision': best_precision,
+        'best_recall': best_recall,
+        'best_f1': best_f1,
     }
 
     return results
