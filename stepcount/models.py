@@ -80,8 +80,7 @@ class StepCounter():
             params = {
                 "distance": x[0] * self.sample_rate,
                 "max_width": x[1] * self.sample_rate,
-                "max_plateau": x[2] * self.sample_rate,
-                "prominence": x[3],
+                "prominence": x[2],
             }
             return params
 
@@ -89,10 +88,9 @@ class StepCounter():
             print("Tuning step counter...")
         res = minimize(
             mae,
-            x0=[.5, .5, .5, .5],
+            x0=[.5, .5, .5],
             bounds=[
                 (.2, 2),  # 0.2s to 2s (4Hz - 0.5Hz)
-                (.01, 1),  # 10ms to 1s
                 (.01, 1),  # 10ms to 1s
                 (.1, 1),  # 1g to 1g
             ],
@@ -315,7 +313,6 @@ def batch_count_peaks_from_V(V, params):
             v,
             distance=params["distance"],
             width=(1, params["max_width"]),
-            plateau_size=(1, params["max_plateau"]),
             prominence=params["prominence"],
         )[0]) for v in V
     ])
