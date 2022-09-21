@@ -19,23 +19,31 @@ class StepCounter():
         self,
         window_sec=5,
         sample_rate=100,
-        lowpass_hz=5,
         steptol=3,
         pnr=0.1,
-        n_jobs=-1,
+        lowpass_hz=5,
+        cv=5,
         wd_params=None,
+        n_jobs=-1,
         verbose=False
     ):
         self.window_sec = window_sec
         self.sample_rate = sample_rate
-        self.lowpass_hz = lowpass_hz
         self.steptol = steptol
         self.pnr = pnr
+        self.lowpass_hz = lowpass_hz
+        self.cv = cv
         self.n_jobs = n_jobs
         self.verbose = verbose
 
         wd_params = wd_params or dict()
-        wd_defaults = dict(sample_rate=sample_rate, n_jobs=n_jobs, verbose=verbose, pnr=pnr)
+        wd_defaults = {
+            'sample_rate': sample_rate,
+            'n_jobs': n_jobs,
+            'verbose': verbose,
+            'pnr': pnr,
+            'cv': cv,
+        }
         for key, value in wd_defaults.items():
             if key not in wd_params:
                 wd_params[key] = value
@@ -59,6 +67,7 @@ class StepCounter():
         Wp, list_of_idxs = cvp(
             self.wd, X, W, groups=groups,
             fit_predict_groups=True,
+            n_splits=self.cv,
             n_jobs=self.n_jobs,
             return_indices=True,
         )
@@ -171,29 +180,45 @@ class StepCounter():
 
 
 class WalkDetector():
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    def __init__(
+        self,
+        sample_rate=100,
+        pnr=0.1,
+        calib_method='precision',
+        precision_tol=.9,
+        recall_tol=.9,
+        cv=5,
+        clf_params=None,
+        hmm_params=None,
+        n_jobs=-1,
+        verbose=False,
+    ):
 
-        self.sample_rate = kwargs['sample_rate']
-        self.n_jobs = kwargs.get('n_jobs', -1)
-        self.verbose = kwargs.get('verbose', 0)
+        self.sample_rate = sample_rate
 
-        self.pnr = kwargs.get('pnr', 0.1)
-        self.calib_method = kwargs.get('calib_method', 'precision')
-        self.precision_tol = kwargs.get('precision_tol', 0.9)
-        self.recall_tol = kwargs.get('recall_tol', 0.9)
+        self.pnr = pnr
+        self.calib_method = calib_method
+        self.precision_tol = precision_tol
+        self.recall_tol = recall_tol
+
+        self.cv = cv
+        self.n_jobs = n_jobs
+        self.verbose = verbose
+
+        clf_params = clf_params or dict()
+        hmm_params = hmm_params or dict()
 
         self.clf = BalancedRandomForestClassifier(
-            n_estimators=kwargs.get('n_estimators', 1000),
-            replacement=kwargs.get('replacement', True),
-            sampling_strategy=kwargs.get('sampling_strategy', 'not minority'),
-            random_state=kwargs.get('random_state', 42),
+            n_estimators=clf_params.get('n_estimators', 1000),
+            replacement=clf_params.get('replacement', True),
+            sampling_strategy=clf_params.get('sampling_strategy', 'not minority'),
+            random_state=clf_params.get('random_state', 42),
             verbose=0, n_jobs=1,
         )
 
         self.hmms = hmm_utils.HMMSmoother(
-            use_hmmlearn=kwargs.get('use_hmmlearn', True),
-            n_iter=kwargs.get('n_iter', 10),
+            use_hmmlearn=hmm_params.get('use_hmmlearn', True),
+            n_iter=hmm_params.get('n_iter', 10),
         )
 
         self.thresh = 0.5
@@ -211,6 +236,7 @@ class WalkDetector():
             self.clf, X_feats, Y, groups,
             method='predict_proba',
             fit_predict_groups=False,
+            n_splits=self.cv,
             n_jobs=self.n_jobs,
         )
 
