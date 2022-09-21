@@ -85,10 +85,10 @@ class StepCounter():
             mae,
             x0=[.5, .5, .5, .5],
             bounds=[
-                (1 / self.sample_rate, 1),
-                (1 / self.sample_rate, 1),
-                (1 / self.sample_rate, 1),
-                (0, 1),
+                (.2, 2),  # 0.2s to 2s (4Hz - 0.5Hz)
+                (.01, 1),  # 10ms to 1s
+                (.01, 1),  # 10ms to 1s
+                (.1, 1),  # 1g to 1g
             ],
             method='Nelder-Mead'
         )
