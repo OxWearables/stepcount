@@ -13,7 +13,7 @@ import actipy
 
 from stepcount import __model_version__
 
-MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib"
+MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib.lzma"
 
 
 def main():
@@ -150,7 +150,7 @@ def load_model(model_path=MODEL_PATH):
 
     if not pth.exists():
 
-        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib"
+        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib.lzma"
 
         print(f"Downloading {url}...")
 
