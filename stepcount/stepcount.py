@@ -150,7 +150,8 @@ def load_model(model_path=MODEL_PATH):
 
     if not pth.exists():
 
-        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib.lzma"
+        # url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib.lzma"
+        url = "https://tinyurl.com/34dswhss"  # 20220921.joblib.lzma
 
         print(f"Downloading {url}...")
 
