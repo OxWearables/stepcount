@@ -2,7 +2,7 @@
 
 A Python package to estimate step counts from accelerometer data.
 
-The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, matching the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649).
+The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649).
 
 
 ## Getting started
@@ -27,14 +27,14 @@ $ pip install stepcount
 # Process an AX3 file
 $ stepcount sample.cwa
 
-# Or a CSV file
-$ stepcount sample.csv
-
 # Or an ActiGraph file
 $ stepcount sample.gt3x
 
 # Or a GENEActiv file
 $ stepcount sample.bin
+
+# Or a CSV file (see data format below)
+$ stepcount sample.csv
 ```
 
 Output:
@@ -60,9 +60,9 @@ Daily step count
 ----------------
               steps
 time
-2013-10-21   5368.0
-2013-10-22   7634.0
-2013-10-23  10009.0
+2013-10-21     5368
+2013-10-22     7634
+2013-10-23    10009
 ...
 
 Output: outputs/sample/
@@ -75,8 +75,23 @@ By default, output files will be stored in a folder `outputs/{filename}/` create
 $ stepcount sample.cwa -o /path/to/some/folder/
 ```
 
+Six output files are created:
+
+- *Info.json* Summary info, as shown above.
+- *Steps.csv* Raw time-series of step counts
+- *HourlySteps.csv* Hourly step counts
+- *DailySteps.csv* Daily step counts
+- *HourlyStepsAdjusted.csv* Like HourlySteps but accounting for missing data (see section below).
+- *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
+
+#### Crude vs. Adjusted Estimates
+Adjusted estimates are provided that account for missing data.
+Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
+
 #### Processing CSV files
-If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. For example:
+If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
+
+For example:
 
 ```console
 time,x,y,z
