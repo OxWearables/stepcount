@@ -19,10 +19,13 @@ MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib.lzma"
 
 def main():
 
-    parser = argparse.ArgumentParser()
-    parser.add_argument("filepath", help="Enter file location to be processed")
+    parser = argparse.ArgumentParser(
+        description="A tool to estimate step counts from accelerometer data",
+        add_help=True
+    )
+    parser.add_argument("filepath", help="Enter file to be processed")
     parser.add_argument("--outdir", "-o", help="Enter folder location to save output files", default="outputs/")
-    parser.add_argument("--model_path", "-m", help="Enter file location to custom model to use", default=None)
+    parser.add_argument("--model_path", "-m", help="Enter custom model file to use", default=None)
     args = parser.parse_args()
 
     # Timing
@@ -66,7 +69,7 @@ def main():
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
-    print("\nEstimated daily step count\n--------------------------")
+    print("\nEstimated Daily Steps\n---------------------")
     print(summary['daily'])  # adjusted
 
     # Timing

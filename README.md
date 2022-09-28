@@ -56,8 +56,8 @@ Summary
     ...
 }
 
-Daily step count
-----------------
+Estimated Daily Steps
+---------------------
               steps
 time
 2013-10-21     5368
@@ -69,7 +69,7 @@ Output: outputs/sample/
 ```
 
 #### Output files
-By default, output files will be stored in a folder `outputs/{filename}/` created in the current working directory. You can change the output path with the `-o` flag:
+By default, output files will be stored in a folder named after the input file, `outputs/{filename}/`, created in the current working directory. You can change the output path with the `-o` flag:
 
 ```console
 $ stepcount sample.cwa -o /path/to/some/folder/
@@ -91,7 +91,7 @@ Missing values in the time-series are imputed with the mean of the same timepoin
 #### Processing CSV files
 If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
 
-For example:
+Example:
 
 ```console
 time,x,y,z
