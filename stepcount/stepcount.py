@@ -8,6 +8,7 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
+from pandas.tseries.frequencies import to_offset
 
 import actipy
 
@@ -24,7 +25,7 @@ def main():
     parser.add_argument("--model_path", "-m", help="Enter file location to custom model to use", default=None)
     args = parser.parse_args()
 
-    # Computational timing
+    # Timing
     start = time.time()
 
     # Load file
@@ -36,49 +37,102 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     # Run model
-    model = load_model(args.model_path or MODEL_PATH)
-    window_sec = model.window_sec
     print("Running step counter...")
+    model = load_model(args.model_path or MODEL_PATH)
     Y = model.predict_from_frame(data)
 
-    # Total walking mins
-    total_walking = (Y > 0).sum().item() * window_sec / 60  # minutes
-    info['TotalWalking(min)'] = total_walking
+    # Save raw output timeseries
+    Y.to_csv(f"{outdir}/{basename}_Steps.csv")
 
-    # Total steps
-    total_steps = int(Y.sum().item())
-    info['TotalSteps'] = total_steps
+    # Summary
+    summary = summarize(Y)
+    summary['hourly'].to_csv(f"{outdir}/{basename}_HourlySteps.csv")
+    summary['daily'].to_csv(f"{outdir}/{basename}_DailySteps.csv")
+    info['TotalSteps'] = summary['total']
+    info['TotalWalking(min)'] = summary['total_walk']
 
-    # All steps
-    steps_outpath = f"{outdir}/{basename}_Steps.csv"
-    Y.to_csv(steps_outpath)
+    # Impute missing periods & recalculate summary
+    Y = impute_missing(Y)
+    summary = summarize(Y)
+    summary['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
+    summary['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
+    info['TotalStepsAdjusted'] = summary['total']
+    info['TotalWalkingAdjusted(min)'] = summary['total_walk']
 
-    # Sum steps by hour
-    hourly = Y.resample('H').sum()
-    hourly_outpath = f"{outdir}/{basename}_HourlySteps.csv"
-    hourly.to_csv(hourly_outpath)
-
-    # Sum steps by day
-    daily = Y.resample('D').sum()
-    daily_outpath = f"{outdir}/{basename}_DailySteps.csv"
-    daily.to_csv(daily_outpath)
-
-    # Output info
-    info_outpath = f"{outdir}/{basename}_Info.json"
-
-    with open(info_outpath, 'w') as f:
+    # Save info
+    with open(f"{outdir}/{basename}_Info.json", 'w') as f:
         json.dump(info, f, indent=4, cls=NpEncoder)
 
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
-    print("\nDaily step count\n----------------")
-    print(daily)
+    print("\nEstimated daily step count\n--------------------------")
+    print(summary['daily'])  # adjusted
 
-    # Computational Timing
+    # Timing
     end = time.time()
     print(f"Done! ({round(end - start,2)}s)")
 
+
+def summarize(Y):
+
+    total = int(np.round(Y.sum()))  # total steps
+    hourly = Y.resample('H').sum().round().astype('int')  # steps, hourly
+    daily = Y.resample('D').sum().round().astype('int')  # steps, daily
+    total_walk = float(  # total walk (mins)
+        (pd.Timedelta(pd.infer_freq(Y.index)) * (Y > 0).sum())
+        .total_seconds() / 60
+    )
+
+    return {
+        'total': total,
+        'hourly': hourly,
+        'daily': daily,
+        'total_walk': total_walk,
+    }
+
+
+def impute_missing(data: pd.DataFrame, extrapolate=True):
+
+    if extrapolate:
+        # padding at the boundaries to have full 24h
+        data = data.reindex(
+            pd.date_range(
+                data.index[0].floor('D'),
+                data.index[-1].ceil('D'),
+                freq=to_offset(pd.infer_freq(data.index)),
+                inclusive='left',
+                name='time',
+            ),
+            method='nearest',
+            tolerance=pd.Timedelta('1m'),
+            limit=1)
+
+    def fillna(subframe):
+        if isinstance(subframe, pd.Series):
+            x = subframe.to_numpy()
+            nan = np.isnan(x)
+            nanlen = len(x[nan])
+            if 0 < nanlen < len(x):  # check x contains a NaN and is not all NaN
+                x[nan] = np.nanmean(x)
+                return x  # will be cast back to a Series automatically
+            else:
+                return subframe
+
+    data = (
+        data
+        # first attempt imputation using same day of week
+        .groupby([data.index.weekday, data.index.hour, data.index.minute])
+        .transform(fillna)
+        # then try within weekday/weekend
+        .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute])
+        .transform(fillna)
+        # finally, use all other days
+        .groupby([data.index.hour, data.index.minute])
+        .transform(fillna)
+    )
+
+    return data 
 
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
