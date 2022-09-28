@@ -133,3 +133,4 @@ data/
 *.bin.gz
 *.npy
 *.pkl
+outputs/
