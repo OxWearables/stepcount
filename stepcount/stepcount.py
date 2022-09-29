@@ -8,6 +8,7 @@ import json
 import numpy as np
 import pandas as pd
 import joblib
+import scipy.stats as stats
 from pandas.tseries.frequencies import to_offset
 
 import actipy
@@ -42,6 +43,9 @@ def main():
     # Run model
     print("Running step counter...")
     model = load_model(args.model_path or MODEL_PATH)
+    # TODO: implement reset_sample_rate()
+    model.sample_rate = info['SampleRate']
+    model.wd.sample_rate = info['SampleRate']
     Y = model.predict_from_frame(data)
 
     # Save raw output timeseries
@@ -168,14 +172,23 @@ def read(filepath):
         else:
             raise ValueError(f"Unknown file format: {ftype}")
 
-        # TODO: assert columns and index OK
-        # TODO: process with actipy
+        freq = infer_freq(data.index)
+        sample_rate = int(np.round(pd.Timedelta('1s') / freq))
+
+        data, info = actipy.process(
+            data, sample_rate,
+            lowpass_hz=None,
+            calibrate_gravity=True,
+            detect_nonwear=True,
+            resample_hz='uniform',
+        )
 
         info = {
-            "Filename": filepath,
-            "Device": ftype,
-            "Filesize(MB)": fsize,
-            "NumTicks": len(data),
+            **{"Filename": filepath,
+                "Device": ftype,
+                "Filesize(MB)": fsize,
+                "SampleRate": sample_rate},
+            **info
         }
 
     elif ftype in (".CWA", ".GT3X", ".BIN"):
@@ -189,6 +202,13 @@ def read(filepath):
         )
 
     return data, info
+
+
+def infer_freq(x):
+    """ Like pd.infer_freq but more forgiving """ 
+    freq, _ = stats.mode(np.diff(x), keepdims=False)
+    freq = pd.Timedelta(freq)
+    return freq
 
 
 def resolve_path(path):
