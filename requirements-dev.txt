@@ -1,6 +1,7 @@
 pip
 flake8
 autopep8
+ipdb
 ipython
 ipykernel
 jupyter
