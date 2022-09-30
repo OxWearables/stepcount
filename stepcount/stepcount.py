@@ -5,6 +5,7 @@ import shutil
 import time
 import argparse
 import json
+import hashlib
 import numpy as np
 import pandas as pd
 import joblib
@@ -14,6 +15,7 @@ from pandas.tseries.frequencies import to_offset
 import actipy
 
 from stepcount import __model_version__
+from stepcount import __model_md5__
 
 MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib.lzma"
 
@@ -27,6 +29,7 @@ def main():
     parser.add_argument("filepath", help="Enter file to be processed")
     parser.add_argument("--outdir", "-o", help="Enter folder location to save output files", default="outputs/")
     parser.add_argument("--model_path", "-m", help="Enter custom model file to use", default=None)
+    parser.add_argument("--force-download", action="store_true", help="Force download of model file")
     args = parser.parse_args()
 
     # Timing
@@ -42,7 +45,7 @@ def main():
 
     # Run model
     print("Running step counter...")
-    model = load_model(args.model_path or MODEL_PATH)
+    model = load_model(args.model_path or MODEL_PATH, args.force_download)
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['SampleRate']
     model.wd.sample_rate = info['SampleRate']
@@ -220,12 +223,12 @@ def resolve_path(path):
     return dirname, filename, extension
 
 
-def load_model(model_path=MODEL_PATH):
+def load_model(model_path=MODEL_PATH, force_download=False):
     """ Load trained model. Download if not exists. """
 
     pth = pathlib.Path(model_path)
 
-    if not pth.exists():
+    if force_download or not pth.exists():
 
         # url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcounter/{__model_version__}.joblib.lzma"
         url = "https://tinyurl.com/34dswhss"  # 20220921.joblib.lzma
@@ -235,7 +238,20 @@ def load_model(model_path=MODEL_PATH):
         with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
             shutil.copyfileobj(f_src, f_dst)
 
+    assert md5(pth) == __model_md5__, (
+        "Model file is corrupted. Please run again with --force-download "
+        "to download the model file again."
+    )
+
     return joblib.load(pth)
+
+
+def md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
 
 
 
