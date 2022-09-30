@@ -7,6 +7,19 @@ The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, making it co
 
 ## Getting started
 
+### Prerequisite
+
+- Python 3.9 or greater
+    ```console
+    $ python --version  # or python3 --version
+    ```
+
+- Java 8 (1.8.0) or greater
+    ```console
+    $ java -version
+    ```
+
+
 ### Install
 
 <!-- ```console

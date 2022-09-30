@@ -1,10 +1,22 @@
 Getting started
 =====
 
-Installation
+Prerequisite 
 ------------
 
-Pip:
+- Python 3.9 or greater
+    .. code-block:: console
+
+        $ python --version  # or python3 --version
+
+- Java 8 (1.8.0) or greater
+    .. code-block:: console
+
+        $ java -version
+
+
+Installation
+------------
 
 .. code-block:: console
 
