@@ -48,6 +48,7 @@ def main():
     model = load_model(args.model_path or MODEL_PATH, args.force_download)
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['SampleRate']
+    model.window_len = info['SampleRate'] * model.window_sec
     model.wd.sample_rate = info['SampleRate']
     Y = model.predict_from_frame(data)
 
