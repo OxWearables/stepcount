@@ -88,7 +88,7 @@ By default, output files will be stored in a folder named after the input file, 
 $ stepcount sample.cwa -o /path/to/some/folder/
 ```
 
-Six output files are created:
+The following output files are created:
 
 - *Info.json* Summary info, as shown above.
 - *Steps.csv* Raw time-series of step counts
@@ -100,6 +100,8 @@ Six output files are created:
 #### Crude vs. Adjusted Estimates
 Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
+For adjusted totals and daily statistics, 24h multiples are needed and will be imputed if necessary.
+Estimates will be NaN where data is still missing after imputation.
 
 #### Processing CSV files
 If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
