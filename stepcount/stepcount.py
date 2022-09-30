@@ -62,12 +62,11 @@ def main():
     info['TotalWalking(min)'] = summary['total_walk']
 
     # Impute missing periods & recalculate summary
-    Y = impute_missing(Y)
-    summary = summarize(Y, skipna=False)
-    summary['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
-    summary['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
-    info['TotalStepsAdjusted'] = summary['total']
-    info['TotalWalkingAdjusted(min)'] = summary['total_walk']
+    summary_adj = summarize(Y, adjust_estimates=True)
+    summary_adj['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
+    summary_adj['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
+    info['TotalStepsAdjusted'] = summary_adj['total']
+    info['TotalWalkingAdjusted(min)'] = summary_adj['total_walk']
 
     # Save info
     with open(f"{outdir}/{basename}_Info.json", 'w') as f:
@@ -77,14 +76,24 @@ def main():
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
     print("\nEstimated Daily Steps\n---------------------")
-    print(summary['daily'])  # adjusted
+    print(pd.concat([
+        summary['daily'].rename('Crude'), 
+        summary_adj['daily'].rename('Adjusted')
+    ], axis=1))
 
     # Timing
     end = time.time()
     print(f"Done! ({round(end - start,2)}s)")
 
 
-def summarize(Y, skipna=True):
+def summarize(Y, adjust_estimates=False):
+
+    if adjust_estimates:
+        Y = impute_missing(Y)
+        skipna = False
+    else:
+        # crude summary ignores missing data
+        skipna = True
 
     def _sum(x):
         x = x.to_numpy()
