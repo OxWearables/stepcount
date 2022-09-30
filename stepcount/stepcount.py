@@ -63,7 +63,7 @@ def main():
 
     # Impute missing periods & recalculate summary
     Y = impute_missing(Y)
-    summary = summarize(Y)
+    summary = summarize(Y, skipna=False)
     summary['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
     summary['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
     info['TotalStepsAdjusted'] = summary['total']
@@ -84,15 +84,29 @@ def main():
     print(f"Done! ({round(end - start,2)}s)")
 
 
-def summarize(Y):
+def summarize(Y, skipna=True):
 
-    total = int(np.round(Y.sum()))  # total steps
-    hourly = Y.resample('H').sum().round().astype('int')  # steps, hourly
-    daily = Y.resample('D').sum().round().astype('int')  # steps, daily
-    total_walk = float(  # total walk (mins)
-        (pd.Timedelta(pd.infer_freq(Y.index)) * (Y > 0).sum())
+    def _sum(x):
+        x = x.to_numpy()
+        if skipna:
+            return np.nansum(x)
+        return np.sum(x)
+
+    # there's a bug with .resample().sum(skipna)
+    # https://github.com/pandas-dev/pandas/issues/29382
+
+    total = np.round(Y.agg(_sum))  # total steps
+    hourly = Y.resample('H').agg(_sum).round()  # steps, hourly
+    daily = Y.resample('D').agg(_sum).round()  # steps, daily
+    total_walk = (  # total walk (mins)
+        (pd.Timedelta(infer_freq(Y.index)) * Y.mask(~Y.isna(), Y > 0).agg(_sum))
         .total_seconds() / 60
     )
+
+    total = nanint(total)
+    hourly = pd.to_numeric(hourly, downcast='integer')
+    daily = pd.to_numeric(daily, downcast='integer')
+    total_walk = float(total_walk)
 
     return {
         'total': total,
@@ -110,7 +124,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True):
             pd.date_range(
                 data.index[0].floor('D'),
                 data.index[-1].ceil('D'),
-                freq=to_offset(pd.infer_freq(data.index)),
+                freq=to_offset(infer_freq(data.index)),
                 closed='left',
                 name='time',
             ),
@@ -144,6 +158,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True):
 
     return data 
 
+
 class NpEncoder(json.JSONEncoder):
     def default(self, obj):
         if isinstance(obj, np.integer):
@@ -153,6 +168,12 @@ class NpEncoder(json.JSONEncoder):
         if isinstance(obj, np.ndarray):
             return obj.tolist()
         return json.JSONEncoder.default(self, obj)
+
+
+def nanint(x):
+    if np.isnan(x):
+        return x
+    return int(x)
 
 
 def read(filepath):
