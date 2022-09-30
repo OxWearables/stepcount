@@ -1,5 +1,5 @@
 name = "stepcount"
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 __author__ = "Shing Chan, Scott Small, Aiden Doherty"
 __email__ = "shing.chan@ndph.ox.ac.uk, scott.small@ndph.ox.ac.uk, aiden.doherty@ndph.ox.ac.uk"
 __license__ = "2-Clause BSD"
