@@ -167,6 +167,8 @@ class StepCounter():
             """ Process the chunk. Apply padding if length is not enough. """
             n = len(chunk)
             x = chunk[['x', 'y', 'z']].to_numpy()
+            if n > self.window_len:
+                x = x[:self.window_len]
             if n < self.window_len:
                 m = self.window_len - n
                 x = np.pad(x, ((0, m), (0, 0)), mode='wrap')
