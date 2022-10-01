@@ -48,6 +48,22 @@ setuptools.setup(
         "imbalanced-learn==0.9.1",
         "hmmlearn==0.2.7",
     ],
+    extras_require={
+        "dev": [
+            "flake8",
+            "autopep8",
+            "ipython",
+            "ipdb",
+            "twine",
+        ],
+        "docs": [
+            "sphinx>=4.2",
+            "sphinx_rtd_theme>=1.0",
+            "readthedocs-sphinx-search>=0.1",
+            "sphinxcontrib-programoutput>=0.17",
+            "docutils<0.18",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "stepcount=stepcount.stepcount:main"
