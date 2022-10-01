@@ -229,8 +229,8 @@ def read(filepath):
 
 def infer_freq(x):
     """ Like pd.infer_freq but more forgiving """ 
-    freq, _ = stats.mode(np.diff(x))
-    freq = pd.Timedelta(freq[0])
+    freq, _ = stats.mode(np.diff(x), keepdims=False)
+    freq = pd.Timedelta(freq)
     return freq
 
 

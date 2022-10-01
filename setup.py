@@ -40,7 +40,7 @@ setuptools.setup(
     install_requires=[
         "actipy==1.1.0",
         "numpy>=1.22",
-        "scipy>=1.7",
+        "scipy>=1.9",
         "pandas>=1.4",
         "tqdm>=4.64",
         "joblib>=1.2.0",
