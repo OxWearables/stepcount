@@ -9,7 +9,7 @@ The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, making it co
 
 ### Prerequisite
 
-- Python 3.9 or greater
+- Python 3.8 or greater
     ```console
     $ python --version  # or python3 --version
     ```

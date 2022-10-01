@@ -21,7 +21,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="stepcount",
-    python_requires=">=3.9",
+    python_requires=">=3.8",
     version=get_string("__version__"),
     description="Step counter for wrist-worn accelerometers compatible with the UK Biobank Accelerometer Dataset",
     long_description=long_description,
@@ -38,13 +38,13 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=("test",)),
     include_package_data=False,
     install_requires=[
-        "actipy==1.0.1",
-        "numpy==1.21.6",
-        "scipy==1.7.3",
-        "pandas==1.3.5",
+        "actipy==1.1.0",
+        "numpy>=1.22",
+        "scipy>=1.7",
+        "pandas>=1.3",
+        "tqdm>=4.64",
+        "joblib>=1.2.0",
         "scikit-learn==1.1.1",
-        "joblib==1.1.0",
-        "tqdm==4.64.0",
         "imbalanced-learn==0.9.1",
         "hmmlearn==0.2.7",
     ],

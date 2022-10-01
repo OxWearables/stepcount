@@ -4,7 +4,7 @@ Getting started
 Prerequisite 
 ------------
 
-- Python 3.9 or greater
+- Python 3.8 or greater
     .. code-block:: console
 
         $ python --version  # or python3 --version
