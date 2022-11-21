@@ -20,7 +20,7 @@ class StepCounter():
         window_sec=5,
         sample_rate=100,
         steptol=3,
-        pnr=0.1,
+        pnr=1.0,
         lowpass_hz=5,
         cv=5,
         wd_params=None,
@@ -185,8 +185,8 @@ class WalkDetector():
     def __init__(
         self,
         sample_rate=100,
-        pnr=0.1,
-        calib_method='f1',
+        pnr=1.0,
+        calib_method='balanced_accuracy',
         precision_tol=.9,
         recall_tol=.9,
         cv=5,
@@ -444,17 +444,17 @@ def toV(x, sample_rate, lowpass_hz):
     return V
 
 
-def calc_sample_weight(yt, pnr=0.1):
+def calc_sample_weight(yt, pnr=1.0):
     sample_weight = np.ones_like(yt, dtype='float')
     sample_weight[yt == 0] = (yt == 1).sum() / (pnr * (yt == 0).sum())
     return sample_weight
 
 
-def classification_report(yt, yp, pnr=0.1):
+def classification_report(yt, yp, pnr=1.0):
     return metrics.classification_report(yt, yp, sample_weight=calc_sample_weight(yt, pnr=pnr))
 
 
-def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
+def calibrate(yp, yt, pnr=1.0, precision_tol=0.9, recall_tol=0.9):
     sample_weight = calc_sample_weight(yt, pnr)
     precision, recall, thresh_pr = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
     fpr, tpr, thresh_roc = metrics.roc_curve(yt, yp, sample_weight=sample_weight)
