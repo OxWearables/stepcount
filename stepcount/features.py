@@ -43,12 +43,11 @@ def extract_features(xyz, sample_rate=100):
 
 
 def moments_features(v, sample_rate=None):
-    """ Statistical moments """
+    """ Moments """
     feats = {
         'avg': np.mean(v),
         'std': np.std(v),
-        'skew': stats.skew(v),
-        'kurt': stats.kurtosis(v),
+        'avgabs': np.mean(np.abs(v)),
     }
     return feats
 
