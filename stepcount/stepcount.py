@@ -178,19 +178,19 @@ def nanint(x):
 def read(filepath):
 
     p = pathlib.Path(filepath)
-    ftype = p.suffixes[0].upper()
+    ftype = p.suffixes[0].lower()
     fsize = round(p.stat().st_size / (1024 * 1024), 1)
 
-    if ftype in (".CSV", ".PKL"):
+    if ftype in (".csv", ".pkl"):
 
-        if ftype == ".CSV":
+        if ftype == ".csv":
             data = pd.read_csv(
                 filepath,
                 usecols=['time', 'x', 'y', 'z'],
                 parse_dates=['time'],
                 index_col='time'
             )
-        elif ftype == ".PKL":
+        elif ftype == ".pkl":
             data = pd.read_pickle(filepath)
         else:
             raise ValueError(f"Unknown file format: {ftype}")
@@ -214,7 +214,7 @@ def read(filepath):
             **info
         }
 
-    elif ftype in (".CWA", ".GT3X", ".BIN"):
+    elif ftype in (".cwa", ".gt3x", ".bin"):
 
         data, info = actipy.read_device(
             filepath,
