@@ -247,19 +247,29 @@ class WalkDetector():
         self.clf.n_jobs = 1
 
         if self.calib_method is not None:
-            calib_ops = calibrate(Yp[:, 1], Y, self.pnr, self.precision_tol)
-            self.thresh = calib_ops['best_f1']['thresh']
-            Ypp = calib_ops['best_f1']['predicted']
+            calib_ops = calibrate(Yp[:, 1], Y, self.pnr, self.precision_tol, self.recall_tol)
 
-            if self.calib_method == 'precision':
-                if calib_ops['best_f1']['precision'] < self.precision_tol:
-                    self.thresh = calib_ops['best_precision']['thresh']
-                    Ypp = calib_ops['best_precision']['predicted']
+            if self.calib_method == 'balanced_accuracy':
+                self.thresh = calib_ops['best_balanced_accuracy']['thresh']
+                Ypp = calib_ops['best_balanced_accuracy']['predicted']
 
-            if self.calib_method == 'recall':
-                if calib_ops['best_f1']['recall'] < self.recall_tol:
-                    self.thresh = calib_ops['best_recall']['thresh']
-                    Ypp = calib_ops['best_recall']['predicted']
+            elif self.calib_method in ('f1', 'precision', 'recall'):
+                # first optimize f1, then adjust for precision or recall if needed
+                self.thresh = calib_ops['best_f1']['thresh']
+                Ypp = calib_ops['best_f1']['predicted']
+
+                if self.calib_method == 'precision':
+                    if calib_ops['best_f1']['precision'] < self.precision_tol:
+                        self.thresh = calib_ops['best_precision']['thresh']
+                        Ypp = calib_ops['best_precision']['predicted']
+
+                if self.calib_method == 'recall':
+                    if calib_ops['best_f1']['recall'] < self.recall_tol:
+                        self.thresh = calib_ops['best_recall']['thresh']
+                        Ypp = calib_ops['best_recall']['predicted']
+
+            else:
+                raise ValueError(f"Unrecognized {self.calib_method=}")
 
         self.hmms.fit(Ypp, Y, groups=groups)
 
@@ -446,12 +456,25 @@ def classification_report(yt, yp, pnr=0.1):
 
 def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
     sample_weight = calc_sample_weight(yt, pnr)
-    precision, recall, thresholds = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
+    precision, recall, thresh_pr = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
+    fpr, tpr, thresh_roc = metrics.roc_curve(yt, yp, sample_weight=sample_weight)
     f1 = stats.hmean(np.asarray([precision, recall]), axis=0)
+    balanced_accuracy = (tpr + (1 - fpr)) / 2
+
+    # optimize for balanced accuracy
+    balanced_accuracy_idx = np.argmax(balanced_accuracy)
+    balanced_accuracy_thresh = thresh_roc[balanced_accuracy_idx]
+    best_balanced_accuracy = {
+        'thresh': balanced_accuracy_thresh,
+        'balanced_accuracy': balanced_accuracy[balanced_accuracy_idx],
+        'tpr': tpr[balanced_accuracy_idx],
+        'fpr': fpr[balanced_accuracy_idx],
+        'predicted': (yp >= balanced_accuracy_thresh).astype('int'),
+    }
 
     # optimize for F1
-    f1_idx = np.argmax(f1)
-    f1_thresh = thresholds[f1_idx]
+    f1_idx = np.argmax(f1[:-1])
+    f1_thresh = thresh_pr[f1_idx]
     best_f1 = {
         'thresh': f1_thresh,
         'f1': f1[f1_idx],
@@ -461,8 +484,8 @@ def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
     }
 
     # optimize for precision
-    precision_idx = np.argmax(precision > precision_tol)
-    precision_thresh = thresholds[precision_idx]
+    precision_idx = np.argmax(precision[:-1] > precision_tol)
+    precision_thresh = thresh_pr[precision_idx]
     best_precision = {
         'thresh': precision_thresh,
         'f1': f1[precision_idx],
@@ -472,8 +495,8 @@ def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
     }
 
     # optimize for recall
-    recall_idx = np.argmax(recall > recall_tol)
-    recall_thresh = thresholds[recall_idx]
+    recall_idx = np.argmax(recall[:-1] > recall_tol)
+    recall_thresh = thresh_pr[recall_idx]
     best_recall = {
         'thresh': recall_thresh,
         'f1': f1[recall_idx],
@@ -486,10 +509,15 @@ def calibrate(yp, yt, pnr=0.1, precision_tol=0.9, recall_tol=0.9):
         'precision': precision,
         'recall': recall,
         'f1': f1,
-        'thresholds': thresholds,
+        'thresh_pr': thresh_pr,
         'best_precision': best_precision,
         'best_recall': best_recall,
         'best_f1': best_f1,
+        'tpr': tpr,
+        'fpr': fpr,
+        'balanced_accuracy': balanced_accuracy,
+        'thresh_roc': thresh_roc,
+        'best_balanced_accuracy': best_balanced_accuracy,
     }
 
     return results
