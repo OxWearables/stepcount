@@ -435,7 +435,7 @@ def toV(x, sample_rate, lowpass_hz):
 
 
 def calc_sample_weight(yt, pnr=0.1):
-    sample_weight = np.ones_like(yt)
+    sample_weight = np.ones_like(yt, dtype='float')
     sample_weight[yt == 0] = (yt == 1).sum() / (pnr * (yt == 0).sum())
     return sample_weight
 
