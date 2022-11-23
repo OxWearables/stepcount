@@ -56,9 +56,12 @@ class StepCounter():
 
     def fit(self, X, Y, groups=None):
 
-        # define walk/non-walk based on threashold
+        # define walk/non-walk based on threshold
         W = np.zeros_like(Y)
         W[Y >= self.steptol] = 1
+        # zero-out windows below the threshold
+        Y = Y.copy()
+        Y[Y < self.steptol] = 0
 
         # train walk detector & cross-val-predict
         if self.verbose:
