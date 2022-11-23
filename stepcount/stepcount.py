@@ -78,7 +78,7 @@ def main():
     print(json.dumps(info, indent=4, cls=NpEncoder))
     print("\nEstimated Daily Steps\n---------------------")
     print(pd.concat([
-        summary['daily'].rename('Crude'), 
+        summary['daily'].rename('Crude'),
         summary_adj['daily'].rename('Adjusted')
     ], axis=1))
 
@@ -166,7 +166,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True):
         .transform(fillna)
     )
 
-    return data 
+    return data
 
 
 def nanint(x):
@@ -228,7 +228,7 @@ def read(filepath):
 
 
 def infer_freq(x):
-    """ Like pd.infer_freq but more forgiving """ 
+    """ Like pd.infer_freq but more forgiving """
     freq, _ = stats.mode(np.diff(x), keepdims=False)
     freq = pd.Timedelta(freq)
     return freq
@@ -259,7 +259,7 @@ def load_model(model_path=MODEL_PATH, force_download=False):
             shutil.copyfileobj(f_src, f_dst)
 
     assert md5(pth) == __model_md5__, (
-        "Model file is corrupted. Please run again with --force-download "
+        "Model file is corrupted. Please run with --force-download "
         "to download the model file again."
     )
 
