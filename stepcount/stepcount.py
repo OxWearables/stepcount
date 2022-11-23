@@ -44,8 +44,8 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     # Run model
-    print("Running step counter...")
     model = load_model(args.model_path or MODEL_PATH, args.force_download)
+    print("Running step counter...")
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['SampleRate']
     model.window_len = int(np.ceil(info['SampleRate'] * model.window_sec))
