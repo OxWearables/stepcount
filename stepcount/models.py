@@ -91,7 +91,7 @@ class StepCounter():
 
         def mae(x):
             Ywp = batch_count_peaks_from_V(Vw, self.sample_rate, to_params(x))
-            err = metrics.mean_absolute_error(Ywp, Yw, sample_weight=sample_weight_w)
+            err = metrics.mean_absolute_error(Yw, Ywp, sample_weight=sample_weight_w)
             return err
 
         def to_params(x):
