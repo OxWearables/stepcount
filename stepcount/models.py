@@ -67,7 +67,7 @@ class StepCounter():
         if self.verbose:
             print("Running cross_val_predict...")
         self.wd.n_jobs = 1
-        Wp, list_of_idxs = cvp(
+        Wp, cv_test_idxs = cvp(
             self.wd, X, W, groups=groups,
             fit_predict_groups=True,
             n_splits=self.cv,
@@ -76,18 +76,18 @@ class StepCounter():
         )
         self.wd.n_jobs = self.n_jobs
 
-        Wp = Wp.astype('bool')
+        whr_walk_pred = Wp == 1
 
         if self.verbose:
             print("Fitting walk detector...")
         self.wd.fit(X, W, groups=groups)
 
         # train step counter
-        Xw, Yw = X[Wp], Y[Wp]
+        Xw, Yw = X[whr_walk_pred], Y[whr_walk_pred]
         Vw = toV(Xw, self.sample_rate, self.lowpass_hz)
 
         sample_weight = calc_sample_weight(W, self.pnr)
-        sample_weight_w = sample_weight[Wp]
+        sample_weight_w = sample_weight[whr_walk_pred]
 
         def mae(x):
             Ywp = batch_count_peaks_from_V(Vw, self.sample_rate, to_params(x))
@@ -118,24 +118,45 @@ class StepCounter():
         self.find_peaks_params = to_params(res.x)
 
         # performance -- walk detector
-        wd_cv_scores, wd_cv_summary = get_cv_scores(
-            W, Wp, list_of_idxs,
+        _, wd_scores = get_cv_scores(
+            W, Wp, cv_test_idxs,
             sample_weight=sample_weight,
-            scorer_type='classification'
+            scorer_type='classif'
         )
 
         # performance -- step count
         Yp = np.zeros_like(Y)
-        Yp[Wp] = batch_count_peaks_from_V(Vw, self.sample_rate, self.find_peaks_params)
-        sc_cv_scores, sc_cv_summary = get_cv_scores(
-            Y, Yp, list_of_idxs,
+        Yp[whr_walk_pred] = batch_count_peaks_from_V(Vw, self.sample_rate, self.find_peaks_params)
+        _, sc_scores = get_cv_scores(
+            Y, Yp, cv_test_idxs,
             sample_weight=sample_weight,
-            scorer_type='regression'
+            scorer_type='regress'
         )
 
-        self.cv_scores = {
-            'wd': {'scores': wd_cv_scores, 'summary': wd_cv_summary},
-            'sc': {'scores': sc_cv_scores, 'summary': sc_cv_summary},
+        # performance -- step count, walk periods only
+        whr_walk_true = W == 1
+        walk_true_idxs = np.flatnonzero(whr_walk_true)
+        _, sc_scores_walk = get_cv_scores(
+            Y[whr_walk_true], Yp[whr_walk_true],
+            [np.flatnonzero(np.isin(walk_true_idxs, idxs)) for idxs in cv_test_idxs],
+            sample_weight=sample_weight[whr_walk_true],
+            scorer_type='regress'
+        )
+
+        self.cv_results = {
+            'test_indices': cv_test_idxs,
+            'groups': groups,
+            'walk_detector': {
+                'scores': wd_scores,
+                'y_true': W,
+                'y_pred': Wp,
+            },
+            'step_counter': {
+                'scores': sc_scores,
+                'scores_walk': sc_scores_walk,
+                'y_true': Y,
+                'y_pred': Yp,
+            },
         }
 
         return self
@@ -345,10 +366,10 @@ def cvp(
     )
 
     Y_pred = np.concatenate([r[0] for r in results])
-    list_of_idxs = [r[1] for r in results]
+    cv_test_idxs = [r[1] for r in results]
 
     if return_indices:
-        return Y_pred, list_of_idxs
+        return Y_pred, cv_test_idxs
 
     return Y_pred
 
@@ -366,30 +387,40 @@ def groupkfold(groups, n_splits=5):
         yield train_idxs, test_idxs
 
 
-def get_cv_scores(yt, yp, list_of_idxs, sample_weight=None, scorer_type='classification'):
+def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif'):
 
     classif_scorers = {
         'accuracy': metrics.accuracy_score,
         'f1': lambda yt, yp, sample_weight=None: metrics.f1_score(yt, yp, sample_weight=sample_weight, zero_division=0),
         'precision': lambda yt, yp, sample_weight=None: metrics.precision_score(yt, yp, sample_weight=sample_weight, zero_division=0),
         'recall': lambda yt, yp, sample_weight=None: metrics.recall_score(yt, yp, sample_weight=sample_weight, zero_division=0),
+        'balanced_accuracy': lambda yt, yp, sample_weight=None: metrics.balanced_accuracy_score(yt, yp, sample_weight=sample_weight)
     }
 
     regress_scorers = {
-        'mae': metrics.mean_absolute_error,
+        'mae': lambda yt, yp, sample_weight: metrics.mean_absolute_error(yt, yp, sample_weight=sample_weight),
         'rmse': lambda yt, yp, sample_weight: metrics.mean_squared_error(yt, yp, sample_weight=sample_weight, squared=False),
+        'mape': lambda yt, yp, sample_weight: smooth_mean_absolute_percentage_error(yt, yp, sample_weight=sample_weight),
     }
 
-    if scorer_type == 'classification':
+    def smooth_mean_absolute_percentage_error(yt, yp, sample_weight=None):
+        yt, yp = yt.copy(), yp.copy()
+        # add 1 where zero to smooth the mape
+        whr = yt == 0
+        yt[whr] += 1
+        yp[whr] += 1
+        return metrics.mean_absolute_percentage_error(yt, yp, sample_weight=sample_weight)
+
+    if scorer_type == 'classif':
         scorers = classif_scorers
-    elif scorer_type == 'regression':
+    elif scorer_type == 'regress':
         scorers = regress_scorers
     else:
         raise ValueError(f"Unknown {scorer_type=}")
 
     raw_scores = defaultdict(list)
 
-    for idxs in list_of_idxs:
+    for idxs in cv_test_idxs:
         yt_, yp_, sample_weight_ = yt[idxs], yp[idxs], sample_weight[idxs]
         for scorer_name, scorer_fn in scorers.items():
             raw_scores[scorer_name].append(scorer_fn(yt_, yp_, sample_weight=sample_weight_))
