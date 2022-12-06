@@ -50,7 +50,8 @@ class HMMSmoother():
                 raise NotImplementedError
             return Y
 
-        Y = HMMSmoother.reshapeY(Y)
+        if Y.ndim == 1:
+            Y = Y[:, None]
 
         hmm_ = hmm.MultinomialHMM(
             n_components=self.n_components,
@@ -73,11 +74,6 @@ class HMMSmoother():
             return hmm_.predict_proba(Y, lengths)
         return hmm_.predict(Y, lengths)
 
-    @staticmethod
-    def reshapeY(Y):
-        if len(Y.shape) == 1:
-            Y = Y[:, None]
-        return Y
 
 
 def compute_transition(Y, labels=None, groups=None):
