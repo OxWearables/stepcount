@@ -90,7 +90,6 @@ def spectral_features(v, sample_rate):
     peak_ranks = np.argsort(peak_powers)[::-1]
 
     TOPN = 3
-    feats = {}
     feats.update({f"f{i + 1}": 0 for i in range(TOPN)})
     feats.update({f"p{i + 1}": 0 for i in range(TOPN)})
     for i, j in enumerate(peak_ranks[:TOPN]):
