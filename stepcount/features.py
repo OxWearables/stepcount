@@ -111,9 +111,7 @@ def spectral_features(v, sample_rate):
 
     freqs, powers = signal.periodogram(v, fs=sample_rate, detrend='constant', scaling='density')
 
-    with np.errstate(divide='ignore', invalid='ignore'):  # ignore div by 0 warnings
-        feats['pentropy'] = np.nan_to_num(stats.entropy(powers + 1e-16))
-
+    feats['pentropy'] = stats.entropy(powers[powers > 0])
     feats['power'] = np.sum(powers)
 
     peaks, _ = signal.find_peaks(powers)
