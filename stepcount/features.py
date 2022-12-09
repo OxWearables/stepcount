@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats as stats
 import scipy.signal as signal
+import statsmodels.tsa.stattools as stattools
 
 
 MIN_WINDOW_SEC = 2  # seconds
@@ -63,15 +64,38 @@ def quantile_features(v, sample_rate=None):
 
 
 def autocorr_features(v, sample_rate):
-    """ Autocorrelation (0.5, 1 and 2 seconds lag) """
-    feats = {}
-    with np.errstate(divide='ignore', invalid='ignore'):  # ignore div by 0 warnings
-        onesec = int(sample_rate)
-        halfsec = int(sample_rate // 2)
-        twosec = int(2 * sample_rate)
-        feats['autocorr_halfsec'] = np.nan_to_num(np.corrcoef(v[:-halfsec], v[halfsec:]))[0, 1]
-        feats['autocorr_onesec'] = np.nan_to_num(np.corrcoef(v[:-onesec], v[onesec:]))[0, 1]
-        feats['autocorr_twosec'] = np.nan_to_num(np.corrcoef(v[:-twosec], v[twosec:]))[0, 1]
+    """ Autocorrelation features """
+
+    with np.errstate(divide='ignore', invalid='ignore'):  # ignore invalid div warnings
+        u = np.nan_to_num(stattools.acf(v, nlags=2 * sample_rate))
+
+    peaks, _ = signal.find_peaks(u, prominence=.1)
+    if len(peaks) > 0:
+        acf_1st_max_loc = peaks[0]
+        acf_1st_max = u[acf_1st_max_loc]
+        acf_1st_max_loc /= sample_rate  # in secs
+    else:
+        acf_1st_max = acf_1st_max_loc = 0.0
+
+    valleys, _ = signal.find_peaks(-u, prominence=.1)
+    if len(valleys) > 0:
+        acf_1st_min_loc = valleys[0]
+        acf_1st_min = u[acf_1st_min_loc]
+        acf_1st_min_loc /= sample_rate  # in secs
+    else:
+        acf_1st_min = acf_1st_min_loc = 0.0
+
+    acf_zeros = np.where(np.diff(np.signbit(u)))
+    acf_zeros = len(acf_zeros)
+
+    feats = {
+        'acf_1st_max': acf_1st_max,
+        'acf_1st_max_loc': acf_1st_max_loc,
+        'acf_1st_min': acf_1st_min,
+        'acf_1st_min_loc': acf_1st_min_loc,
+        'acf_zeros': acf_zeros,
+    }
+
     return feats
 
 
