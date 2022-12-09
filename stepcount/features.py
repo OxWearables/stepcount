@@ -110,6 +110,7 @@ def spectral_features(v, sample_rate):
     feats = {}
 
     freqs, powers = signal.periodogram(v, fs=sample_rate, detrend='constant', scaling='density')
+    powers /= (len(v) / sample_rate)    # unit/sec
 
     feats['pentropy'] = stats.entropy(powers[powers > 0])
     feats['power'] = np.sum(powers)
