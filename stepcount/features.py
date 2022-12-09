@@ -44,11 +44,14 @@ def extract_features(xyz, sample_rate=100):
 
 def moments_features(v, sample_rate=None):
     """ Moments """
-    feats = {
-        'avg': np.mean(v),
-        'std': np.std(v),
-        'avgabs': np.mean(np.abs(v)),
-    }
+    with warnings.catch_warnings():
+        warnings.filterwarnings("ignore", message="Precision loss occurred")
+        feats = {
+            'avg': np.mean(v),
+            'std': np.std(v),
+            'skew': np.nan_to_num(stats.skew(v)),
+            'kurt': np.nan_to_num(stats.kurtosis(v)),
+        }
     return feats
 
 
