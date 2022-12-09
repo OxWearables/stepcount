@@ -137,6 +137,7 @@ def fft_features(v, sample_rate, nfreqs=5):
         nperseg=sample_rate,
         noverlap=sample_rate // 2,
         detrend='constant',
+        scaling='density',
         average='median'
     )
 
