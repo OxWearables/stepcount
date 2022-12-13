@@ -1,19 +1,46 @@
 import numpy as np
-from hmmlearn import hmm
+from hmmlearn.hmm import MultinomialHMM
 
 
 class HMMSmoother():
-
-    def __init__(self, use_hmmlearn=False, **hmmlearn_params) -> None:
+    def __init__(
+        self,
+        use_hmmlearn=False,
+        n_components=None,
+        train_test_split=False,
+        ste="st",
+        startprob=None,
+        emissionprob=None,
+        transmat=None,
+        n_iter=100,
+        n_trials=100,
+        random_state=123,
+        stratify_groups=True,
+    ) -> None:
         self.use_hmmlearn = use_hmmlearn
-        self.hmmlearn_params = hmmlearn_params
+        if use_hmmlearn:
+            assert n_components is not None, "Must specify n_components when use_hmmlearn=True"
+            self.n_components = n_components
+        self.train_test_split = train_test_split
+        self.ste = ste
+        self.startprob = startprob
+        self.emissionprob = emissionprob
+        self.transmat = transmat
+        self.n_iter = n_iter
+        self.n_trials = n_trials
+        self.random_state = random_state
+        self.stratify_groups = stratify_groups
 
     def fit(self, Y_pred, Y_true, groups=None):
         self.labels = np.unique(Y_true)
-        self.n_components = len(self.labels)
-        self.prior = compute_prior(Y_true, self.labels)
-        self.emission = compute_emission(Y_pred, Y_true, self.labels)
-        self.transition = compute_transition(Y_true, self.labels, groups)
+        if self.use_hmmlearn:
+            assert len(self.labels) == self.n_components, f"n_components ({self.n_components}) doesn't match number of labels ({len(self.labels)})"
+        if self.startprob is None:
+            self.startprob = compute_prior(Y_true, self.labels)
+        if self.emissionprob is None:
+            self.emissionprob = compute_emission(Y_pred, Y_true, self.labels)
+        if self.transmat is None:
+            self.transmat = compute_transition(Y_true, self.labels, groups)
         return self
 
     def predict(self, Y, groups=None):
@@ -28,9 +55,9 @@ class HMMSmoother():
 
     def viterbi(self, Y, groups=None):
         params = {
-            'prior': self.prior,
-            'emission': self.emission,
-            'transition': self.transition,
+            'prior': self.startprob,
+            'emission': self.emissionprob,
+            'transition': self.transmat,
             'labels': self.labels,
         }
         if groups is None:
@@ -42,38 +69,137 @@ class HMMSmoother():
             ])
         return Y_vit
 
-    def _hmmlearn_fit_predict(self, Y, groups=None, method='predict'):
+    def hmmlearn_fit_predict(self, Y, groups=None, method='predict'):
 
-        if len(np.unique(Y)) < 2:
-            if method == 'predict_proba':
-                # TODO:
-                raise NotImplementedError
-            return Y
+        hmm_params = dict(
+            n_components=self.n_components,
+            method=method,
+            train_test_split=self.train_test_split,
+            ste=self.ste,
+            startprob=self.startprob,
+            emissionprob=self.emissionprob,
+            transmat=self.transmat,
+            n_iter=self.n_iter,
+            n_trials=self.n_trials,
+            random_state=self.random_state,
+        )
 
         if Y.ndim == 1:
             Y = Y[:, None]
 
-        hmm_ = hmm.MultinomialHMM(
-            n_components=self.n_components,
-            params="te",
+        if groups is None:
+            groups = np.ones(len(Y))
+
+        if self.stratify_groups:
+            Y_pred = []
+            score = []
+            hmm = []
+            for g in ordered_unique(groups):
+                _hmm, _score, _Y_pred = hmmlearn_fit_predict(Y[groups == g], groups=None, **hmm_params)
+                Y_pred.append(_Y_pred)
+                score.append(_score)
+                hmm.append(_hmm)
+            Y_pred = np.concatenate(Y_pred)
+
+        else:
+            hmm, score, Y_pred = hmmlearn_fit_predict(Y, groups=groups, **hmm_params)
+
+        self.hmm = hmm
+        self.score = score
+
+        return Y_pred
+
+
+def hmmlearn_fit_predict(
+    Y,
+    groups=None,
+    n_components=2,
+    method='predict',
+    train_test_split=False,
+    ste="st",
+    startprob=None,
+    emissionprob=None,
+    transmat=None,
+    n_iter=100,
+    n_trials=100,
+    random_state=123,
+    **kwargs,
+):
+
+    if method == 'predict_proba' and len(np.unique(Y)) < 2:
+        # TODO:
+        raise NotImplementedError
+
+    np.random.seed(random_state)
+
+    # TODO: it's better to split by group
+    if train_test_split:
+        n = len(Y)
+        Y_train, Y_test = Y[: n // 2], Y[n // 2 :]
+        if groups is None:
+            groups_train = groups_test = None
+        else:
+            groups_train, groups_test = groups[: n // 2], groups[n // 2 :]
+    else:
+        Y_train = Y_test = Y
+        groups_train = groups_test = groups
+
+    best_score = best_hmm = None
+
+    for idx in range(n_trials + 1):
+
+        hmm = MultinomialHMM(
+            n_components=n_components,
+            params=ste,
             init_params="",
-            **self.hmmlearn_params,
+            n_iter=n_iter,
+            random_state=idx,
+            **kwargs,
         )
-        hmm_.startprob_ = self.prior
-        hmm_.emissionprob_ = self.emission
-        hmm_.transmat_ = self.transition
 
-        lengths = None
-        if groups is not None:
-            _, ind, cnt = np.unique(groups, return_index=True, return_counts=True)
-            lengths = cnt[np.argsort(ind)]
+        if n_trials > 0 and "s" in ste:
+            if startprob is None:
+                hmm.startprob_ = np.random.rand(n_components)
+            elif isinstance(startprob, np.ndarray):
+                hmm.startprob_ = np.random.dirichlet(startprob)
+        else:
+            hmm.startprob_ = startprob
 
-        hmm_.fit(Y, lengths)
+        if n_trials > 0 and "t" in ste:
+            if transmat is None:
+                hmm.transmat_ = np.random.rand(n_components, n_components)
+            elif isinstance(transmat, np.ndarray):
+                hmm.transmat_ = np.array([
+                    np.random.dirichlet(transmat[0]),
+                    np.random.dirichlet(transmat[1]),
+                ])
+        else:
+            hmm.transmat_ = transmat
 
-        if method == 'predict_proba':
-            return hmm_.predict_proba(Y, lengths)
-        return hmm_.predict(Y, lengths)
+        if n_trials > 0 and "e" in ste:
+            if emissionprob is None:
+                hmm.emissionprob_ = np.random.rand(n_components, n_components)
+            elif isinstance(emissionprob, np.ndarray):
+                hmm.emissionprob_ = np.array([
+                    np.random.dirichlet(emissionprob[0]),
+                    np.random.dirichlet(emissionprob[1]),
+                ])
+        else:
+            hmm.emissionprob_ = emissionprob
 
+        hmm.fit(Y_train, lengths_from_groups(groups_train))
+        score = hmm.score(Y_test, lengths_from_groups(groups_test))
+
+        if best_score is None or score > best_score:
+            best_score = score
+            best_hmm = hmm
+
+    if method == 'predict_proba':
+        Y_pred = best_hmm.predict_proba(Y, lengths_from_groups(groups))
+    else:
+        Y_pred = best_hmm.predict(Y, lengths_from_groups(groups))
+
+    return best_hmm, best_score, Y_pred
 
 
 def compute_transition(Y, labels=None, groups=None):
@@ -178,3 +304,12 @@ def viterbi(Y, hmm_params):
 def ordered_unique(x):
     """ np.unique without sorting """
     return x[np.sort(np.unique(x, return_index=True)[1])]
+
+
+def lengths_from_groups(groups):
+    if groups is None or len(np.unique(groups)) == 1:
+        lengths = None
+    else:
+        _, ind, cnt = np.unique(groups, return_index=True, return_counts=True)
+        lengths = cnt[np.argsort(ind)]
+    return lengths
