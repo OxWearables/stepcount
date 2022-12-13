@@ -18,12 +18,12 @@ class HMMSmoother():
 
     def predict(self, Y, groups=None):
         if self.use_hmmlearn:
-            return self._hmmlearn_fit_predict(Y, groups=None)
+            return self.hmmlearn_fit_predict(Y, groups=groups, method='predict')
         return self.viterbi(Y, groups)
 
-    def predict_proba(self, Y):
+    def predict_proba(self, Y, groups=None):
         if self.use_hmmlearn:
-            return self._hmmlearn_fit_predict(Y, groups=None, method='predict_proba')
+            return self.hmmlearn_fit_predict(Y, groups=groups, method='predict_proba')
         raise NotImplementedError
 
     def viterbi(self, Y, groups=None):
