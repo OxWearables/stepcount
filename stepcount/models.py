@@ -353,6 +353,7 @@ def cvp(
         X_test, Y_test, groups_test = X[test_idxs], Y[test_idxs], groups[test_idxs]
 
         m = deepcopy(model)
+        m.n_jobs = 1
 
         if fit_predict_groups:
             m.fit(X_train, Y_train, groups=groups_train)
