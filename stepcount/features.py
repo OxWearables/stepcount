@@ -164,7 +164,7 @@ def peaks_features(v, sample_rate):
     return feats
 
 
-def butterfilt(x, cutoffs, fs, order=10, axis=0):
+def butterfilt(x, cutoffs, fs, order=4, axis=0):
     """ Butterworth filter """
     nyq = 0.5 * fs
     if isinstance(cutoffs, tuple):
