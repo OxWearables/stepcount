@@ -295,6 +295,9 @@ class WalkDetector():
             else:
                 raise ValueError(f"Unrecognized {self.calib_method=}")
 
+        else:
+            Ypp = Yp
+
         self.hmms.fit(Ypp, Y, groups=groups)
 
         return self
