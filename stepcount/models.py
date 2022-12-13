@@ -97,8 +97,7 @@ class StepCounter():
         def to_params(x):
             params = {
                 "distance": x[0],
-                "max_width": x[1],
-                "prominence": x[2],
+                "prominence": x[1],
             }
             return params
 
@@ -106,11 +105,10 @@ class StepCounter():
             print("Tuning step counter...")
         res = minimize(
             mae,
-            x0=[.5, .5, .5],
+            x0=[.5, .5],
             bounds=[
                 (.2, 2),  # 0.2s to 2s (4Hz - 0.5Hz)
-                (.01, 1),  # 10ms to 1s
-                (.1, 1),  # 1g to 1g
+                (.15, 1),  # 0.15g to 1g
             ],
             method='Nelder-Mead'
         )
@@ -464,7 +462,6 @@ def batch_count_peaks_from_V(V, sample_rate, params):
         len(find_peaks(
             v,
             distance=params["distance"] * sample_rate,
-            width=(1, params["max_width"] * sample_rate),
             prominence=params["prominence"],
         )[0]) for v in V
     ])
