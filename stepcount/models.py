@@ -242,10 +242,7 @@ class WalkDetector():
             verbose=0, n_jobs=1,
         )
 
-        self.hmms = hmm_utils.HMMSmoother(
-            use_hmmlearn=hmm_params.get('use_hmmlearn', True),
-            n_iter=hmm_params.get('n_iter', 10),
-        )
+        self.hmms = hmm_utils.HMMSmoother(**hmm_params)
 
         self.thresh = 0.5
 
