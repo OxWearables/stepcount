@@ -17,8 +17,6 @@ import actipy
 from stepcount import __model_version__
 from stepcount import __model_md5__
 
-MODEL_PATH = pathlib.Path(__file__).parent / f"{__model_version__}.joblib.lzma"
-
 
 def main():
 
@@ -28,15 +26,24 @@ def main():
     )
     parser.add_argument("filepath", help="Enter file to be processed")
     parser.add_argument("--outdir", "-o", help="Enter folder location to save output files", default="outputs/")
-    parser.add_argument("--model_path", "-m", help="Enter custom model file to use", default=None)
+    parser.add_argument("--model-path", "-m", help="Enter custom model file to use", default=None)
     parser.add_argument("--force-download", action="store_true", help="Force download of model file")
+    parser.add_argument('--model-type', '-t',
+                        help='Enter model type to run (Self-Supervised Learning model or Random Forest)',
+                        choices=['ssl', 'rf'], default='ssl')
+    parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only)",
+                        type=str, default='cpu')
     args = parser.parse_args()
 
     # Timing
     start = time.time()
 
     # Load file
-    data, info = read(args.filepath)
+    if args.model_type == 'ssl':
+        resample_hz = 30
+    else:
+        resample_hz = 'uniform'
+    data, info = read(args.filepath, resample_hz)
 
     # Output paths
     basename = resolve_path(args.filepath)[1]
@@ -44,12 +51,16 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     # Run model
-    model = load_model(args.model_path or MODEL_PATH, args.force_download)
+    model_path = pathlib.Path(__file__).parent / f"{__model_version__[args.model_type]}.joblib.lzma"
+    model = load_model(args.model_path or model_path, args.model_type, args.force_download)
     print("Running step counter...")
     # TODO: implement reset_sample_rate()
-    model.sample_rate = info['SampleRate']
-    model.window_len = int(np.ceil(info['SampleRate'] * model.window_sec))
-    model.wd.sample_rate = info['SampleRate']
+    model.sample_rate = info['ResampleRate']
+    model.window_len = int(np.ceil(info['ResampleRate'] * model.window_sec))
+    model.wd.sample_rate = info['ResampleRate']
+
+    model.wd.device = args.pytorch_device
+
     Y = model.predict_from_frame(data)
 
     # Save raw output timeseries
@@ -175,7 +186,7 @@ def nanint(x):
     return int(x)
 
 
-def read(filepath):
+def read(filepath, resample_hz='uniform'):
 
     p = pathlib.Path(filepath)
     ftype = p.suffixes[0].lower()
@@ -203,7 +214,7 @@ def read(filepath):
             lowpass_hz=None,
             calibrate_gravity=True,
             detect_nonwear=True,
-            resample_hz='uniform',
+            resample_hz=resample_hz,
         )
 
         info = {
@@ -221,7 +232,7 @@ def read(filepath):
             lowpass_hz=None,
             calibrate_gravity=True,
             detect_nonwear=True,
-            resample_hz='uniform',
+            resample_hz=resample_hz,
         )
 
     return data, info
@@ -243,22 +254,21 @@ def resolve_path(path):
     return dirname, filename, extension
 
 
-def load_model(model_path=MODEL_PATH, force_download=False):
+def load_model(model_path, model_type, force_download=False):
     """ Load trained model. Download if not exists. """
 
     pth = pathlib.Path(model_path)
 
     if force_download or not pth.exists():
 
-        # url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__}.joblib.lzma"
-        url = "https://tinyurl.com/54e4a87d"
+        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__[model_type]}.joblib.lzma"
 
         print(f"Downloading {url}...")
 
         with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
             shutil.copyfileobj(f_src, f_dst)
 
-    assert md5(pth) == __model_md5__, (
+    assert md5(pth) == __model_md5__[model_type], (
         "Model file is corrupted. Please run with --force-download "
         "to download the model file again."
     )
