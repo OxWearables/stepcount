@@ -1,7 +1,7 @@
 name = "stepcount"
 __version__ = "1.3.0"
-__author__ = "Shing Chan, Scott Small, Aiden Doherty"
-__email__ = "shing.chan@ndph.ox.ac.uk, scott.small@ndph.ox.ac.uk, aiden.doherty@ndph.ox.ac.uk"
+__author__ = "Shing Chan, Scott Small, Gert Mertes, Aiden Doherty"
+__email__ = "shing.chan@ndph.ox.ac.uk, scott.small@ndph.ox.ac.uk, gert.mertes@ndph.ox.ac.uk, aiden.doherty@ndph.ox.ac.uk"
 __license__ = "2-Clause BSD"
 __model_version__ = {
     "rf": "20221213",
