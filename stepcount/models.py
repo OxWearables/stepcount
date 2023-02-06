@@ -1,19 +1,24 @@
 from copy import deepcopy
-from collections import defaultdict
+from collections import defaultdict, Counter
+import torch
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
 from scipy.optimize import minimize
+from scipy.special import softmax
 from scipy import stats
 from joblib import Parallel, delayed
 from sklearn import metrics
+from sklearn.model_selection import GroupShuffleSplit
 from imblearn.ensemble import BalancedRandomForestClassifier
 from stepcount import hmm_utils
 from stepcount import features
+from stepcount import sslmodel
 from tqdm.auto import tqdm
+from torch.utils.data import DataLoader
 
 
-class StepCounter():
+class StepCounter:
 
     def __init__(
         self,
@@ -23,6 +28,7 @@ class StepCounter():
         pnr=1.0,
         lowpass_hz=5,
         cv=5,
+        wd_type='ssl',
         wd_params=None,
         n_jobs=-1,
         verbose=False
@@ -37,20 +43,37 @@ class StepCounter():
         self.verbose = verbose
 
         wd_params = wd_params or dict()
-        wd_defaults = {
-            'sample_rate': sample_rate,
-            'n_jobs': n_jobs,
-            'verbose': verbose,
-            'pnr': pnr,
-            'cv': cv,
-        }
+
+        if wd_type == 'ssl':
+            wd_defaults = {
+                'device': 'cpu',
+                'batch_size': 100,
+                'verbose': verbose
+            }
+            wd = WalkDetectorSSL
+            # ssl is pretrained with 10s/30hz
+            self.window_sec = 10
+            self.sample_rate = 30
+            # disable multiprocessing, pytorch will already use all available cores,
+            # and when using gpu we can only do 1 process at a time anyway
+            self.n_jobs = 1
+        else:
+            wd_defaults = {
+                'sample_rate': sample_rate,
+                'n_jobs': n_jobs,
+                'verbose': verbose,
+                'pnr': pnr,
+                'cv': cv,
+            }
+            wd = WalkDetectorRF
+
         for key, value in wd_defaults.items():
             if key not in wd_params:
                 wd_params[key] = value
         self.wd_params = wd_params
-        self.wd = WalkDetector(**self.wd_params)
+        self.wd = wd(**self.wd_params)
 
-        self.window_len = int(np.ceil(window_sec * sample_rate))
+        self.window_len = int(np.ceil(self.window_sec * self.sample_rate))
         self.find_peaks_params = None
         self.cv_scores = None
 
@@ -203,7 +226,7 @@ class StepCounter():
         return Y
 
 
-class WalkDetector():
+class WalkDetectorRF:
     def __init__(
         self,
         sample_rate=100,
@@ -304,6 +327,114 @@ class WalkDetector():
         W[whr_ok] = (self.clf.predict_proba(X_feats[whr_ok])[:, 1] > self.thresh).astype('int')
         W = self.hmms.predict(W, groups=groups)
         return W
+
+
+class WalkDetectorSSL:
+    def __init__(
+            self,
+            device='cpu',
+            batch_size=100,
+            weights_path='state_dict.pt',
+            repo_tag='v1.0.0',
+            hmm_params=None,
+            verbose=False,
+    ):
+        self.device = device
+        self.weights_path = weights_path
+        self.repo_tag = repo_tag
+        self.batch_size = batch_size
+        self.state_dict = None
+
+        self.verbose = verbose
+
+        hmm_params = hmm_params or dict()
+        self.hmms = hmm_utils.HMMSmoother(**hmm_params)
+
+    def fit(self, X, Y, groups=None):
+        sslmodel.verbose = self.verbose
+
+        if self.verbose:
+            print('Training SSL')
+
+        # prepare training and validation sets
+        folds = GroupShuffleSplit(
+            1, test_size=0.2, random_state=41
+        ).split(X, Y, groups=groups)
+        train_idx, val_idx = next(folds)
+
+        x_train = X[train_idx]
+        x_val = X[val_idx]
+
+        y_train = Y[train_idx]
+        y_val = Y[val_idx]
+
+        group_train = groups[train_idx]
+        group_val = groups[val_idx]
+
+        train_dataset = sslmodel.NormalDataset(x_train, y_train, pid=group_train, name="training", augmentation=True)
+        val_dataset = sslmodel.NormalDataset(x_val, y_val, pid=group_val, name="validation")
+
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=1,
+        )
+
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=1,
+        )
+
+        # balancing to 90% notwalk, 10% walk
+        c = Counter(y_train)
+        notwalk = c[0]
+        walk = c[1]
+        class_weights = [(walk * 9.0) / notwalk, 1.0]
+
+        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=True)
+        model.to(self.device)
+
+        sslmodel.train(model, train_loader, val_loader, self.device, class_weights, weights_path=self.weights_path)
+        model.load_state_dict(torch.load(self.weights_path, self.device))
+
+        if self.verbose:
+            print('Training HMM')
+
+        # train HMM with predictions of the validation set
+        y_val, y_val_pred, group_val = sslmodel.predict(model, val_loader, self.device, output_logits=True)
+        y_val_pred_sf = softmax(y_val_pred, axis=1)
+
+        self.hmms.fit(y_val_pred_sf, y_val, groups=group_val)
+
+        # move model to cpu to get a device-less state dict (prevents device conflicts when loading on cpu/gpu later)
+        model.to('cpu')
+        self.state_dict = model.state_dict()
+
+        return self
+
+    def predict(self, X, groups=None):
+        sslmodel.verbose = self.verbose
+
+        dataset = sslmodel.NormalDataset(X, name='prediction')
+        dataloader = DataLoader(
+            dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=1,
+        )
+
+        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False)
+        model.load_state_dict(self.state_dict)
+        model.to(self.device)
+
+        _, y_pred, _ = sslmodel.predict(model, dataloader, self.device, output_logits=False)
+
+        y_pred = self.hmms.predict(y_pred, groups=groups)
+
+        return y_pred
 
 
 def make_windows(data, window_sec, fn=None, return_index=False):
