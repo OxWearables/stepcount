@@ -134,4 +134,6 @@ torch_hub_cache/
 *.bin.gz
 *.npy
 *.pkl
+*.joblib
+*.joblib.lzma
 outputs/
