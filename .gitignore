@@ -125,6 +125,7 @@ doc/source/savefig/
 
 # Misc
 data/
+torch_hub_cache/
 *.cwa
 *.cwa.gz
 *.gt3x
