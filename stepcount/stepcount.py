@@ -235,6 +235,9 @@ def read(filepath, resample_hz='uniform'):
             resample_hz=resample_hz,
         )
 
+    if 'ResampleRate' not in info:
+        info['ResampleRate'] = info['SampleRate']
+
     return data, info
 
 
