@@ -52,7 +52,8 @@ def main():
 
     # Run model
     model_path = pathlib.Path(__file__).parent / f"{__model_version__[args.model_type]}.joblib.lzma"
-    model = load_model(args.model_path or model_path, args.model_type, args.force_download)
+    check_md5 = args.model_path is None
+    model = load_model(args.model_path or model_path, args.model_type, check_md5, args.force_download)
     print("Running step counter...")
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['ResampleRate']
@@ -257,7 +258,7 @@ def resolve_path(path):
     return dirname, filename, extension
 
 
-def load_model(model_path, model_type, force_download=False):
+def load_model(model_path, model_type, check_md5=True, force_download=False):
     """ Load trained model. Download if not exists. """
 
     pth = pathlib.Path(model_path)
@@ -271,10 +272,11 @@ def load_model(model_path, model_type, force_download=False):
         with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
             shutil.copyfileobj(f_src, f_dst)
 
-    assert md5(pth) == __model_md5__[model_type], (
-        "Model file is corrupted. Please run with --force-download "
-        "to download the model file again."
-    )
+    if check_md5:
+        assert md5(pth) == __model_md5__[model_type], (
+            "Model file is corrupted. Please run with --force-download "
+            "to download the model file again."
+        )
 
     return joblib.load(pth)
 
