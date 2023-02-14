@@ -68,16 +68,18 @@ def main():
     Y.to_csv(f"{outdir}/{basename}_Steps.csv")
 
     # Summary
-    summary = summarize(Y)
+    summary = summarize(Y, model.steptol)
     summary['hourly'].to_csv(f"{outdir}/{basename}_HourlySteps.csv")
     summary['daily'].to_csv(f"{outdir}/{basename}_DailySteps.csv")
+    summary['daily_walk'].to_csv(f"{outdir}/{basename}_DailyWalk.csv")
     info['TotalSteps'] = summary['total']
     info['TotalWalking(min)'] = summary['total_walk']
 
     # Impute missing periods & recalculate summary
-    summary_adj = summarize(Y, adjust_estimates=True)
+    summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
     summary_adj['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
     summary_adj['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
+    summary_adj['daily_walk'].to_csv(f"{outdir}/{basename}_DailyWalkAdjusted.csv")
     info['TotalStepsAdjusted'] = summary_adj['total']
     info['TotalWalkingAdjusted(min)'] = summary_adj['total_walk']
 
@@ -88,10 +90,12 @@ def main():
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
-    print("\nEstimated Daily Steps\n---------------------")
+    print("\nEstimated Daily Steps/Walk\n---------------------")
     print(pd.concat([
-        summary['daily'].rename('Crude'),
-        summary_adj['daily'].rename('Adjusted')
+        summary['daily'].rename('StepsCrude'),
+        summary['daily_walk'].rename('WalkCrude(min)'),
+        summary_adj['daily'].rename('StepsAdjusted'),
+        summary_adj['daily_walk'].rename('WalkAdjusted(min)')
     ], axis=1))
 
     # Timing
@@ -99,7 +103,7 @@ def main():
     print(f"Done! ({round(end - start,2)}s)")
 
 
-def summarize(Y, adjust_estimates=False):
+def summarize(Y, steptol=3, adjust_estimates=False):
 
     if adjust_estimates:
         Y = impute_missing(Y)
@@ -120,21 +124,24 @@ def summarize(Y, adjust_estimates=False):
     total = np.round(Y.agg(_sum))  # total steps
     hourly = Y.resample('H').agg(_sum).round()  # steps, hourly
     daily = Y.resample('D').agg(_sum).round()  # steps, daily
-    total_walk = (  # total walk (mins)
-        (pd.Timedelta(infer_freq(Y.index)) * Y.mask(~Y.isna(), Y > 0).agg(_sum))
-        .total_seconds() / 60
-    )
+
+    dt = pd.Timedelta(infer_freq(Y.index)).seconds
+    W = Y.mask(~Y.isna(), Y >= steptol)
+    total_walk = np.round(W.agg(_sum) * dt / 60)
+    daily_walk = (W.resample('D').agg(_sum) * dt / 60).round()
 
     total = nanint(total)
     hourly = pd.to_numeric(hourly, downcast='integer')
     daily = pd.to_numeric(daily, downcast='integer')
-    total_walk = float(total_walk)
+    total_walk = nanint(total_walk)
+    daily_walk = pd.to_numeric(daily_walk, downcast='integer')
 
     return {
         'total': total,
         'hourly': hourly,
         'daily': daily,
         'total_walk': total_walk,
+        'daily_walk': daily_walk,
     }
 
 
