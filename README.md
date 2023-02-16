@@ -2,8 +2,7 @@
 
 A Python package to estimate step counts from accelerometer data.
 
-The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649).
-
+The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
 ## Getting started
 
@@ -20,7 +19,7 @@ The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, making it co
     ```
 
 
-### Install
+### Install (Bash/Linux)
 
 <!-- ```console
 $ pip install git+https://github.com/OxWearables/stepcount.git@master#egg=stepcount
@@ -33,6 +32,20 @@ $ pip install git+ssh://git@github.com/OxWearables/stepcount.git@master#egg=step
 ```console
 $ pip install stepcount
 ```
+
+### Install (Windows)
+For Windows users, we recommend running stepcount using the **Anaconda Prompt** from **Miniconda** via the following steps:
+
+1. Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda). Choose **Miniconda3 Windows 64-bit**.
+2. Install. Use the default recommended settings.
+3. From the Start menu, search and open the **Anaconda Prompt**.
+
+```console
+$ pip install stepcount
+```
+
+For further information running Anaconda on Windows using virtual environments see this [note](anaconda_on_windows.md).
+
 
 ### Usage
 
