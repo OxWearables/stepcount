@@ -35,8 +35,7 @@ def main():
                         type=str, default='cpu')
     args = parser.parse_args()
 
-    # Timing
-    start = time.time()
+    before = time.time()
 
     # Load file
     if args.model_type == 'ssl':
@@ -69,19 +68,19 @@ def main():
 
     # Summary
     summary = summarize(Y, model.steptol)
-    summary['hourly'].to_csv(f"{outdir}/{basename}_HourlySteps.csv")
-    summary['daily'].to_csv(f"{outdir}/{basename}_DailySteps.csv")
-    summary['daily_walk'].to_csv(f"{outdir}/{basename}_DailyWalk.csv")
+    summary['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}_HourlySteps.csv")
+    summary['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailySteps.csv")
+    summary['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalk.csv")
     info['TotalSteps'] = summary['total']
-    info['TotalWalking(min)'] = summary['total_walk']
+    info['TotalWalking(mins)'] = summary['total_walk']
 
     # Impute missing periods & recalculate summary
     summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
-    summary_adj['hourly'].to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
-    summary_adj['daily'].to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
-    summary_adj['daily_walk'].to_csv(f"{outdir}/{basename}_DailyWalkAdjusted.csv")
+    summary_adj['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
+    summary_adj['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
+    summary_adj['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalkAdjusted.csv")
     info['TotalStepsAdjusted'] = summary_adj['total']
-    info['TotalWalkingAdjusted(min)'] = summary_adj['total_walk']
+    info['TotalWalkingAdjusted(mins)'] = summary_adj['total_walk']
 
     # Save info
     with open(f"{outdir}/{basename}_Info.json", 'w') as f:
@@ -93,14 +92,13 @@ def main():
     print("\nEstimated Daily Steps/Walk\n---------------------")
     print(pd.concat([
         summary['daily'].rename('StepsCrude'),
-        summary['daily_walk'].rename('WalkCrude(min)'),
+        summary['daily_walk'].rename('WalkCrude(mins)'),
         summary_adj['daily'].rename('StepsAdjusted'),
-        summary_adj['daily_walk'].rename('WalkAdjusted(min)')
+        summary_adj['daily_walk'].rename('WalkAdjusted(mins)')
     ], axis=1))
 
-    # Timing
-    end = time.time()
-    print(f"Done! ({round(end - start,2)}s)")
+    after = time.time()
+    print(f"Done! ({round(after - before,2)}s)")
 
 
 def summarize(Y, steptol=3, adjust_estimates=False):
