@@ -64,7 +64,7 @@ def main():
     Y = model.predict_from_frame(data)
 
     # Save raw output timeseries
-    Y.to_csv(f"{outdir}/{basename}_Steps.csv")
+    Y.rename('Steps').to_csv(f"{outdir}/{basename}_Steps.csv")
 
     # Summary
     summary = summarize(Y, model.steptol)
