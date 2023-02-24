@@ -4,6 +4,8 @@ A Python package to estimate step counts from accelerometer data.
 
 The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
+A short video tutorial for installation and basic usage can be found on YouTube at [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
+
 ## Getting started
 
 ### Prerequisite
@@ -110,17 +112,18 @@ The following output files are created:
 - *HourlyStepsAdjusted.csv* Like HourlySteps but accounting for missing data (see section below).
 - *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
 
+
 #### Crude vs. Adjusted Estimates
 Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
 For adjusted totals and daily statistics, 24h multiples are needed and will be imputed if necessary.
 Estimates will be NaN where data is still missing after imputation.
 
+
 #### Processing CSV files
 If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
 
 Example:
-
 ```console
 time,x,y,z
 2013-10-21 10:00:08.000,-0.078923,0.396706,0.917759
@@ -129,3 +132,36 @@ time,x,y,z
 2013-10-21 10:00:08.030,-0.078923,0.411933,0.901938
 ...
 ```
+
+#### Processing multiple files (Windows)
+To process multiple files you can create a text file in Notepad which includes one line for each file you wish to process, as shown below for *file1.cwa*, *file2.cwa*, and *file2.cwa*.
+
+Example text file named *commands.txt*: 
+```console
+stepcount file1.cwa &
+stepcount file2.cwa &
+stepcount file3.cwa 
+:END
+````
+Once this file is created, run the following command within the consule within the directory where you have installed the package:
+
+```console
+ cmd < commands.txt
+```
+
+## Validation
+
+Validation for this algorithm is presented in a preprint on medRxiv at: [https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1). 
+
+
+## Citing our work
+
+Please cite this manuscript if you use this algorithm in your own work. When using this tool, please consider the works listed in [CITATION.md](CITATION.md).
+
+
+## Licence
+See [LICENSE.md](LICENSE.md).
+
+
+## Acknowledgements
+We would like to thank all our code contributors, manuscript co-authors, and research participants for their help in making this work possible.
