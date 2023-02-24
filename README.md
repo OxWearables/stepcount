@@ -4,6 +4,10 @@ A Python package to estimate step counts from accelerometer data.
 
 The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
+Validation for this algorithm is presented in this [preprint](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1). Please cite this manuscript if you use this algorithm in your own work. 
+
+A short video tutorial for installation and basic usage can also be found [here](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
+
 ## Getting started
 
 ### Prerequisite
