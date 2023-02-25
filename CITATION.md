@@ -1,7 +1,8 @@
 When using this tool, please consider citing the following works:
 
-1. [Small2023] Small SR, Chan S, Walmsley R, et al. (2023)
-*Development and Validation of a Machine Learning Wrist-worn Step Detection Algorithm with Deployment in the UK Biobank* medRxiv.DOI: 10.1101/2023.02.20.23285750
+1. Small SR, Chan S, Walmsley R, et al. (2023)
+[Development and Validation of a Machine Learning Wrist-worn Step Detection Algorithm with Deployment in the UK Biobank](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1).
+medRxiv. DOI: 10.1101/2023.02.20.23285750
     
 ```
 @article {Small2023.02.20.23285750,
@@ -18,8 +19,9 @@ When using this tool, please consider citing the following works:
 
 ```
 
-2. [Small2022] Small SR, von Fritsch L, Doherty A, et al. (2023)
-*OxWalk: Wrist and hip-based activity tracker dataset for free-living step detection and gait recognition* Oxford University Research Arvive. DOI: 10.5287/bodleian:ORQ2abnbR
+2. Small SR, von Fritsch L, Doherty A, et al. (2023)
+[OxWalk: Wrist and hip-based activity tracker dataset for free-living step detection and gait recognition](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
+Oxford University Research Arvive. DOI: 10.5287/bodleian:ORQ2abnbR
 
 ``` 
 @misc{small2022a,
