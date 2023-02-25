@@ -4,7 +4,7 @@ A Python package to estimate step counts from accelerometer data.
 
 The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
-A short video tutorial for installation and basic usage can be found on YouTube at [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
+Check out the 5-minute video tutorial to get started: [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
 
 ## Getting started
 
@@ -20,8 +20,20 @@ A short video tutorial for installation and basic usage can be found on YouTube 
     $ java -version
     ```
 
+### Install (Windows)
+For Windows users, we recommend running stepcount using the **Anaconda Prompt** from **Miniconda** via the following steps:
 
-### Install (Bash/Linux)
+1. Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda). Choose **Miniconda3 Windows 64-bit**.
+2. Install. Use the default recommended settings.
+3. From the Start menu, search and open the **Anaconda Prompt**.
+
+```console
+$ pip install stepcount
+```
+
+For further information running Anaconda on Windows using virtual environments, see [this guide](anaconda_on_windows.md).
+
+### Install (Linux)
 
 <!-- ```console
 $ pip install git+https://github.com/OxWearables/stepcount.git@master#egg=stepcount
@@ -35,21 +47,9 @@ $ pip install git+ssh://git@github.com/OxWearables/stepcount.git@master#egg=step
 $ pip install stepcount
 ```
 
-### Install (Windows)
-For Windows users, we recommend running stepcount using the **Anaconda Prompt** from **Miniconda** via the following steps:
-
-1. Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda). Choose **Miniconda3 Windows 64-bit**.
-2. Install. Use the default recommended settings.
-3. From the Start menu, search and open the **Anaconda Prompt**.
-
-```console
-$ pip install stepcount
-```
-
-For further information running Anaconda on Windows using virtual environments see this [note](anaconda_on_windows.md).
 
 
-### Usage
+## Usage
 
 ```bash
 # Process an AX3 file
@@ -96,7 +96,7 @@ time
 Output: outputs/sample/
 ```
 
-#### Output files
+### Output files
 By default, output files will be stored in a folder named after the input file, `outputs/{filename}/`, created in the current working directory. You can change the output path with the `-o` flag:
 
 ```console
@@ -113,14 +113,14 @@ The following output files are created:
 - *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
 
 
-#### Crude vs. Adjusted Estimates
+### Crude vs. Adjusted Estimates
 Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
 For adjusted totals and daily statistics, 24h multiples are needed and will be imputed if necessary.
 Estimates will be NaN where data is still missing after imputation.
 
 
-#### Processing CSV files
+### Processing CSV files
 If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
 
 Example:
@@ -133,21 +133,27 @@ time,x,y,z
 ...
 ```
 
-#### Processing multiple files (Windows)
+### Processing multiple files
+#### Windows
 To process multiple files you can create a text file in Notepad which includes one line for each file you wish to process, as shown below for *file1.cwa*, *file2.cwa*, and *file2.cwa*.
 
-Example text file named *commands.txt*: 
+Example text file *commands.txt*: 
 ```console
 stepcount file1.cwa &
 stepcount file2.cwa &
 stepcount file3.cwa 
 :END
 ````
-Once this file is created, run the following command within the consule within the directory where you have installed the package:
+Once this file is created, run `cmd < commands.txt` from the terminal.
 
+#### Linux
+Create a file *command.sh* with:
 ```console
- cmd < commands.txt
+stepcount file1.cwa
+stepcount file2.cwa
+stepcount file3.cwa
 ```
+Then, run `bash command.sh` from the terminal.
 
 ## Validation
 
@@ -156,7 +162,7 @@ Validation for this algorithm is presented in a preprint on medRxiv at: [https:/
 
 ## Citing our work
 
-Please cite this manuscript if you use this algorithm in your own work. When using this tool, please consider the works listed in [CITATION.md](CITATION.md).
+When using this tool, please consider citing the works listed in [CITATION.md](CITATION.md).
 
 
 ## Licence
