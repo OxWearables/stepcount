@@ -72,7 +72,17 @@ def main():
     summary['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailySteps.csv")
     summary['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalk.csv")
     info['TotalSteps'] = summary['total']
+    info['StepsDayAvg'] = summary['daily_avg']
+    info['StepsDayMed'] = summary['daily_med']
+    info['StepsDayMin'] = summary['daily_min']
+    info['StepsDayMax'] = summary['daily_max']
     info['TotalWalking(mins)'] = summary['total_walk']
+    info['WalkingDayAvg(mins)'] = summary['daily_walk_avg']
+    info['WalkingDayMed(mins)'] = summary['daily_walk_med']
+    info['WalkingDayMin(mins)'] = summary['daily_walk_min']
+    info['WalkingDayMax(mins)'] = summary['daily_walk_max']
+    info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
+    info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
 
     # Impute missing periods & recalculate summary
     summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
@@ -80,7 +90,17 @@ def main():
     summary_adj['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
     summary_adj['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalkAdjusted.csv")
     info['TotalStepsAdjusted'] = summary_adj['total']
+    info['StepsDayAvgAdjusted'] = summary_adj['daily_avg']
+    info['StepsDayMedAdjusted'] = summary_adj['daily_med']
+    info['StepsDayMinAdjusted'] = summary_adj['daily_min']
+    info['StepsDayMaxAdjusted'] = summary_adj['daily_max']
     info['TotalWalkingAdjusted(mins)'] = summary_adj['total_walk']
+    info['WalkingDayAvgAdjusted(mins)'] = summary_adj['daily_walk_avg']
+    info['WalkingDayMedAdjusted(mins)'] = summary_adj['daily_walk_med']
+    info['WalkingDayMinAdjusted(mins)'] = summary_adj['daily_walk_min']
+    info['WalkingDayMaxAdjusted(mins)'] = summary_adj['daily_walk_max']
+    info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
+    info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
 
     # Save info
     with open(f"{outdir}/{basename}_Info.json", 'w') as f:
@@ -119,27 +139,65 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
 
+    # steps
     total = np.round(Y.agg(_sum))  # total steps
     hourly = Y.resample('H').agg(_sum).round()  # steps, hourly
     daily = Y.resample('D').agg(_sum).round()  # steps, daily
+    daily_avg = daily.mean().round()
+    daily_med = daily.median().round()
+    daily_min = daily.min().round()
+    daily_max = daily.max().round()
 
+    # walking
     dt = pd.Timedelta(infer_freq(Y.index)).seconds
     W = Y.mask(~Y.isna(), Y >= steptol)
     total_walk = np.round(W.agg(_sum) * dt / 60)
     daily_walk = (W.resample('D').agg(_sum) * dt / 60).round()
+    daily_walk_avg = daily_walk.mean().round()
+    daily_walk_med = daily_walk.median().round()
+    daily_walk_min = daily_walk.min().round()
+    daily_walk_max = daily_walk.max().round()
+
+    def _max(x, n=1):
+        return x.nlargest(n, keep='all').mean()
+
+    # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
+    cadence = Y.resample('min').sum()
+    cadence_peak1 = cadence.resample('D').agg(_max, n=1).mean()
+    cadence_peak30 = cadence.resample('D').agg(_max, n=30).mean()
 
     total = nanint(total)
     hourly = pd.to_numeric(hourly, downcast='integer')
     daily = pd.to_numeric(daily, downcast='integer')
+    daily_avg = nanint(daily_avg)
+    daily_med = nanint(daily_med)
+    daily_min = nanint(daily_min)
+    daily_max = nanint(daily_max)
     total_walk = nanint(total_walk)
     daily_walk = pd.to_numeric(daily_walk, downcast='integer')
+    daily_walk_avg = nanint(daily_walk_avg)
+    daily_walk_med = nanint(daily_walk_med)
+    daily_walk_min = nanint(daily_walk_min)
+    daily_walk_max = nanint(daily_walk_max)
+    cadence_peak1 = nanint(cadence_peak1)
+    cadence_peak30 = nanint(cadence_peak30)
 
     return {
         'total': total,
         'hourly': hourly,
         'daily': daily,
+        'daily_avg': daily_avg,
+        'daily_med': daily_med,
+        'daily_min': daily_min,
+        'daily_max': daily_max,
         'total_walk': total_walk,
         'daily_walk': daily_walk,
+        'daily_walk_avg': daily_walk_avg,
+        'daily_walk_med': daily_walk_med,
+        'daily_walk_min': daily_walk_min,
+        'daily_walk_max': daily_walk_max,
+        'cadence_peak1': cadence_peak1,
+        'cadence_peak30': cadence_peak30,
     }
 
 
