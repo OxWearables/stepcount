@@ -155,6 +155,15 @@ stepcount file3.cwa
 ```
 Then, run `bash command.sh` from the terminal.
 
+#### Collating outputs
+
+A utility script is provided to collate outputs from multiple runs:
+
+```console
+stepcount-collate-outputs outputs/
+```
+This will collate all *-Info.json files found in outputs/ and generate a CSV file.
+
 ## Validation
 
 Validation for this algorithm is presented in a preprint on medRxiv at: [https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1). 
