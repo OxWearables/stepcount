@@ -47,9 +47,9 @@ setuptools.setup(
         "scikit-learn==1.1.1",
         "imbalanced-learn==0.9.1",
         "hmmlearn==0.2.7",
-        "torch~=1.12.1",
-        "torchvision~=0.13.1",
-        "transforms3d~=0.4.1"
+        "torch==1.13.*",
+        "torchvision==0.14.*",
+        "transforms3d==0.4.*"
     ],
     extras_require={
         "dev": [
