@@ -38,7 +38,7 @@ setuptools.setup(
     packages=setuptools.find_packages(exclude=("test", "tests")),
     include_package_data=False,
     install_requires=[
-        "actipy==2.0.1",
+        "actipy==2.0.3",
         "numpy==1.24.*",
         "scipy==1.10.*",
         "pandas==1.5.*",
