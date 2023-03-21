@@ -64,13 +64,13 @@ def main():
     Y = model.predict_from_frame(data)
 
     # Save raw output timeseries
-    Y.rename('Steps').to_csv(f"{outdir}/{basename}_Steps.csv")
+    Y.rename('Steps').to_csv(f"{outdir}/{basename}-Steps.csv")
 
     # Summary
     summary = summarize(Y, model.steptol)
-    summary['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}_HourlySteps.csv")
-    summary['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailySteps.csv")
-    summary['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalk.csv")
+    summary['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}-HourlySteps.csv")
+    summary['daily'].rename('Steps').to_csv(f"{outdir}/{basename}-DailySteps.csv")
+    summary['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}-DailyWalk.csv")
     info['TotalSteps'] = summary['total']
     info['StepsDayAvg'] = summary['daily_avg']
     info['StepsDayMed'] = summary['daily_med']
@@ -86,9 +86,9 @@ def main():
 
     # Impute missing periods & recalculate summary
     summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
-    summary_adj['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}_HourlyStepsAdjusted.csv")
-    summary_adj['daily'].rename('Steps').to_csv(f"{outdir}/{basename}_DailyStepsAdjusted.csv")
-    summary_adj['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}_DailyWalkAdjusted.csv")
+    summary_adj['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}-HourlyStepsAdjusted.csv")
+    summary_adj['daily'].rename('Steps').to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv")
+    summary_adj['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}-DailyWalkAdjusted.csv")
     info['TotalStepsAdjusted'] = summary_adj['total']
     info['StepsDayAvgAdjusted'] = summary_adj['daily_avg']
     info['StepsDayMedAdjusted'] = summary_adj['daily_med']
@@ -103,7 +103,7 @@ def main():
     info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
 
     # Save info
-    with open(f"{outdir}/{basename}_Info.json", 'w') as f:
+    with open(f"{outdir}/{basename}-Info.json", 'w') as f:
         json.dump(info, f, indent=4, cls=NpEncoder)
 
     # Print
