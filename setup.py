@@ -1,6 +1,12 @@
+import sys
+import os.path
+# https://github.com/python-versioneer/python-versioneer/issues/193
+sys.path.insert(0, os.path.dirname(__file__))
+
 import setuptools
 import codecs
-import os.path
+
+import versioneer
 
 
 def read(rel_path):
@@ -8,7 +14,7 @@ def read(rel_path):
     with codecs.open(os.path.join(here, rel_path), 'r') as fp:
         return fp.read()
 
-def get_string(string, rel_path="stepcount/__init__.py"):
+def get_string(string, rel_path="src/stepcount/__init__.py"):
     for line in read(rel_path).splitlines():
         if line.startswith(string):
             delim = '"' if '"' in line else "'"
@@ -22,7 +28,8 @@ with open("README.md", "r") as fh:
 setuptools.setup(
     name="stepcount",
     python_requires=">=3.8",
-    version=get_string("__version__"),
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
     description="Step counter for wrist-worn accelerometers compatible with the UK Biobank Accelerometer Dataset",
     long_description=long_description,
     long_description_content_type="text/markdown",
@@ -35,7 +42,8 @@ setuptools.setup(
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: Unix",
     ],
-    packages=setuptools.find_packages(exclude=("test", "tests")),
+    packages=setuptools.find_packages(where="src", exclude=("test", "tests")),
+    package_dir={"": "src"},
     include_package_data=False,
     install_requires=[
         "actipy==2.0.3",
