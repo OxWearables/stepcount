@@ -35,6 +35,11 @@ jobs:
           python setup.py sdist bdist_wheel
           twine check --strict dist/*
 
+      - name: Sanity check build
+        run: |
+          python -m pip install dist/*.gz
+          python -c "import stepcount; print(stepcount.__version__)"
+
       - name: Publish distribution 📦 to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
