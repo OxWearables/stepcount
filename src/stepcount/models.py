@@ -212,11 +212,15 @@ class StepCounter:
             """ Process the chunk. Apply padding if length is not enough. """
             n = len(chunk)
             x = chunk[['x', 'y', 'z']].to_numpy()
-            if n > self.window_len:
+            if n == self.window_len:
+                x = x
+            elif n > self.window_len:
                 x = x[:self.window_len]
-            if n < self.window_len:
+            elif n < self.window_len and n > self.window_len / 2:
                 m = self.window_len - n
                 x = np.pad(x, ((0, m), (0, 0)), mode='wrap')
+            else:
+                x = np.full((self.window_len, 3), fill_value=np.nan)
             return x
 
         X, T = make_windows(data, self.window_sec, fn=fn, return_index=True)
