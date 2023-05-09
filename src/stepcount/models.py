@@ -220,7 +220,6 @@ class StepCounter:
             return x
 
         X, T = make_windows(data, self.window_sec, fn=fn, return_index=True)
-        X = np.asarray(X)
         Y = self.predict(X, **kwargs)
         Y = pd.Series(Y, index=T)
         return Y
@@ -444,15 +443,16 @@ def make_windows(data, window_sec, fn=None, return_index=False):
         def fn(x):
             return x
 
-    X = [fn(x) for _, x in data.resample(f"{window_sec}s", origin="start")]
+    X, T = [], []
+    for t, x in data.resample(f"{window_sec}s", origin="start"):
+        x = fn(x)
+        X.append(x)
+        T.append(t)
+
+    X = np.asarray(X)
 
     if return_index:
-        T = (
-            data.index
-            .to_series()
-            .resample(f"{window_sec}s", origin="start")
-            .first()
-        )
+        T = pd.DatetimeIndex(T)
         return X, T
 
     return X
