@@ -70,6 +70,7 @@ setuptools.setup(
             "ipython",
             "ipdb",
             "twine",
+            "tomli",
         ],
         "docs": [
             "sphinx>=4.2",
