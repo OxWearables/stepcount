@@ -27,7 +27,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="stepcount",
-    python_requires=">=3.8,<3.11",
+    python_requires=">=3.8, <3.11",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
     description="Step counter for wrist-worn accelerometers compatible with the UK Biobank Accelerometer Dataset",
