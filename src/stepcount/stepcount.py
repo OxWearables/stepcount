@@ -41,7 +41,7 @@ def main():
     if args.model_type == 'ssl':
         resample_hz = 30
     else:
-        resample_hz = 'uniform'
+        resample_hz = None
     data, info = read(args.filepath, resample_hz)
 
     # Output paths
