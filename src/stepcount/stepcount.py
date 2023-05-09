@@ -143,20 +143,20 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     total = np.round(Y.agg(_sum))  # total steps
     hourly = Y.resample('H').agg(_sum).round()  # steps, hourly
     daily = Y.resample('D').agg(_sum).round()  # steps, daily
-    daily_avg = daily.mean().round()
-    daily_med = daily.median().round()
-    daily_min = daily.min().round()
-    daily_max = daily.max().round()
+    daily_avg = np.round(daily.mean())
+    daily_med = np.round(daily.median())
+    daily_min = np.round(daily.min())
+    daily_max = np.round(daily.max())
 
     # walking
     dt = pd.Timedelta(infer_freq(Y.index)).seconds
     W = Y.mask(~Y.isna(), Y >= steptol)
     total_walk = np.round(W.agg(_sum) * dt / 60)
     daily_walk = (W.resample('D').agg(_sum) * dt / 60).round()
-    daily_walk_avg = daily_walk.mean().round()
-    daily_walk_med = daily_walk.median().round()
-    daily_walk_min = daily_walk.min().round()
-    daily_walk_max = daily_walk.max().round()
+    daily_walk_avg = np.round(daily_walk.mean())
+    daily_walk_med = np.round(daily_walk.median())
+    daily_walk_min = np.round(daily_walk.min())
+    daily_walk_max = np.round(daily_walk.max())
 
     def _max(x, n=1):
         return x.nlargest(n, keep='all').mean()
