@@ -31,7 +31,7 @@ For Windows users, we recommend running stepcount using the **Anaconda Prompt** 
 $ pip install stepcount
 ```
 
-For further information running Anaconda on Windows using virtual environments, see [this guide](anaconda_on_windows.md).
+For further information running Anaconda on Windows using virtual environments, see [this guide](anaconda-on-windows.md).
 
 ### Install (Linux)
 
