@@ -160,7 +160,7 @@ Then, run `bash command.sh` from the terminal.
 A utility script is provided to collate outputs from multiple runs:
 
 ```console
-stepcount-collate-outputs outputs/
+$ stepcount-collate-outputs outputs/
 ```
 This will collate all *-Info.json files found in outputs/ and generate a CSV file.
 
