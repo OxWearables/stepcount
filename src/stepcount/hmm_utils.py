@@ -156,6 +156,11 @@ def hmmlearn_fit_predict(
             random_state=idx,
             **kwargs,
         )
+        # Manually set n_features = n_components, otherwise this is set
+        # automatically to np.unique(Y) which can result in a mismatch when Y
+        # doesn't contain all the possible labels.
+        # https://github.com/hmmlearn/hmmlearn/issues/423
+        hmm.n_features = n_components
 
         if n_trials > 0 and "s" in ste:
             if startprob is None:
