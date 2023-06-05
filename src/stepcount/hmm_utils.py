@@ -272,6 +272,9 @@ def compute_prior(Y_true, labels=None, uniform=True):
 def viterbi(Y, hmm_params):
     ''' https://en.wikipedia.org/wiki/Viterbi_algorithm '''
 
+    if len(Y) == 0:
+        return np.empty_like(Y)
+
     def log(x):
         SMALL_NUMBER = 1e-16
         return np.log(x + SMALL_NUMBER)
