@@ -226,7 +226,7 @@ def get_sslnet(tag='v1.0.0', pretrained=False):
     return sslnet
 
 
-def predict(model, data_loader, device, output_logits=False):
+def predict(model, dataloader, device, output_logits=False):
     """
     Iterate over the dataloader and do prediction with a pytorch model.
 
@@ -244,7 +244,10 @@ def predict(model, data_loader, device, output_logits=False):
     pid_list = []
     model.eval()
 
-    for i, (x, y, pid) in enumerate(tqdm(data_loader, mininterval=60, disable=not verbose)):
+    if len(dataloader) == 0:
+        return np.array([]), np.array([]), np.array([])
+
+    for i, (x, y, pid) in enumerate(tqdm(dataloader, mininterval=60, disable=not verbose)):
         with torch.inference_mode():
             x = x.to(device, dtype=torch.float)
             logits = model(x)
@@ -255,6 +258,7 @@ def predict(model, data_loader, device, output_logits=False):
                 pred_y = torch.argmax(logits, dim=1)
                 predictions_list.append(pred_y.cpu())
             pid_list.extend(pid)
+
     true_list = torch.cat(true_list)
     predictions_list = torch.cat(predictions_list)
 
