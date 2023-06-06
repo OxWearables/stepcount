@@ -362,8 +362,8 @@ def _validate_model(model, val_loader, device, loss_fn):
     model.eval()
     losses = []
     acces = []
-    for i, (x, y, _) in enumerate(val_loader):
-        with torch.inference_mode():
+    with torch.inference_mode():
+        for x, y, _ in val_loader:
             x = x.to(device, dtype=torch.float)
             true_y = y.to(device, dtype=torch.long)
 
