@@ -247,8 +247,8 @@ def predict(model, dataloader, device, output_logits=False):
     if len(dataloader) == 0:
         return np.array([]), np.array([]), np.array([])
 
-    for i, (x, y, pid) in enumerate(tqdm(dataloader, mininterval=60, disable=not verbose)):
-        with torch.inference_mode():
+    with torch.inference_mode():
+        for x, y, pid in tqdm(dataloader, mininterval=60, disable=not verbose):
             x = x.to(device, dtype=torch.float)
             logits = model(x)
             true_list.append(y)
