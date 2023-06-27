@@ -273,6 +273,9 @@ def read(filepath, resample_hz='uniform'):
         freq = infer_freq(data.index)
         sample_rate = int(np.round(pd.Timedelta('1s') / freq))
 
+        # Quick fix: Drop duplicate indices. TODO: Maybe should be handled by actipy.
+        data = data[~data.index.duplicated(keep='first')]
+
         data, info = actipy.process(
             data, sample_rate,
             lowpass_hz=None,
