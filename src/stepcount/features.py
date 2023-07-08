@@ -92,8 +92,7 @@ def autocorr_features(v, sample_rate):
     else:
         acf_1st_min = acf_1st_min_loc = 0.0
 
-    acf_zeros = np.where(np.diff(np.signbit(u)))
-    acf_zeros = len(acf_zeros)
+    acf_zeros = np.sum(np.diff(np.signbit(u)))
 
     feats = {
         'acf_1st_max': acf_1st_max,
