@@ -20,33 +20,28 @@ Check out the 5-minute video tutorial to get started: [https://www.youtube.com/w
     $ java -version
     ```
 
-### Install (Windows)
-For Windows users, we recommend running stepcount using the **Anaconda Prompt** from **Miniconda** via the following steps:
+### Install
 
-1. Download [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda). Choose **Miniconda3 Windows 64-bit**.
-2. Install. Use the default recommended settings.
-3. From the Start menu, search and open the **Anaconda Prompt**.
+We recommend using **Anaconda**:
 
-```console
-$ pip install stepcount
-```
+1. Download & install [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda).
+1. (Windows) Once installed, launch the **Anaconda Prompt**.
+1. Create a virtual environment:
+    ```console
+    $ conda create -n stepcount python=3.9 openjdk=8 pip
+    ```
+    This creates a virtual environment called `stepcount` with Python version 3.9, OpenJDK version 8, and Pip.
+1. Activate the environment:
+    ```console
+    $ conda activate stepcount
+    ```
+    You should now see `(stepcount)` written in front of your prompt.
+1. Install `stepcount`:
+    ```console
+    $ pip install stepcount
+    ```
 
-For further information running Anaconda on Windows using virtual environments, see [this guide](anaconda-on-windows.md).
-
-### Install (Linux)
-
-<!-- ```console
-$ pip install git+https://github.com/OxWearables/stepcount.git@master#egg=stepcount
-``` -->
-
-<!-- ```console
-$ pip install git+ssh://git@github.com/OxWearables/stepcount.git@master#egg=stepcount
-``` -->
-
-```console
-$ pip install stepcount
-```
-
+You are all set! The next time that you want to use `stepcount`, open the Anaconda Prompt and activate the environment (step 4). If you see `(stepcount)` in front of your prompt, you are ready to go!
 
 
 ## Usage
