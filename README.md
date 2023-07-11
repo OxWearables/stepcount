@@ -4,8 +4,6 @@ A Python package to estimate step counts from accelerometer data.
 
 The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
-Check out the 5-minute video tutorial to get started: [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
-
 ## Getting started
 
 ### Prerequisite
@@ -43,6 +41,7 @@ We recommend using **Anaconda**:
 
 You are all set! The next time that you want to use `stepcount`, open the Anaconda Prompt and activate the environment (step 4). If you see `(stepcount)` in front of your prompt, you are ready to go!
 
+Check out the 5-minute video tutorial to get started: [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
 
 ## Usage
 
