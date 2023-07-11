@@ -456,7 +456,7 @@ def make_windows(data, window_sec, fn=None, return_index=False):
     X = np.asarray(X)
 
     if return_index:
-        T = pd.DatetimeIndex(T)
+        T = pd.DatetimeIndex(T, name=data.index.name)
         return X, T
 
     return X
