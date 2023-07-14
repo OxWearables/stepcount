@@ -4,21 +4,7 @@ A Python package to estimate step counts from accelerometer data.
 
 The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649). 
 
-## Getting started
-
-### Prerequisite
-
-- Python 3.8 or greater
-    ```console
-    $ python --version  # or python3 --version
-    ```
-
-- Java 8 (1.8.0) or greater
-    ```console
-    $ java -version
-    ```
-
-### Install
+## Install
 
 We recommend using **Anaconda**:
 
@@ -28,7 +14,7 @@ We recommend using **Anaconda**:
     ```console
     $ conda create -n stepcount python=3.9 openjdk pip
     ```
-    This creates a virtual environment called `stepcount` with Python version 3.9, OpenJDK version 8, and Pip.
+    This creates a virtual environment called `stepcount` with Python version 3.9, OpenJDK, and Pip.
 1. Activate the environment:
     ```console
     $ conda activate stepcount
@@ -91,8 +77,7 @@ Output: outputs/sample/
 ```
 
 ### Troubleshooting 
-Some systems may face issues with Java when running the script. If this is your case, try fixing the version of OpenJDK:
-
+Some systems may face issues with Java when running the script. If this is your case, try fixing OpenJDK to version 8:
 ```console
 $ conda install -n stepcount openjdk=8
 ```
