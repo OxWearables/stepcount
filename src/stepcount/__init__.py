@@ -6,11 +6,11 @@ __maintainer_email__ = "shing.chan@ndph.ox.ac.uk"
 __license__ = "See LICENSE file."
 
 __model_version__ = {
-    "rf": "20230210",
+    "rf": "20230713",
     "ssl": "ssl-20230208"
 }
 __model_md5__ = {
-    "rf": "8d803d175b792fff12f93ca37fbc9271",
+    "rf": "9a6ef63ca4d651c937c18b25d5af4e72",
     "ssl": "eea6179f079b554d5e2c8c98ccea8423"
 }
 
