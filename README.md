@@ -26,7 +26,7 @@ We recommend using **Anaconda**:
 1. (Windows) Once installed, launch the **Anaconda Prompt**.
 1. Create a virtual environment:
     ```console
-    $ conda create -n stepcount python=3.9 openjdk=8 pip
+    $ conda create -n stepcount python=3.9 openjdk pip
     ```
     This creates a virtual environment called `stepcount` with Python version 3.9, OpenJDK version 8, and Pip.
 1. Activate the environment:
@@ -88,6 +88,13 @@ time
 ...
 
 Output: outputs/sample/
+```
+
+### Troubleshooting 
+Some systems may face issues with Java when running the script. If this is your case, try fixing the version of OpenJDK:
+
+```console
+$ conda install -n stepcount openjdk=8
 ```
 
 ### Output files
