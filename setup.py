@@ -71,6 +71,8 @@ setuptools.setup(
             "ipdb",
             "twine",
             "tomli",
+            "jupyter",
+            "matplotlib",
         ],
         "docs": [
             "sphinx>=4.2",
