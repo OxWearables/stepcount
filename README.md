@@ -99,6 +99,19 @@ The following output files are created:
 - *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
 
 
+### Machine learning model type
+By default, the `stepcount` tool employs a self-supervised Resnet18 model to detect walking periods.
+However, it is possible to switch to a random forest model, by using the `-t` flag:
+
+```console
+$ stepcount sample.cwa -t rf
+```
+
+When using the random forest model, a set of signal features is extracted from the accelerometer data. 
+These features are subsequently used as inputs for the model's classification process. 
+For a comprehensive list of the extracted features, please refer to [rf-feature-list.md](rf-feature-list.md).
+
+
 ### Crude vs. Adjusted Estimates
 Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
