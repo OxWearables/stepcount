@@ -13,6 +13,8 @@ from torch.utils.data.dataset import Dataset
 verbose = False
 torch_cache_path = Path(__file__).parent / 'torch_hub_cache'
 
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 
 class RandomSwitchAxis:
     """
