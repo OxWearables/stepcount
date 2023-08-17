@@ -426,7 +426,7 @@ class WalkDetectorSSL:
             dataset,
             batch_size=self.batch_size,
             shuffle=False,
-            num_workers=1,
+            num_workers=0,
         )
 
         model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False)
