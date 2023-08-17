@@ -263,7 +263,8 @@ def read(filepath, resample_hz='uniform'):
                 filepath,
                 usecols=['time', 'x', 'y', 'z'],
                 parse_dates=['time'],
-                index_col='time'
+                index_col='time',
+                dtype={'x': 'f4', 'y': 'f4', 'z': 'f4'},
             )
         elif ftype == ".pkl":
             data = pd.read_pickle(filepath)
