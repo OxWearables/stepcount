@@ -424,7 +424,7 @@ class WalkDetectorSSL:
         dataset = sslmodel.NormalDataset(X, name='prediction')
         dataloader = DataLoader(
             dataset,
-            batch_size=self.batch_size,
+            batch_size=512,
             shuffle=False,
             num_workers=0,
         )
