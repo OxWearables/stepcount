@@ -34,8 +34,8 @@ jobs:
 
       - name: Download test file
         run: |
-          wget http://gas.ndph.ox.ac.uk/aidend/accModels/sample.cwa.gz --quiet
+          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
 
       - name: Smoke test
         run: |
-          stepcount sample.cwa.gz
+          stepcount tiny-sample.cwa.gz
