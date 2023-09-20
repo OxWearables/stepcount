@@ -90,9 +90,6 @@ class NormalDataset(Dataset):
         else:
             self.transform = None
 
-        if verbose:
-            print(f"{name} set sample count: {len(self.X)}")
-
     def __len__(self):
         return len(self.X)
 
@@ -239,6 +236,9 @@ def predict(model, dataloader, device, output_logits=False):
     :return: true labels, model predictions, pids
     :rtype: (np.ndarray, np.ndarray, np.ndarray)
     """
+
+    if verbose:
+        print('Classifying windows...')
 
     predictions_list = []
     true_list = []

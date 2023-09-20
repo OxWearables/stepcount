@@ -33,16 +33,19 @@ def main():
                         choices=['ssl', 'rf'], default='ssl')
     parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only)",
                         type=str, default='cpu')
+    parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
     before = time.time()
+
+    verbose = not args.quiet
 
     # Load file
     if args.model_type == 'ssl':
         resample_hz = 30
     else:
         resample_hz = None
-    data, info = read(args.filepath, resample_hz)
+    data, info = read(args.filepath, resample_hz, verbose=verbose)
 
     # Output paths
     basename = resolve_path(args.filepath)[1]
@@ -50,17 +53,22 @@ def main():
     os.makedirs(outdir, exist_ok=True)
 
     # Run model
+    if verbose:
+        print("Loading model...")
     model_path = pathlib.Path(__file__).parent / f"{__model_version__[args.model_type]}.joblib.lzma"
     check_md5 = args.model_path is None
     model = load_model(args.model_path or model_path, args.model_type, check_md5, args.force_download)
-    print("Running step counter...")
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['ResampleRate']
     model.window_len = int(np.ceil(info['ResampleRate'] * model.window_sec))
     model.wd.sample_rate = info['ResampleRate']
+    model.verbose = verbose
+    model.wd.verbose = verbose
 
     model.wd.device = args.pytorch_device
 
+    if verbose:
+        print("Running step counter...")
     Y = model.predict_from_frame(data)
 
     # Save raw output timeseries
@@ -292,7 +300,7 @@ def nanint(x):
     return int(x)
 
 
-def read(filepath, resample_hz='uniform'):
+def read(filepath, resample_hz='uniform', verbose=True):
 
     p = pathlib.Path(filepath)
     ftype = p.suffixes[0].lower()
@@ -325,6 +333,7 @@ def read(filepath, resample_hz='uniform'):
             calibrate_gravity=True,
             detect_nonwear=True,
             resample_hz=resample_hz,
+            verbose=verbose,
         )
 
         info = {
@@ -343,6 +352,7 @@ def read(filepath, resample_hz='uniform'):
             calibrate_gravity=True,
             detect_nonwear=True,
             resample_hz=resample_hz,
+            verbose=verbose,
         )
 
     if 'ResampleRate' not in info:

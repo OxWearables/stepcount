@@ -223,7 +223,7 @@ class StepCounter:
                 x = np.full((self.window_len, 3), fill_value=np.nan)
             return x
 
-        X, T = make_windows(data, self.window_sec, fn=fn, return_index=True)
+        X, T = make_windows(data, self.window_sec, fn=fn, return_index=True, verbose=self.verbose)
         Y = self.predict(X, **kwargs)
         Y = pd.Series(Y, index=T)
         return Y
@@ -272,7 +272,7 @@ class WalkDetectorRF:
 
     def fit(self, X, Y, groups=None):
 
-        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
+        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
 
         whr_ok = ~(np.isnan(X_feats).any(1))
         X_feats = X_feats[whr_ok]
@@ -324,7 +324,7 @@ class WalkDetectorRF:
         return self
 
     def predict(self, X, groups=None):
-        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs)
+        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
         whr_ok = ~(np.isnan(X_feats).any(1))
         W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
         W[whr_ok] = (self.clf.predict_proba(X_feats[whr_ok])[:, 1] > self.thresh).astype('int')
@@ -440,15 +440,18 @@ class WalkDetectorSSL:
         return y_pred
 
 
-def make_windows(data, window_sec, fn=None, return_index=False):
+def make_windows(data, window_sec, fn=None, return_index=False, verbose=True):
     """ Split data into windows """
+
+    if verbose:
+        print("Defining windows...")
 
     if fn is None:
         def fn(x):
             return x
 
     X, T = [], []
-    for t, x in data.resample(f"{window_sec}s", origin="start"):
+    for t, x in tqdm(data.resample(f"{window_sec}s", origin="start"), mininterval=5, disable=not verbose):
         x = fn(x)
         X.append(x)
         T.append(t)
@@ -574,9 +577,12 @@ def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif
 def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=False):
     """ Extract features for a list or array of windows """
 
+    if verbose:
+        print("Extracting features...")
+
     X_feats = Parallel(n_jobs=n_jobs)(
         delayed(features.extract_features)(x, sample_rate)
-        for x in tqdm(X, disable=not verbose)
+        for x in tqdm(X, mininterval=5, disable=not verbose)
     )
     X_feats = pd.DataFrame(X_feats)
 
