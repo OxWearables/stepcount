@@ -196,6 +196,8 @@ class StepCounter:
         Y_ = np.zeros_like(W_, dtype='float')
         Y_[W_] = batch_count_peaks(X_[W_], self.sample_rate, self.lowpass_hz, self.find_peaks_params)
 
+        # TODO: should we zero out < steptol windows?
+
         Y = np.full(len(X), fill_value=np.nan)
         Y[whr_ok] = Y_
 
