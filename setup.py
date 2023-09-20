@@ -53,7 +53,7 @@ setuptools.setup(
         "actipy==2.1.0",
         "numpy==1.24.*",
         "scipy==1.10.*",
-        "pandas==1.5.*",
+        "pandas==2.0.*",
         "tqdm==4.64.*",
         "joblib==1.2.*",
         "scikit-learn==1.1.1",
