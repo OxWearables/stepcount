@@ -10,7 +10,7 @@ from tqdm import tqdm
 from torchvision import transforms
 from torch.utils.data.dataset import Dataset
 
-verbose = False
+verbose = True
 torch_cache_path = Path(__file__).parent / 'torch_hub_cache'
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -249,7 +249,7 @@ def predict(model, dataloader, device, output_logits=False):
         return np.array([]), np.array([]), np.array([])
 
     with torch.inference_mode():
-        for x, y, pid in tqdm(dataloader, mininterval=60, disable=not verbose):
+        for x, y, pid in tqdm(dataloader, mininterval=5, disable=not verbose):
             x = x.to(device, dtype=torch.float)
             logits = model(x)
             true_list.append(y)
