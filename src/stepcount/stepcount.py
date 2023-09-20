@@ -68,9 +68,8 @@ def main():
 
     # Summary
     summary = summarize(Y, model.steptol)
-    summary['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}-HourlySteps.csv")
-    summary['daily'].rename('Steps').to_csv(f"{outdir}/{basename}-DailySteps.csv")
-    summary['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}-DailyWalk.csv")
+    summary['hourly'].to_csv(f"{outdir}/{basename}-HourlySteps.csv")
+    summary['daily_stats'].to_csv(f"{outdir}/{basename}-DailySteps.csv")
     info['TotalSteps'] = summary['total']
     info['StepsDayAvg'] = summary['daily_avg']
     info['StepsDayMed'] = summary['daily_med']
@@ -83,12 +82,17 @@ def main():
     info['WalkingDayMax(mins)'] = summary['daily_walk_max']
     info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
+    info['StepsQ1DayAvgAt'] = summary['daily_QAt_avg']['StepsQ1At']
+    info['StepsQ2DayAvgAt'] = summary['daily_QAt_avg']['StepsQ2At']
+    info['StepsQ3DayAvgAt'] = summary['daily_QAt_avg']['StepsQ3At']
+    info['StepsQ1DayMedAt'] = summary['daily_QAt_med']['StepsQ1At']
+    info['StepsQ2DayMedAt'] = summary['daily_QAt_med']['StepsQ2At']
+    info['StepsQ3DayMedAt'] = summary['daily_QAt_med']['StepsQ3At']
 
     # Impute missing periods & recalculate summary
     summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
-    summary_adj['hourly'].rename('Steps').to_csv(f"{outdir}/{basename}-HourlyStepsAdjusted.csv")
-    summary_adj['daily'].rename('Steps').to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv")
-    summary_adj['daily_walk'].rename('Walk(mins)').to_csv(f"{outdir}/{basename}-DailyWalkAdjusted.csv")
+    summary_adj['hourly'].to_csv(f"{outdir}/{basename}-HourlyStepsAdjusted.csv")
+    summary_adj['daily_stats'].to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv")
     info['TotalStepsAdjusted'] = summary_adj['total']
     info['StepsDayAvgAdjusted'] = summary_adj['daily_avg']
     info['StepsDayMedAdjusted'] = summary_adj['daily_med']
@@ -101,6 +105,12 @@ def main():
     info['WalkingDayMaxAdjusted(mins)'] = summary_adj['daily_walk_max']
     info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
+    info['StepsQ1DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ1At']
+    info['StepsQ2DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ2At']
+    info['StepsQ3DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ3At']
+    info['StepsQ1DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ1At']
+    info['StepsQ2DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ2At']
+    info['StepsQ3DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ3At']
 
     # Save info
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -109,13 +119,10 @@ def main():
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
-    print("\nEstimated Daily Steps/Walk\n---------------------")
-    print(pd.concat([
-        summary['daily'].rename('StepsCrude'),
-        summary['daily_walk'].rename('WalkCrude(mins)'),
-        summary_adj['daily'].rename('StepsAdjusted'),
-        summary_adj['daily_walk'].rename('WalkAdjusted(mins)')
-    ], axis=1))
+    print("\nEstimated Daily Stats\n---------------------")
+    print(summary['daily_stats'])
+    print("\nEstimated Daily Stats (Adjusted)\n---------------------")
+    print(summary_adj['daily_stats'])
 
     after = time.time()
     print(f"Done! ({round(after - before,2)}s)")
@@ -141,8 +148,8 @@ def summarize(Y, steptol=3, adjust_estimates=False):
 
     # steps
     total = np.round(Y.agg(_sum))  # total steps
-    hourly = Y.resample('H').agg(_sum).round()  # steps, hourly
-    daily = Y.resample('D').agg(_sum).round()  # steps, daily
+    hourly = Y.resample('H').agg(_sum).round().rename('Steps')  # steps, hourly
+    daily = Y.resample('D').agg(_sum).round().rename('Steps')  # steps, daily
     daily_avg = np.round(daily.mean())
     daily_med = np.round(daily.median())
     daily_min = np.round(daily.min())
@@ -152,7 +159,7 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     dt = pd.Timedelta(infer_freq(Y.index)).seconds
     W = Y.mask(~Y.isna(), Y >= steptol)
     total_walk = np.round(W.agg(_sum) * dt / 60)
-    daily_walk = (W.resample('D').agg(_sum) * dt / 60).round()
+    daily_walk = (W.resample('D').agg(_sum) * dt / 60).round().rename('Walk(mins)')
     daily_walk_avg = np.round(daily_walk.mean())
     daily_walk_med = np.round(daily_walk.median())
     daily_walk_min = np.round(daily_walk.min())
@@ -166,6 +173,38 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     cadence_peak1 = cadence.resample('D').agg(_max, n=1).mean()
     cadence_peak30 = cadence.resample('D').agg(_max, n=30).mean()
 
+    # distributional features - quantiles
+    def _QAt(x):
+        if adjust_estimates and x.isna().any():
+            return {'StepsQ1At': np.nan, 'StepsQ2At': np.nan, 'StepsQ3At': np.nan}
+        z = x.cumsum() / x.sum()
+        q1_at = z[z >= 0.25].index[0]
+        q1_at = q1_at - q1_at.floor('D')
+        q2_at = z[z >= 0.5].index[0]
+        q2_at = q2_at - q2_at.floor('D')
+        q3_at = z[z >= 0.75].index[0]
+        q3_at = q3_at - q3_at.floor('D')
+        return {'StepsQ1At': q1_at, 'StepsQ2At': q2_at, 'StepsQ3At': q3_at}
+
+    def _QAt_to_str(tdelta):
+        if pd.isna(tdelta):
+            return np.nan
+        hours, rem = divmod(tdelta.seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+    daily_QAt = Y.groupby(pd.Grouper(freq='D')).apply(_QAt).unstack(1)
+    daily_QAt_avg = daily_QAt.mean()
+    daily_QAt_med = daily_QAt.median()
+
+    # daily stats
+    daily_stats = pd.concat([
+        daily_walk,
+        daily,
+        daily_QAt.applymap(_QAt_to_str),
+    ], axis=1)
+
+    # convert units
     total = nanint(total)
     hourly = pd.to_numeric(hourly, downcast='integer')
     daily = pd.to_numeric(daily, downcast='integer')
@@ -181,23 +220,26 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     daily_walk_max = nanint(daily_walk_max)
     cadence_peak1 = nanint(cadence_peak1)
     cadence_peak30 = nanint(cadence_peak30)
+    daily_QAt_avg = daily_QAt_avg.map(_QAt_to_str)
+    daily_QAt_med = daily_QAt_med.map(_QAt_to_str)
 
     return {
         'total': total,
         'hourly': hourly,
-        'daily': daily,
+        'daily_stats': daily_stats,
         'daily_avg': daily_avg,
         'daily_med': daily_med,
         'daily_min': daily_min,
         'daily_max': daily_max,
         'total_walk': total_walk,
-        'daily_walk': daily_walk,
         'daily_walk_avg': daily_walk_avg,
         'daily_walk_med': daily_walk_med,
         'daily_walk_min': daily_walk_min,
         'daily_walk_max': daily_walk_max,
         'cadence_peak1': cadence_peak1,
         'cadence_peak30': cadence_peak30,
+        'daily_QAt_avg': daily_QAt_avg,
+        'daily_QAt_med': daily_QAt_med,
     }
 
 
