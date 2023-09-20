@@ -1,1 +1,1 @@
-from stepcount.utils.collate_outputs import collate_outputs
+from stepcount.utils.collate_outputs import collate_outputs, generate_commands
