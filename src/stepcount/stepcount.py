@@ -183,16 +183,20 @@ def summarize(Y, steptol=3, adjust_estimates=False):
 
     # distributional features - quantiles
     def _QAt(x):
+        na_return = {'StepsQ1At': np.nan, 'StepsQ2At': np.nan, 'StepsQ3At': np.nan}
         if adjust_estimates and x.isna().any():
-            return {'StepsQ1At': np.nan, 'StepsQ2At': np.nan, 'StepsQ3At': np.nan}
+            return na_return
         z = x.cumsum() / x.sum()
-        q1_at = z[z >= 0.25].index[0]
-        q1_at = q1_at - q1_at.floor('D')
-        q2_at = z[z >= 0.5].index[0]
-        q2_at = q2_at - q2_at.floor('D')
-        q3_at = z[z >= 0.75].index[0]
-        q3_at = q3_at - q3_at.floor('D')
-        return {'StepsQ1At': q1_at, 'StepsQ2At': q2_at, 'StepsQ3At': q3_at}
+        try:
+            q1_at = z[z >= 0.25].index[0]
+            q1_at = q1_at - q1_at.floor('D')
+            q2_at = z[z >= 0.5].index[0]
+            q2_at = q2_at - q2_at.floor('D')
+            q3_at = z[z >= 0.75].index[0]
+            q3_at = q3_at - q3_at.floor('D')
+            return {'StepsQ1At': q1_at, 'StepsQ2At': q2_at, 'StepsQ3At': q3_at}
+        except IndexError:
+            return na_return
 
     def _QAt_to_str(tdelta):
         if pd.isna(tdelta):
