@@ -6,7 +6,9 @@ The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data f
 
 ## Install
 
-We recommend using **Anaconda**:
+*Minimum requirements*: Python>=3.8, Java 8 (1.8)
+
+The following instructions make use of Anaconda to meet the minimum requirements:
 
 1. Download & install [Miniconda](https://docs.conda.io/en/latest/miniconda.html) (light-weight version of Anaconda).
 1. (Windows) Once installed, launch the **Anaconda Prompt**.
