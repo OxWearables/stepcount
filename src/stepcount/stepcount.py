@@ -192,8 +192,16 @@ def summarize(Y, steptol=3, adjust_estimates=False):
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
     cadence = Y.resample('min').sum()
-    cadence_peak1 = cadence.resample('D').agg(_max, n=1).mean()
-    cadence_peak30 = cadence.resample('D').agg(_max, n=30).mean()
+    daily_cadence_peak1 = cadence.resample('D').agg(_max, n=1)
+    daily_cadence_peak30 = cadence.resample('D').agg(_max, n=30)
+    if not adjust_estimates:
+        cadence_peak1 = np.round(daily_cadence_peak1.mean())
+        cadence_peak30 = np.round(daily_cadence_peak30.mean())
+    else:
+        weekdaily_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).mean()
+        weekdaily_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).mean()
+        cadence_peak1 = np.round(weekdaily_cadence_peak1.mean())
+        cadence_peak30 = np.round(weekdaily_cadence_peak30.mean())
 
     # distributional features - quantiles
     def _QAt(x):
