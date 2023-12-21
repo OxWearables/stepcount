@@ -69,10 +69,12 @@ def main():
 
     if verbose:
         print("Running step counter...")
-    Y = model.predict_from_frame(data)
+    Y, W, T_steps = model.predict_from_frame(data)
 
-    # Save raw output timeseries
-    Y.rename('Steps').to_csv(f"{outdir}/{basename}-Steps.csv")
+    # Save step counts
+    Y.to_csv(f"{outdir}/{basename}-Steps.csv")
+    # Save timestamps of each step
+    T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv", index=False)
 
     # Summary
     summary = summarize(Y, model.steptol)

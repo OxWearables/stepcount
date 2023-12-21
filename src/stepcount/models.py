@@ -182,33 +182,46 @@ class StepCounter:
 
         return self
 
-    def predict(self, X, groups=None, return_walk=False):
+    def predict(self, X, groups=None, return_walk=False, return_step_times=False):
 
         if self.find_peaks_params is None:
             print("Model not yet trained. Call .fit() first.")
             return
 
         # check X quality
-        whr_ok = ~(np.asarray([np.isnan(x).any() for x in X]))
+        ok = ~(np.asarray([np.isnan(x).any() for x in X]))
 
-        X_ = X[whr_ok]
+        X_ = X[ok]
         W_ = self.wd.predict(X_, groups).astype('bool')
         Y_ = np.zeros_like(W_, dtype='float')
-        Y_[W_] = batch_count_peaks(X_[W_], self.sample_rate, self.lowpass_hz, self.find_peaks_params)
+        Z_ = np.full_like(W_, fill_value=None, dtype=np.ndarray)
+
+        (Y_[W_], Z_[W_]) = batch_count_peaks(
+            X_[W_],
+            self.sample_rate,
+            self.lowpass_hz,
+            self.find_peaks_params,
+            return_peaks=True
+        )
 
         # TODO: should we zero out < steptol windows?
 
         Y = np.full(len(X), fill_value=np.nan)
-        Y[whr_ok] = Y_
+        Y[ok] = Y_
 
+        W = None
         if return_walk:
             W = np.full(len(X), fill_value=np.nan)
-            W[whr_ok] = W_
-            return Y, W
+            W[ok] = W_
 
-        return Y
+        Z = None
+        if return_step_times:
+            Z = np.full(len(X), fill_value=None, dtype=np.ndarray)
+            Z[ok] = Z_
 
-    def predict_from_frame(self, data, **kwargs):
+        return Y, W, Z
+
+    def predict_from_frame(self, data):
 
         def fn(chunk):
             """ Process the chunk. Apply padding if length is not enough. """
@@ -226,9 +239,20 @@ class StepCounter:
             return x
 
         X, T = make_windows(data, self.window_sec, fn=fn, return_index=True, verbose=self.verbose)
-        Y = self.predict(X, **kwargs)
-        Y = pd.Series(Y, index=T)
-        return Y
+
+        Y, W, Z = self.predict(X, return_walk=True, return_step_times=True)
+
+        Y = pd.Series(Y, index=T, name='Steps')
+        W = pd.Series(W, index=T, name='Walk')
+
+        T_steps = []
+        for t, z in zip(T, Z):
+            if z is not None:
+                # convert the local window timestamps to global timestamps
+                T_steps.extend([t + pd.Timedelta(seconds=dt) for dt in z])
+        T_steps = pd.Series(T_steps, name='time')
+
+        return Y, W, T_steps
 
 
 class WalkDetectorRF:
@@ -593,22 +617,37 @@ def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=Fals
     return X_feats
 
 
-def batch_count_peaks(X, sample_rate, lowpass_hz, params):
+def batch_count_peaks(X, sample_rate, lowpass_hz, params, return_peaks=False):
     """ Count number of peaks for an array of signals """
     V = toV(X, sample_rate, lowpass_hz)
-    return batch_count_peaks_from_V(V, sample_rate, params)
+    return batch_count_peaks_from_V(V, sample_rate, params, return_peaks)
 
 
-def batch_count_peaks_from_V(V, sample_rate, params):
+def batch_count_peaks_from_V(V, sample_rate, params, return_peaks=False):
     """ Count number of peaks for an array of signals """
-    Y = np.asarray([
-        len(find_peaks(
+
+    batch_peaks = batch_find_peaks_from_V(V, sample_rate, params)
+
+    Y = np.asarray([len(peaks) for peaks in batch_peaks])
+
+    if return_peaks:
+        return Y, batch_peaks
+    return Y
+
+
+def batch_find_peaks_from_V(V, sample_rate, params):
+    """Find the peaks for an array of signals"""
+
+    batch_peaks = [
+        find_peaks(
             v,
             distance=params["distance"] * sample_rate,
             prominence=params["prominence"],
-        )[0]) for v in V
-    ])
-    return Y
+        )[0] / sample_rate  # convert indices to seconds
+        for v in V
+    ]
+
+    return batch_peaks
 
 
 def toV(x, sample_rate, lowpass_hz):
