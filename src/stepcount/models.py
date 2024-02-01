@@ -189,15 +189,16 @@ class StepCounter:
             return
 
         # check X quality
-        ok = ~(np.asarray([np.isnan(x).any() for x in X]))
+        ok = np.flatnonzero(~np.asarray([np.isnan(x).any() for x in X]))
 
         X_ = X[ok]
         W_ = self.wd.predict(X_, groups).astype('bool')
         Y_ = np.zeros_like(W_, dtype='float')
         Z_ = np.full_like(W_, fill_value=None, dtype=np.ndarray)
 
-        (Y_[W_], Z_[W_]) = batch_count_peaks(
-            X_[W_],
+        w_ = np.flatnonzero(W_)
+        (Y_[w_], Z_[w_]) = batch_count_peaks(
+            X_[w_],
             self.sample_rate,
             self.lowpass_hz,
             self.find_peaks_params,
