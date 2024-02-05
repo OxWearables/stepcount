@@ -333,8 +333,10 @@ def nanint(x):
 def read(filepath, resample_hz='uniform', sample_rate=None, verbose=True):
 
     p = pathlib.Path(filepath)
-    ftype = p.suffixes[0].lower()
     fsize = round(p.stat().st_size / (1024 * 1024), 1)
+    ftype = p.suffix.lower()
+    if ftype in (".gz", ".xz", ".lzma", ".bz2", ".zip"):  # if file is compressed, check the next extension
+        ftype = pathlib.Path(p.stem).suffix.lower()
 
     if ftype in (".csv", ".pkl"):
 
@@ -385,6 +387,9 @@ def read(filepath, resample_hz='uniform', sample_rate=None, verbose=True):
             resample_hz=resample_hz,
             verbose=verbose,
         )
+
+    else:
+        raise ValueError(f"Unknown file format: {ftype}")
 
     if 'ResampleRate' not in info:
         info['ResampleRate'] = info['SampleRate']
