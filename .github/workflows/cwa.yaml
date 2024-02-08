@@ -39,3 +39,4 @@ jobs:
       - name: Smoke test
         run: |
           stepcount tiny-sample.cwa.gz
+          stepcount tiny-sample.cwa.gz -t rf
