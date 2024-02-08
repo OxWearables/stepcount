@@ -1,5 +1,5 @@
 import numpy as np
-from hmmlearn.hmm import MultinomialHMM
+from hmmlearn.hmm import CategoricalHMM
 
 
 class HMMSmoother():
@@ -148,7 +148,7 @@ def hmmlearn_fit_predict(
 
     for idx in range(n_trials + 1):
 
-        hmm = MultinomialHMM(
+        hmm = CategoricalHMM(
             n_components=n_components,
             params=ste,
             init_params="",
