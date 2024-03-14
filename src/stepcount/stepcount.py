@@ -34,7 +34,12 @@ def main():
     parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only)",
                         type=str, default='cpu')
     parser.add_argument("--sample-rate", "-r", help="Sample rate for measurement, otherwise inferred.",
-                        type=int, default=None)    
+                        type=int, default=None)
+    parser.add_argument("--txyz",
+                        help=("Use this option to specify the column names for time, x, y, z "
+                              "in the input file, in that order. Use a comma-separated string. "
+                              "Default: 'time,x,y,z'"),
+                        type=str, default="time,x,y,z")
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -43,11 +48,13 @@ def main():
     verbose = not args.quiet
 
     # Load file
-    if args.model_type == 'ssl':
-        resample_hz = 30
-    else:
-        resample_hz = None
-    data, info = read(args.filepath, resample_hz, sample_rate=args.sample_rate, verbose=verbose)
+    data, info = read(
+        args.filepath, 
+        usecols=args.txyz, 
+        resample_hz=30 if args.model_type == 'ssl' else None,
+        sample_rate=args.sample_rate, 
+        verbose=verbose
+    )
 
     # Output paths
     basename = resolve_path(args.filepath)[1]
@@ -335,7 +342,13 @@ def nanint(x):
     return int(x)
 
 
-def read(filepath, resample_hz='uniform', sample_rate=None, verbose=True):
+def read(
+    filepath: str,
+    usecols: str = 'time,x,y,z',
+    resample_hz: str = 'uniform',
+    sample_rate: float = None,
+    verbose: bool = True
+):
 
     p = pathlib.Path(filepath)
     fsize = round(p.stat().st_size / (1024 * 1024), 1)
@@ -346,15 +359,21 @@ def read(filepath, resample_hz='uniform', sample_rate=None, verbose=True):
     if ftype in (".csv", ".pkl"):
 
         if ftype == ".csv":
+            tcol, xcol, ycol, zcol = usecols.split(',')
             data = pd.read_csv(
                 filepath,
-                usecols=['time', 'x', 'y', 'z'],
-                parse_dates=['time'],
-                index_col='time',
-                dtype={'x': 'f4', 'y': 'f4', 'z': 'f4'},
+                usecols=[tcol, xcol, ycol, zcol],
+                parse_dates=[tcol],
+                index_col=tcol,
+                dtype={xcol: 'f4', ycol: 'f4', zcol: 'f4'},
             )
+            # rename to standard names
+            data = data.rename(columns={xcol: 'x', ycol: 'y', zcol: 'z'})
+            data.index.name = 'time'
+
         elif ftype == ".pkl":
             data = pd.read_pickle(filepath)
+
         else:
             raise ValueError(f"Unknown file format: {ftype}")
 
