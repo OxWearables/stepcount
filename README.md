@@ -122,7 +122,7 @@ Estimates will be NaN where data is still missing after imputation.
 
 
 ### Processing CSV files
-If a CSV file is provided, it must have the following header: `time`, `x`, `y`, `z`. 
+If a CSV file is provided, the following header is expected: `time`, `x`, `y`, `z`. 
 
 Example:
 ```console
@@ -133,6 +133,23 @@ time,x,y,z
 2013-10-21 10:00:08.030,-0.078923,0.411933,0.901938
 ...
 ```
+
+If the CSV file has a different header, use the option `--txyz` to specify the time and x-y-z columns, in that order. For example:
+
+```console
+HEADER_TIMESTAMP,X,Y,Z
+2013-10-21 10:00:08.000,-0.078923,0.396706,0.917759
+2013-10-21 10:00:08.010,-0.094370,0.381479,0.933580
+2013-10-21 10:00:08.020,-0.094370,0.366252,0.901938
+2013-10-21 10:00:08.030,-0.078923,0.411933,0.901938
+...
+```
+
+then use:
+```console
+$ stepcount my-file.csv --txyz 'HEADER_TIMESTAMP,X,Y,Z'
+```
+
 
 ### Processing multiple files
 #### Windows
