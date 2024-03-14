@@ -1,3 +1,4 @@
+import warnings
 import os
 import pathlib
 import urllib
@@ -282,13 +283,18 @@ def summarize(Y, steptol=3, adjust_estimates=False):
 
 def impute_missing(data: pd.DataFrame, extrapolate=True):
 
-    if extrapolate:
-        # padding at the boundaries to have full 24h
+    if extrapolate:  # extrapolate beyond start/end times to have full 24h
+        freq = infer_freq(data.index)
+        if pd.isna(freq):
+            warnings.warn("Cannot infer frequency, using 1s")
+            freq = pd.Timedelta('1s')
+        freq = to_offset(freq)
         data = data.reindex(
             pd.date_range(
+                # TODO: This fails if data.index[0] happens to be midnight
                 data.index[0].floor('D'),
                 data.index[-1].ceil('D'),
-                freq=to_offset(infer_freq(data.index)),
+                freq=freq,
                 inclusive='left',
                 name='time',
             ),
