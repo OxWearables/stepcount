@@ -147,7 +147,7 @@ HEADER_TIMESTAMP,X,Y,Z
 
 then use:
 ```console
-$ stepcount my-file.csv --txyz 'HEADER_TIMESTAMP,X,Y,Z'
+$ stepcount my-file.csv --txyz HEADER_TIMESTAMP,X,Y,Z
 ```
 
 
