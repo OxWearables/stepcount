@@ -159,10 +159,9 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         skipna = True
 
     def _sum(x):
-        x = x.to_numpy()
-        if skipna:
-            return np.nansum(x)
-        return np.sum(x)
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.sum()
 
     def _max(x, n=1):
         if not skipna and x.isna().any():
