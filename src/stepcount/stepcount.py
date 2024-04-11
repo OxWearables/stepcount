@@ -101,6 +101,7 @@ def main():
     info['WalkingDayMax(mins)'] = summary['daily_walk_max']
     info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
+    info['Cadence95th(steps/min)'] = summary['cadence_p95']
     info['StepsQ1DayAvgAt'] = summary['daily_QAt_avg']['StepsQ1At']
     info['StepsQ2DayAvgAt'] = summary['daily_QAt_avg']['StepsQ2At']
     info['StepsQ3DayAvgAt'] = summary['daily_QAt_avg']['StepsQ3At']
@@ -124,6 +125,7 @@ def main():
     info['WalkingDayMaxAdjusted(mins)'] = summary_adj['daily_walk_max']
     info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
+    info['Cadence95thAdjusted(steps/min)'] = summary_adj['cadence_p95']
     info['StepsQ1DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ1At']
     info['StepsQ2DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ2At']
     info['StepsQ3DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ3At']
@@ -165,6 +167,12 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     def _max(x, n=1):
         if skipna:
             return x.nlargest(n, keep='all').mean()
+        elif x.isna().any():
+            return np.nan
+
+    def _percentile(x, p=95):
+        if skipna:
+            return x.quantile(p / 100)
         elif x.isna().any():
             return np.nan
 
@@ -212,14 +220,18 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
     daily_cadence_peak1 = minutely.resample('D').agg(_max, n=1)
     daily_cadence_peak30 = minutely.resample('D').agg(_max, n=30)
+    daily_cadence_p95 = minutely.resample('D').agg(_percentile, p=95)
     if not adjust_estimates:
         cadence_peak1 = np.round(daily_cadence_peak1.mean())
         cadence_peak30 = np.round(daily_cadence_peak30.mean())
+        cadence_p95 = np.round(daily_cadence_p95.mean())
     else:
         weekdaily_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).mean()
         weekdaily_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).mean()
+        weekdaily_cadence_p95 = daily_cadence_p95.groupby(daily_cadence_p95.index.weekday).mean()
         cadence_peak1 = np.round(weekdaily_cadence_peak1.mean())
         cadence_peak30 = np.round(weekdaily_cadence_peak30.mean())
+        cadence_p95 = np.round(weekdaily_cadence_p95.mean())
 
     # distributional features - quantiles
     def _QAt(x):
@@ -272,6 +284,7 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     daily_walk_max = nanint(daily_walk_max)
     cadence_peak1 = nanint(cadence_peak1)
     cadence_peak30 = nanint(cadence_peak30)
+    cadence_p95 = nanint(cadence_p95)
     daily_QAt_avg = daily_QAt_avg.map(_QAt_to_str)
     daily_QAt_med = daily_QAt_med.map(_QAt_to_str)
 
@@ -290,6 +303,7 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         'daily_walk_max': daily_walk_max,
         'cadence_peak1': cadence_peak1,
         'cadence_peak30': cadence_peak30,
+        'cadence_p95': cadence_p95,
         'daily_QAt_avg': daily_QAt_avg,
         'daily_QAt_med': daily_QAt_med,
     }
