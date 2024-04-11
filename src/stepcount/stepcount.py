@@ -165,16 +165,14 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         return np.sum(x)
 
     def _max(x, n=1):
-        if skipna:
-            return x.nlargest(n, keep='all').mean()
-        elif x.isna().any():
+        if not skipna and x.isna().any():
             return np.nan
+        return x.nlargest(n, keep='all').mean()
 
     def _percentile(x, p=95):
-        if skipna:
-            return x.quantile(p / 100)
-        elif x.isna().any():
+        if not skipna and x.isna().any():
             return np.nan
+        return x.quantile(p / 100)
 
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
