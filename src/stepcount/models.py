@@ -1,3 +1,4 @@
+import warnings
 from copy import deepcopy
 from collections import defaultdict, Counter
 import torch
@@ -351,11 +352,18 @@ class WalkDetectorRF:
         return self
 
     def predict(self, X, groups=None):
-        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
-        whr_ok = ~(np.isnan(X_feats).any(1))
+
+        if len(X) == 0:
+            warnings.warn("No data to predict")
+            return np.array([], dtype='int')
+
         W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
-        W[whr_ok] = (self.clf.predict_proba(X_feats[whr_ok])[:, 1] > self.thresh).astype('int')
+        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
+        ok = ~(np.isnan(X_feats).any(1))
+        if ok.any():
+            W[ok] = (self.clf.predict_proba(X_feats[ok])[:, 1] > self.thresh).astype('int')
         W = self.hmms.predict(W, groups=groups)
+
         return W
 
 
@@ -446,6 +454,11 @@ class WalkDetectorSSL:
         return self
 
     def predict(self, X, groups=None):
+
+        if len(X) == 0:
+            warnings.warn("No data to predict")
+            return np.array([], dtype='int')
+
         sslmodel.verbose = self.verbose
 
         dataset = sslmodel.NormalDataset(X, name='prediction')
