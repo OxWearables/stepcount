@@ -35,8 +35,12 @@ jobs:
       - name: Download test file
         run: |
           wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
+          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
 
       - name: Smoke test
         run: |
           stepcount tiny-sample.cwa.gz
           stepcount tiny-sample.cwa.gz -t rf
+          stepcount mini-sample.csv.gz
+          stepcount mini-sample.csv.gz -t rf
+            
