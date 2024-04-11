@@ -162,6 +162,12 @@ def summarize(Y, steptol=3, adjust_estimates=False):
             return np.nansum(x)
         return np.sum(x)
 
+    def _max(x, n=1):
+        if skipna:
+            return x.nlargest(n, keep='all').mean()
+        elif x.isna().any():
+            return np.nan
+
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
 
@@ -169,6 +175,9 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     total = np.round(Y.agg(_sum))  # total steps
     hourly = Y.resample('H').agg(_sum).round().rename('Steps')  # steps, hourly
     daily = Y.resample('D').agg(_sum).round().rename('Steps')  # steps, daily
+    minutely = Y.resample('T').agg(_sum).round().rename('Steps')  # steps, minutely
+
+    # steps, daily stats
     if not adjust_estimates:
         daily_avg = np.round(daily.mean())
         daily_med = np.round(daily.median())
@@ -186,6 +195,8 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     W = Y.mask(~Y.isna(), Y >= steptol)
     total_walk = np.round(W.agg(_sum) * dt / 60)
     daily_walk = (W.resample('D').agg(_sum) * dt / 60).round().rename('Walk(mins)')
+
+    # walking, daily stats
     if not adjust_estimates:
         daily_walk_avg = np.round(daily_walk.mean())
         daily_walk_med = np.round(daily_walk.median())
@@ -198,13 +209,9 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         daily_walk_min = np.round(weekdaily_walk.min())
         daily_walk_max = np.round(weekdaily_walk.max())
 
-    def _max(x, n=1):
-        return x.nlargest(n, keep='all').mean()
-
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
-    cadence = Y.resample('min').sum()
-    daily_cadence_peak1 = cadence.resample('D').agg(_max, n=1)
-    daily_cadence_peak30 = cadence.resample('D').agg(_max, n=30)
+    daily_cadence_peak1 = minutely.resample('D').agg(_max, n=1)
+    daily_cadence_peak30 = minutely.resample('D').agg(_max, n=30)
     if not adjust_estimates:
         cadence_peak1 = np.round(daily_cadence_peak1.mean())
         cadence_peak30 = np.round(daily_cadence_peak30.mean())
