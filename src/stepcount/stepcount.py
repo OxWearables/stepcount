@@ -185,13 +185,17 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     # steps, daily stats
     if not adjust_estimates:
         daily_avg = np.round(daily.mean())
-        daily_med = np.round(daily.median())
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            daily_med = np.round(daily.median())
         daily_min = np.round(daily.min())
         daily_max = np.round(daily.max())
     else:
         weekdaily = daily.groupby(daily.index.weekday).mean()
         daily_avg = np.round(weekdaily.mean())
-        daily_med = np.round(weekdaily.median())
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            daily_med = np.round(weekdaily.median())
         daily_min = np.round(weekdaily.min())
         daily_max = np.round(weekdaily.max())
 
@@ -204,13 +208,17 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     # walking, daily stats
     if not adjust_estimates:
         daily_walk_avg = np.round(daily_walk.mean())
-        daily_walk_med = np.round(daily_walk.median())
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            daily_walk_med = np.round(daily_walk.median())
         daily_walk_min = np.round(daily_walk.min())
         daily_walk_max = np.round(daily_walk.max())
     else:
         weekdaily_walk = daily_walk.groupby(daily_walk.index.weekday).mean()
         daily_walk_avg = np.round(weekdaily_walk.mean())
-        daily_walk_med = np.round(weekdaily_walk.median())
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            daily_walk_med = np.round(weekdaily_walk.median())
         daily_walk_min = np.round(weekdaily_walk.min())
         daily_walk_max = np.round(weekdaily_walk.max())
 
