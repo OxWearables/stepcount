@@ -102,12 +102,16 @@ def main():
     info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = summary['cadence_p95']
-    info['StepsQ1DayAvgAt'] = summary['daily_QAt_avg']['StepsQ1At']
-    info['StepsQ2DayAvgAt'] = summary['daily_QAt_avg']['StepsQ2At']
-    info['StepsQ3DayAvgAt'] = summary['daily_QAt_avg']['StepsQ3At']
-    info['StepsQ1DayMedAt'] = summary['daily_QAt_med']['StepsQ1At']
-    info['StepsQ2DayMedAt'] = summary['daily_QAt_med']['StepsQ2At']
-    info['StepsQ3DayMedAt'] = summary['daily_QAt_med']['StepsQ3At']
+    info['Steps5thDayAvgAt'] = summary['daily_ptile_at_avg']['p05_at']
+    info['Steps25thDayAvgAt'] = summary['daily_ptile_at_avg']['p25_at']
+    info['Steps50thDayAvgAt'] = summary['daily_ptile_at_avg']['p50_at']
+    info['Steps75thDayAvgAt'] = summary['daily_ptile_at_avg']['p75_at']
+    info['Steps95thDayAvgAt'] = summary['daily_ptile_at_avg']['p95_at']
+    info['Steps5thDayMedAt'] = summary['daily_ptile_at_med']['p05_at']
+    info['Steps25thDayMedAt'] = summary['daily_ptile_at_med']['p25_at']
+    info['Steps50thDayMedAt'] = summary['daily_ptile_at_med']['p50_at']
+    info['Steps75thDayMedAt'] = summary['daily_ptile_at_med']['p75_at']
+    info['Steps95thDayMedAt'] = summary['daily_ptile_at_med']['p95_at']
 
     # Impute missing periods & recalculate summary
     summary_adj = summarize(Y, model.steptol, adjust_estimates=True)
@@ -126,12 +130,16 @@ def main():
     info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = summary_adj['cadence_p95']
-    info['StepsQ1DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ1At']
-    info['StepsQ2DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ2At']
-    info['StepsQ3DayAvgAdjustedAt'] = summary_adj['daily_QAt_avg']['StepsQ3At']
-    info['StepsQ1DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ1At']
-    info['StepsQ2DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ2At']
-    info['StepsQ3DayMedAdjustedAt'] = summary_adj['daily_QAt_med']['StepsQ3At']
+    info['Steps5thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p05_at']
+    info['Steps25thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p25_at']
+    info['Steps50thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p50_at']
+    info['Steps75thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p75_at']
+    info['Steps95thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p95_at']
+    info['Steps5thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p05_at']
+    info['Steps25thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p25_at']
+    info['Steps50thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p50_at']
+    info['Steps75thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p75_at']
+    info['Steps95thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p95_at']
 
     # Save info
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -172,6 +180,27 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         if not skipna and x.isna().any():
             return np.nan
         return x.quantile(p / 100)
+
+    def _percentile_at(x, ps=(5, 25, 50, 75, 95)):
+        percentiles = {f'p{p:02}_at': np.nan for p in ps}
+        if not skipna and x.isna().any():
+            return percentiles
+        z = x.cumsum() / x.sum()
+        for p in ps:
+            try:
+                p_at = z[z >= p / 100].index[0]
+                p_at = p_at - p_at.floor('D')
+                percentiles[f'p{p:02}_at'] = p_at
+            except IndexError:
+                pass
+        return percentiles
+
+    def _tdelta_to_str(tdelta):
+        if pd.isna(tdelta):
+            return np.nan
+        hours, rem = divmod(tdelta.seconds, 3600)
+        minutes, seconds = divmod(rem, 60)
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
@@ -238,39 +267,21 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         cadence_peak30 = np.round(weekdaily_cadence_peak30.mean())
         cadence_p95 = np.round(weekdaily_cadence_p95.mean())
 
-    # distributional features - quantiles
-    def _QAt(x):
-        na_return = {'StepsQ1At': np.nan, 'StepsQ2At': np.nan, 'StepsQ3At': np.nan}
-        if adjust_estimates and x.isna().any():
-            return na_return
-        z = x.cumsum() / x.sum()
-        try:
-            q1_at = z[z >= 0.25].index[0]
-            q1_at = q1_at - q1_at.floor('D')
-            q2_at = z[z >= 0.5].index[0]
-            q2_at = q2_at - q2_at.floor('D')
-            q3_at = z[z >= 0.75].index[0]
-            q3_at = q3_at - q3_at.floor('D')
-            return {'StepsQ1At': q1_at, 'StepsQ2At': q2_at, 'StepsQ3At': q3_at}
-        except IndexError:
-            return na_return
-
-    def _QAt_to_str(tdelta):
-        if pd.isna(tdelta):
-            return np.nan
-        hours, rem = divmod(tdelta.seconds, 3600)
-        minutes, seconds = divmod(rem, 60)
-        return f"{hours:02}:{minutes:02}:{seconds:02}"
-
-    daily_QAt = Y.groupby(pd.Grouper(freq='D')).apply(_QAt).unstack(1)
-    daily_QAt_avg = daily_QAt.mean()
-    daily_QAt_med = daily_QAt.median()
+    daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
+    daily_ptile_at_avg = daily_ptile_at.mean()
+    daily_ptile_at_med = daily_ptile_at.median()
 
     # daily stats
     daily_stats = pd.concat([
         daily_walk,
         daily,
-        daily_QAt.applymap(_QAt_to_str),
+        daily_ptile_at.rename(columns={
+            'p05_at': 'Steps5thAt',
+            'p25_at': 'Steps25thAt',
+            'p50_at': 'Steps50thAt',
+            'p75_at': 'Steps75thAt',
+            'p95_at': 'Steps95thAt'
+        }).applymap(_tdelta_to_str),
     ], axis=1)
 
     # convert units
@@ -290,8 +301,8 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     cadence_peak1 = nanint(cadence_peak1)
     cadence_peak30 = nanint(cadence_peak30)
     cadence_p95 = nanint(cadence_p95)
-    daily_QAt_avg = daily_QAt_avg.map(_QAt_to_str)
-    daily_QAt_med = daily_QAt_med.map(_QAt_to_str)
+    daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
+    daily_ptile_at_med = daily_ptile_at_med.map(_tdelta_to_str)
 
     return {
         'total': total,
@@ -309,8 +320,8 @@ def summarize(Y, steptol=3, adjust_estimates=False):
         'cadence_peak1': cadence_peak1,
         'cadence_peak30': cadence_peak30,
         'cadence_p95': cadence_p95,
-        'daily_QAt_avg': daily_QAt_avg,
-        'daily_QAt_med': daily_QAt_med,
+        'daily_ptile_at_avg': daily_ptile_at_avg,
+        'daily_ptile_at_med': daily_ptile_at_med,
     }
 
 
