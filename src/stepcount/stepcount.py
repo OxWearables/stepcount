@@ -85,6 +85,20 @@ def main():
     # Save timestamps of each step
     T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv.gz", index=False)
 
+    # ENMO summary
+    enmo_summary = summarize_enmo(data)
+    info['ENMO(mg)'] = enmo_summary['avg']
+    enmo_summary['minutely'].to_csv(f"{outdir}/{basename}-MinutelyENMO.csv.gz")
+    enmo_summary['hourly'].to_csv(f"{outdir}/{basename}-HourlyENMO.csv.gz")
+    enmo_summary['daily'].to_csv(f"{outdir}/{basename}-DailyENMO.csv.gz")
+
+    # ENMO summary, adjusted
+    enmo_summary_adj = summarize_enmo(data, adjust_estimates=True)
+    info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
+    enmo_summary_adj['minutely'].to_csv(f"{outdir}/{basename}-MinutelyENMOAdjusted.csv.gz")
+    enmo_summary_adj['hourly'].to_csv(f"{outdir}/{basename}-HourlyENMOAdjusted.csv.gz")
+    enmo_summary_adj['daily'].to_csv(f"{outdir}/{basename}-DailyENMOAdjusted.csv.gz")
+
     # Steps summary
     summary = summarize_steps(Y, model.steptol)
     summary['minutely'].to_csv(f"{outdir}/{basename}-MinutelySteps.csv.gz")
@@ -157,6 +171,46 @@ def main():
 
     after = time.time()
     print(f"Done! ({round(after - before,2)}s)")
+
+
+def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
+    """ Summarize ENMO data """
+
+    # Truncated ENMO: Euclidean norm minus one and clipped at zero
+    v = np.sqrt(data['x'] ** 2 + data['y'] ** 2 + data['z'] ** 2)
+    v = np.clip(v - 1, a_min=0, a_max=None)
+    v *= 1000  # convert to mg
+
+    if adjust_estimates:
+        v = impute_missing(v)
+        skipna = False
+    else:
+        # crude summary ignores missing data
+        skipna = True
+
+    def _mean(x):
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.mean()
+
+    # steps
+    hourly = v.resample('H').agg(_mean).rename('ENMO(mg)')  # ENMO, hourly
+    daily = v.resample('D').agg(_mean).rename('ENMO(mg)')  # ENMO, daily
+    minutely = v.resample('T').agg(_mean).rename('ENMO(mg)')  # ENMO, minutely
+
+    # steps, daily stats
+    if not adjust_estimates:
+        avg = daily.mean()
+    else:
+        day_of_week = daily.groupby(daily.index.weekday).mean()
+        avg = day_of_week.mean()
+
+    return {
+        'avg': avg,
+        'hourly': hourly,
+        'daily': daily,
+        'minutely': minutely,
+    }
 
 
 def summarize_steps(Y, steptol=3, adjust_estimates=False):
