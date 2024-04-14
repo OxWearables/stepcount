@@ -176,10 +176,10 @@ def summarize(Y, steptol=3, adjust_estimates=False):
             return np.nan
         return x.nlargest(n, keep='all').mean()
 
-    def _percentile(x, p=95):
+    def _p95(x, steptol):
         if not skipna and x.isna().any():
             return np.nan
-        return x.quantile(p / 100)
+        return x[x >= steptol].quantile(.95)
 
     def _percentile_at(x, ps=(5, 25, 50, 75, 95)):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
@@ -254,7 +254,7 @@ def summarize(Y, steptol=3, adjust_estimates=False):
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
     daily_cadence_peak1 = minutely.resample('D').agg(_max, n=1)
     daily_cadence_peak30 = minutely.resample('D').agg(_max, n=30)
-    daily_cadence_p95 = minutely.resample('D').agg(_percentile, p=95)
+    daily_cadence_p95 = minutely.resample('D').agg(_p95, steptol=steptol * 60 / dt)  # scale steptol to steps/min
     if not adjust_estimates:
         cadence_peak1 = np.round(daily_cadence_peak1.mean())
         cadence_peak30 = np.round(daily_cadence_peak30.mean())
