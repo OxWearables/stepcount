@@ -117,16 +117,11 @@ def main():
     info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = summary['cadence_p95']
-    info['Steps5thDayAvgAt'] = summary['daily_ptile_at_avg']['p05_at']
-    info['Steps25thDayAvgAt'] = summary['daily_ptile_at_avg']['p25_at']
-    info['Steps50thDayAvgAt'] = summary['daily_ptile_at_avg']['p50_at']
-    info['Steps75thDayAvgAt'] = summary['daily_ptile_at_avg']['p75_at']
-    info['Steps95thDayAvgAt'] = summary['daily_ptile_at_avg']['p95_at']
-    info['Steps5thDayMedAt'] = summary['daily_ptile_at_med']['p05_at']
-    info['Steps25thDayMedAt'] = summary['daily_ptile_at_med']['p25_at']
-    info['Steps50thDayMedAt'] = summary['daily_ptile_at_med']['p50_at']
-    info['Steps75thDayMedAt'] = summary['daily_ptile_at_med']['p75_at']
-    info['Steps95thDayMedAt'] = summary['daily_ptile_at_med']['p95_at']
+    info['Steps5thAt'] = summary['daily_ptile_at_avg']['p05_at']
+    info['Steps25thAt'] = summary['daily_ptile_at_avg']['p25_at']
+    info['Steps50thAt'] = summary['daily_ptile_at_avg']['p50_at']
+    info['Steps75thAt'] = summary['daily_ptile_at_avg']['p75_at']
+    info['Steps95thAt'] = summary['daily_ptile_at_avg']['p95_at']
 
     # Steps summary, adjusted
     summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
@@ -146,16 +141,11 @@ def main():
     info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = summary_adj['cadence_p95']
-    info['Steps5thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p05_at']
-    info['Steps25thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p25_at']
-    info['Steps50thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p50_at']
-    info['Steps75thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p75_at']
-    info['Steps95thDayAvgAdjustedAt'] = summary_adj['daily_ptile_at_avg']['p95_at']
-    info['Steps5thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p05_at']
-    info['Steps25thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p25_at']
-    info['Steps50thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p50_at']
-    info['Steps75thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p75_at']
-    info['Steps95thDayMedAdjustedAt'] = summary_adj['daily_ptile_at_med']['p95_at']
+    info['Steps5thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p05_at']
+    info['Steps25thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p25_at']
+    info['Steps50thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p50_at']
+    info['Steps75thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p75_at']
+    info['Steps95thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p95_at']
 
     # Save info
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -326,7 +316,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
 
     daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
     daily_ptile_at_avg = daily_ptile_at.mean()
-    daily_ptile_at_med = daily_ptile_at.median()
 
     # daily stats
     daily = pd.concat([
@@ -361,7 +350,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
     cadence_peak30 = nanint(cadence_peak30)
     cadence_p95 = nanint(cadence_p95)
     daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
-    daily_ptile_at_med = daily_ptile_at_med.map(_tdelta_to_str)
 
     return {
         'total': total,
@@ -381,7 +369,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         'cadence_peak30': cadence_peak30,
         'cadence_p95': cadence_p95,
         'daily_ptile_at_avg': daily_ptile_at_avg,
-        'daily_ptile_at_med': daily_ptile_at_med,
     }
 
 
