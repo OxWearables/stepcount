@@ -77,6 +77,7 @@ time
 
 Output: outputs/sample/
 ```
+Refer to the [Data Dictionary](data-dictionary.md) for a comprehensive list of outputs.
 
 ### Troubleshooting 
 Some systems may face issues with Java when running the script. If this is your case, try fixing OpenJDK to version 8:
