@@ -1,0 +1,45 @@
+## Data Dictionary
+
+- **Filename**: The name of the data file.
+- **Filesize(MB)**: The size of the file in megabytes.
+- **Device**: The brand or model of the device that recorded the data, or the file extension.
+- **DeviceID**: A unique identifier for the specific device used.
+- **ReadErrors**: Number of errors encountered while reading data from the device.
+- **SampleRate**: The frequency at which data points are sampled per second, measured in Hz.
+- **ReadOK**: A binary indicator (1 for success, 0 for failure) showing whether the data was read successfully.
+- **NumTicks**: Total number of data points recorded.
+- **StartTime**: Timestamp marking the beginning of the data recording.
+- **EndTime**: Timestamp marking the end of the data recording.
+- **WearTime(days)**: Total time the device was worn, expressed in days.
+- **NumInterrupts**: Number of interruptions in the data recording.
+- **CalibErrorBefore(mg)**: Calibration error before any correction was applied, measured in milli-g.
+- **CalibOK**: A binary indicator (1 for successful calibration, 0 for unsuccessful) showing the calibration status.
+- **CalibErrorAfter(mg)**: Calibration error after attempting correction, measured in milli-g.
+- **NonwearTime(days)**: Total time the device was not worn, expressed in days.
+- **NumNonwearEpisodes**: Number of separate episodes when the device was not worn.
+- **ResampleRate**: The new sampling rate after data has been resampled.
+- **NumTicksAfterResample**: Number of data points after resampling.
+- **ENMO(mg)**: Average energy expenditure metric, measured in milli-g.
+- **TotalSteps**: Total number of steps recorded.
+- **StepsDayAvg**: Average number of steps per day.
+- **StepsDayMed**: Median number of steps per day.
+- **StepsDayMin**: Minimum number of steps in any single day.
+- **StepsDayMax**: Maximum number of steps in any single day.
+- **TotalWalking(mins)**: Total minutes spent walking.
+- **WalkingDayAvg(mins)**: Average walking duration per day in minutes.
+- **WalkingDayMed(mins)**: Median walking duration per day in minutes.
+- **WalkingDayMin(mins)**: Minimum walking duration in any single day in minutes.
+- **WalkingDayMax(mins)**: Maximum walking duration in any single day in minutes.
+- **CadencePeak1(steps/min)**: The highest cadence recorded in one minute of the day, averaged across all days.
+- **CadencePeak30(steps/min)**: The mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days.
+- **Cadence95th(steps/min)**: The 95th percentile of cadence of the day, averaged across all days.
+- **Steps5thDayAvgAt**: Average time of day when the 5th percentile of steps was accumulated.
+- **Steps25thDayAvgAt**: Average time of day when the 25th percentile of steps was accumulated.
+- **Steps50thDayAvgAt**: Average time of day when the median of steps was accumulated.
+- **Steps75thDayAvgAt**: Average time of day when the 75th percentile of steps was accumulated.
+- **Steps95thDayAvgAt**: Average time of day when the 95th percentile of steps was accumulated.
+- **Steps5thDayMedAt**: Median time of day when the 5th percentile of steps was accumulated.
+- **Steps25thDayMedAt**: Median time of day when the 25th percentile of steps was accumulated.
+- **Steps50thDayMedAt**: Median time of day when the median steps was accumulated.
+- **Steps75thDayMedAt**: Median time of day when the 75th percentile of steps was accumulated.
+- **Steps95thDayMedAt**: Median time of day when the 95th percentile of steps was accumulated.
