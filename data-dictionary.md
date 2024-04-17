@@ -33,8 +33,8 @@
 - **CadencePeak1(steps/min)**: The highest cadence recorded in one minute of the day, averaged across all days.
 - **CadencePeak30(steps/min)**: The mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days.
 - **Cadence95th(steps/min)**: The 95th percentile of cadence of the day, averaged across all days.
-- **Steps5thAt**: Average time of day when the 5th percentile of steps was accumulated.
-- **Steps25thAt**: Average time of day when the 25th percentile of steps was accumulated.
-- **Steps50thAt**: Average time of day when the median of steps was accumulated.
-- **Steps75thAt**: Average time of day when the 75th percentile of steps was accumulated.
-- **Steps95thAt**: Average time of day when the 95th percentile of steps was accumulated.
+- **Steps5thAt**: Average time of day when 5% of steps was accumulated.
+- **Steps25thAt**: Average time of day when 25% of steps was accumulated.
+- **Steps50thAt**: Average time of day when 50% of steps was accumulated.
+- **Steps75thAt**: Average time of day when 75% of steps was accumulated.
+- **Steps95thAt**: Average time of day when 95% of steps was accumulated.
