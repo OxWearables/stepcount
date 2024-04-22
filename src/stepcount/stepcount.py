@@ -206,8 +206,12 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
 def summarize_steps(Y, steptol=3, adjust_estimates=False):
     """ Summarize step count data """
 
+    dt = pd.Timedelta(infer_freq(Y.index)).seconds
+    W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
+
     if adjust_estimates:
         Y = impute_missing(Y)
+        W = impute_missing(W)
         skipna = False
     else:
         # crude summary ignores missing data
@@ -276,8 +280,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         daily_max = np.round(day_of_week.max())
 
     # walking
-    dt = pd.Timedelta(infer_freq(Y.index)).seconds
-    W = Y.mask(~Y.isna(), Y >= steptol)
     total_walk = np.round(W.agg(_sum) * dt / 60)
     daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
 
