@@ -225,7 +225,7 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
     def _max(x, n=1):
         if not skipna and x.isna().any():
             return np.nan
-        return x.nlargest(n, keep='all').mean()
+        return x[x >= steptol].nlargest(n, keep='all').mean()
 
     def _p95(x, steptol):
         if not skipna and x.isna().any():
