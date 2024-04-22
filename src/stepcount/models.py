@@ -205,8 +205,8 @@ class StepCounter:
             self.find_peaks_params,
             return_peaks=True
         )
-
-        # TODO: should we zero out < steptol windows?
+        # zero-out windows below the threshold
+        Y_[Y_ < self.steptol] = 0
 
         Y = np.full(len(X), fill_value=np.nan)
         Y[ok] = Y_
