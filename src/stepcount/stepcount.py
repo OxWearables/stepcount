@@ -222,6 +222,28 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
             return np.nan
         return x.sum()
 
+    def _mean(x):
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.mean()
+
+    def _min(x):
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.min()
+
+    def _max(x):
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.max()
+
+    def _median(x):
+        if not skipna and x.isna().any():
+            return np.nan
+        with warnings.catch_warnings():
+            warnings.filterwarnings('ignore', message='Mean of empty slice')
+            return x.median()
+
     def _max_in_walk(x, steptol, n=1):
         if not skipna and x.isna().any():
             return np.nan
@@ -264,20 +286,16 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
 
     # steps, daily stats
     if not adjust_estimates:
-        daily_avg = np.round(daily.mean())
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            daily_med = np.round(daily.median())
-        daily_min = np.round(daily.min())
-        daily_max = np.round(daily.max())
+        daily_avg = np.round(daily.agg(_mean))
+        daily_med = np.round(daily.agg(_median))
+        daily_min = np.round(daily.agg(_min))
+        daily_max = np.round(daily.agg(_max))
     else:
-        day_of_week = daily.groupby(daily.index.weekday).mean()
-        daily_avg = np.round(day_of_week.mean())
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            daily_med = np.round(day_of_week.median())
-        daily_min = np.round(day_of_week.min())
-        daily_max = np.round(day_of_week.max())
+        day_of_week = daily.groupby(daily.index.weekday).agg(_mean)
+        daily_avg = np.round(day_of_week.agg(_mean))
+        daily_med = np.round(day_of_week.agg(_median))
+        daily_min = np.round(day_of_week.agg(_min))
+        daily_max = np.round(day_of_week.agg(_max))
 
     # walking
     total_walk = np.round(W.agg(_sum) * dt / 60)
@@ -285,20 +303,16 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
 
     # walking, daily stats
     if not adjust_estimates:
-        daily_walk_avg = np.round(daily_walk.mean())
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            daily_walk_med = np.round(daily_walk.median())
-        daily_walk_min = np.round(daily_walk.min())
-        daily_walk_max = np.round(daily_walk.max())
+        daily_walk_avg = np.round(daily_walk.agg(_mean))
+        daily_walk_med = np.round(daily_walk.agg(_median))
+        daily_walk_min = np.round(daily_walk.agg(_min))
+        daily_walk_max = np.round(daily_walk.agg(_max))
     else:
-        day_of_week_walk = daily_walk.groupby(daily_walk.index.weekday).mean()
-        daily_walk_avg = np.round(day_of_week_walk.mean())
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            daily_walk_med = np.round(day_of_week_walk.median())
-        daily_walk_min = np.round(day_of_week_walk.min())
-        daily_walk_max = np.round(day_of_week_walk.max())
+        day_of_week_walk = daily_walk.groupby(daily_walk.index.weekday).agg(_mean)
+        daily_walk_avg = np.round(day_of_week_walk.agg(_mean))
+        daily_walk_med = np.round(day_of_week_walk.agg(_median))
+        daily_walk_min = np.round(day_of_week_walk.agg(_min))
+        daily_walk_max = np.round(day_of_week_walk.agg(_max))
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
     daily_cadence_peak1 = minutely.resample('D').agg(_max_in_walk, steptol=steptol * 60 / dt, n=1).rename('CadencePeak1')  # scale steptol to steps/min
