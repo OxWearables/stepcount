@@ -423,13 +423,13 @@ def impute_missing(data: pd.DataFrame, extrapolate=True):
     data = (
         data
         # first attempt imputation using same day of week
-        .groupby([data.index.weekday, data.index.hour, data.index.minute])
+        .groupby([data.index.weekday, data.index.hour, data.index.minute // 5])
         .transform(fillna)
         # then try within weekday/weekend
-        .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute])
+        .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute // 5])
         .transform(fillna)
         # finally, use all other days
-        .groupby([data.index.hour, data.index.minute])
+        .groupby([data.index.hour, data.index.minute // 5])
         .transform(fillna)
     )
 
