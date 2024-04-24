@@ -222,12 +222,12 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
             return np.nan
         return x.sum()
 
-    def _max(x, n=1):
+    def _max_in_walk(x, steptol, n=1):
         if not skipna and x.isna().any():
             return np.nan
         return x[x >= steptol].nlargest(n, keep='all').mean()
 
-    def _p95(x, steptol):
+    def _p95_in_walk(x, steptol):
         if not skipna and x.isna().any():
             return np.nan
         return x[x >= steptol].quantile(.95)
@@ -301,9 +301,9 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         daily_walk_max = np.round(day_of_week_walk.max())
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
-    daily_cadence_peak1 = minutely.resample('D').agg(_max, n=1).rename('CadencePeak1')
-    daily_cadence_peak30 = minutely.resample('D').agg(_max, n=30).rename('CadencePeak30')
-    daily_cadence_p95 = minutely.resample('D').agg(_p95, steptol=steptol * 60 / dt).rename('Cadence95th')  # scale steptol to steps/min
+    daily_cadence_peak1 = minutely.resample('D').agg(_max_in_walk, steptol=steptol, n=1).rename('CadencePeak1')
+    daily_cadence_peak30 = minutely.resample('D').agg(_max_in_walk, steptol=steptol, n=30).rename('CadencePeak30')
+    daily_cadence_p95 = minutely.resample('D').agg(_p95_in_walk, steptol=steptol * 60 / dt).rename('Cadence95th')  # scale steptol to steps/min
     if not adjust_estimates:
         cadence_peak1 = np.round(daily_cadence_peak1.mean())
         cadence_peak30 = np.round(daily_cadence_peak30.mean())
