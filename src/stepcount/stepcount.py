@@ -103,7 +103,6 @@ def main():
     summary = summarize_steps(Y, model.steptol)
     summary['minutely'].to_csv(f"{outdir}/{basename}-MinutelySteps.csv.gz")
     summary['hourly'].to_csv(f"{outdir}/{basename}-HourlySteps.csv.gz")
-    summary['daily'].to_csv(f"{outdir}/{basename}-DailySteps.csv.gz")
     info['TotalSteps'] = summary['total']
     info['StepsDayAvg'] = summary['daily_avg']
     info['StepsDayMed'] = summary['daily_med']
@@ -114,9 +113,6 @@ def main():
     info['WalkingDayMed(mins)'] = summary['daily_walk_med']
     info['WalkingDayMin(mins)'] = summary['daily_walk_min']
     info['WalkingDayMax(mins)'] = summary['daily_walk_max']
-    info['CadencePeak1(steps/min)'] = summary['cadence_peak1']
-    info['CadencePeak30(steps/min)'] = summary['cadence_peak30']
-    info['Cadence95th(steps/min)'] = summary['cadence_p95']
     info['Steps5thAt'] = summary['daily_ptile_at_avg']['p05_at']
     info['Steps25thAt'] = summary['daily_ptile_at_avg']['p25_at']
     info['Steps50thAt'] = summary['daily_ptile_at_avg']['p50_at']
@@ -127,7 +123,6 @@ def main():
     summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
     summary_adj['minutely'].to_csv(f"{outdir}/{basename}-MinutelyStepsAdjusted.csv.gz")
     summary_adj['hourly'].to_csv(f"{outdir}/{basename}-HourlyStepsAdjusted.csv.gz")
-    summary_adj['daily'].to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv.gz")
     info['TotalStepsAdjusted'] = summary_adj['total']
     info['StepsDayAvgAdjusted'] = summary_adj['daily_avg']
     info['StepsDayMedAdjusted'] = summary_adj['daily_med']
@@ -138,14 +133,25 @@ def main():
     info['WalkingDayMedAdjusted(mins)'] = summary_adj['daily_walk_med']
     info['WalkingDayMinAdjusted(mins)'] = summary_adj['daily_walk_min']
     info['WalkingDayMaxAdjusted(mins)'] = summary_adj['daily_walk_max']
-    info['CadencePeak1Adjusted(steps/min)'] = summary_adj['cadence_peak1']
-    info['CadencePeak30Adjusted(steps/min)'] = summary_adj['cadence_peak30']
-    info['Cadence95thAdjusted(steps/min)'] = summary_adj['cadence_p95']
     info['Steps5thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p05_at']
     info['Steps25thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p25_at']
     info['Steps50thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p50_at']
     info['Steps75thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p75_at']
     info['Steps95thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p95_at']
+
+    cadence_summary = summary_cadence(Y, model.steptol)
+    info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
+    info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
+    info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
+    summary['daily'] = pd.concat([summary['daily'], cadence_summary['daily_cadence']], axis=1)
+    summary['daily'].to_csv(f"{outdir}/{basename}-DailySteps.csv.gz")
+
+    cadence_summary_adj = summary_cadence(Y, model.steptol, adjust_estimates=True)
+    info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
+    info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
+    info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
+    summary_adj['daily'] = pd.concat([summary_adj['daily'], cadence_summary_adj['daily_cadence']], axis=1)
+    summary_adj['daily'].to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv.gz")
 
     # Save info
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -244,16 +250,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
             warnings.filterwarnings('ignore', message='Mean of empty slice')
             return x.median()
 
-    def _max_in_walk(x, steptol, n=1):
-        if not skipna and x.isna().any():
-            return np.nan
-        return x[x >= steptol].nlargest(n, keep='all').mean()
-
-    def _p95_in_walk(x, steptol):
-        if not skipna and x.isna().any():
-            return np.nan
-        return x[x >= steptol].quantile(.95)
-
     def _percentile_at(x, ps=(5, 25, 50, 75, 95)):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
         if not skipna and x.isna().any():
@@ -314,22 +310,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         daily_walk_min = np.round(day_of_week_walk.agg(_min))
         daily_walk_max = np.round(day_of_week_walk.agg(_max))
 
-    # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
-    daily_cadence_peak1 = minutely.resample('D').agg(_max_in_walk, steptol=steptol * 60 / dt, n=1).rename('CadencePeak1')  # scale steptol to steps/min
-    daily_cadence_peak30 = minutely.resample('D').agg(_max_in_walk, steptol=steptol * 60 / dt, n=30).rename('CadencePeak30')  # scale steptol to steps/min
-    daily_cadence_p95 = minutely.resample('D').agg(_p95_in_walk, steptol=steptol * 60 / dt).rename('Cadence95th')  # scale steptol to steps/min
-    if not adjust_estimates:
-        cadence_peak1 = np.round(daily_cadence_peak1.mean())
-        cadence_peak30 = np.round(daily_cadence_peak30.mean())
-        cadence_p95 = np.round(daily_cadence_p95.mean())
-    else:
-        day_of_week_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).mean()
-        day_of_week_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).mean()
-        day_of_week_cadence_p95 = daily_cadence_p95.groupby(daily_cadence_p95.index.weekday).mean()
-        cadence_peak1 = np.round(day_of_week_cadence_peak1.mean())
-        cadence_peak30 = np.round(day_of_week_cadence_peak30.mean())
-        cadence_p95 = np.round(day_of_week_cadence_p95.mean())
-
     daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
     daily_ptile_at_avg = daily_ptile_at.mean()
 
@@ -337,9 +317,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
     daily = pd.concat([
         pd.to_numeric(daily_walk.round(), downcast='integer'),
         pd.to_numeric(daily.round(), downcast='integer'),
-        pd.to_numeric(daily_cadence_peak1.round(), downcast='integer'),
-        pd.to_numeric(daily_cadence_peak30.round(), downcast='integer'),
-        pd.to_numeric(daily_cadence_p95.round(), downcast='integer'),
         daily_ptile_at.rename(columns={
             'p05_at': 'Steps5thAt',
             'p25_at': 'Steps25thAt',
@@ -362,9 +339,6 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
     daily_walk_med = nanint(daily_walk_med)
     daily_walk_min = nanint(daily_walk_min)
     daily_walk_max = nanint(daily_walk_max)
-    cadence_peak1 = nanint(cadence_peak1)
-    cadence_peak30 = nanint(cadence_peak30)
-    cadence_p95 = nanint(cadence_p95)
     daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
 
     return {
@@ -381,10 +355,86 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         'daily_walk_med': daily_walk_med,
         'daily_walk_min': daily_walk_min,
         'daily_walk_max': daily_walk_max,
-        'cadence_peak1': cadence_peak1,
-        'cadence_peak30': cadence_peak30,
-        'cadence_p95': cadence_p95,
         'daily_ptile_at_avg': daily_ptile_at_avg,
+    }
+
+
+def summary_cadence(Y, steptol=3, adjust_estimates=False):
+    """ Summarize cadence data """
+
+    # TODO: split walking and running cadence?
+
+    def _cadence_max(x, steptol, walktol=30, n=1):
+        y = x[x >= steptol]
+        # if not enough walking time, return NA.
+        # note: walktol in minutes, x must be minutely
+        if len(y) < walktol:
+            return np.nan
+        return y.nlargest(n, keep='all').mean()
+
+    def _cadence_p95(x, steptol, walktol=30):
+        y = x[x >= steptol]
+        # if not enough walking time, return NA.
+        # note: walktol in minutes, x must be minutely
+        if len(y) < walktol:
+            return np.nan
+        return y.quantile(.95)
+
+    def _impute_days(x):
+        def na_to_median(x):
+            return x.fillna(x.median())
+        if x.isna().all():
+            return x
+        return (
+            x
+            .groupby(x.index.weekday).transform(na_to_median)
+            .groupby(x.index.weekday >= 5).transform(na_to_median)
+            .transform(na_to_median)
+        )
+
+    dt = pd.Timedelta(infer_freq(Y.index)).seconds
+    steptol_in_minutes = steptol * 60 / dt  # rescale steptol to steps/min
+    minutely = Y.resample('T').sum().rename('Steps')  # steps/min
+
+    # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
+
+    daily_cadence_peak1 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, n=1).rename('CadencePeak1')
+    daily_cadence_peak30 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, n=30).rename('CadencePeak30')
+    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95, steptol=steptol_in_minutes).rename('Cadence95th')
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', message='Mean of empty slice')
+
+        if adjust_estimates:
+            daily_cadence_peak1 = _impute_days(daily_cadence_peak1)
+            daily_cadence_peak30 = _impute_days(daily_cadence_peak30)
+            daily_cadence_p95 = _impute_days(daily_cadence_p95)
+
+            # representative week
+            day_of_week_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).median()
+            day_of_week_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).median()
+            day_of_week_cadence_p95 = daily_cadence_p95.groupby(daily_cadence_p95.index.weekday).median()
+
+            cadence_peak1 = np.round(day_of_week_cadence_peak1.median())
+            cadence_peak30 = np.round(day_of_week_cadence_peak30.median())
+            cadence_p95 = np.round(day_of_week_cadence_p95.median())
+
+        else:
+            cadence_peak1 = np.round(daily_cadence_peak1.median())
+            cadence_peak30 = np.round(daily_cadence_peak30.median())
+            cadence_p95 = np.round(daily_cadence_p95.median())
+
+    daily_cadence = pd.concat([
+        daily_cadence_peak1.round().astype(pd.Int64Dtype()),
+        daily_cadence_peak30.round().astype(pd.Int64Dtype()),
+        daily_cadence_p95.round().astype(pd.Int64Dtype()),
+    ], axis=1)
+
+    return {
+        'daily_cadence': daily_cadence,
+        'cadence_peak1': nanint(cadence_peak1),
+        'cadence_peak30': nanint(cadence_peak30),
+        'cadence_p95': nanint(cadence_p95),
     }
 
 
