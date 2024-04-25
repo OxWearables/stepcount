@@ -212,7 +212,7 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
 def summarize_steps(Y, steptol=3, adjust_estimates=False):
     """ Summarize step count data """
 
-    dt = pd.Timedelta(infer_freq(Y.index)).seconds
+    dt = infer_freq(Y.index).total_seconds()
     W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
 
     if adjust_estimates:
@@ -395,7 +395,7 @@ def summary_cadence(Y, steptol=3, adjust_estimates=False):
             .transform(na_to_median)
         )
 
-    dt = pd.Timedelta(infer_freq(Y.index)).seconds
+    dt = infer_freq(Y.index).total_seconds()
     steptol_in_minutes = steptol * 60 / dt  # rescale steptol to steps/min
     minutely = Y.resample('T').sum().rename('Steps')  # steps/min
 
