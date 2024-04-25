@@ -224,7 +224,10 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
         skipna = True
 
     def _sum(x):
-        if not skipna and x.isna().any():
+        na = x.isna()
+        if not skipna and na.any():
+            return np.nan
+        if na.all():  # have to do this explicitly because pandas' .sum() returns 0 if all-NaN
             return np.nan
         return x.sum()
 
