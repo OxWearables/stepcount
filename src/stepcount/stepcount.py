@@ -172,10 +172,17 @@ def main():
 def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
     """ Summarize ENMO data """
 
+    def _mean(x, skipna=True):
+        if not skipna and x.isna().any():
+            return np.nan
+        return x.mean()
+
     # Truncated ENMO: Euclidean norm minus one and clipped at zero
     v = np.sqrt(data['x'] ** 2 + data['y'] ** 2 + data['z'] ** 2)
     v = np.clip(v - 1, a_min=0, a_max=None)
     v *= 1000  # convert to mg
+    # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
+    v = v.resample('T').agg(_mean, skipna=False)
 
     if adjust_estimates:
         v = impute_missing(v)
@@ -184,15 +191,10 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
         # crude summary ignores missing data
         skipna = True
 
-    def _mean(x):
-        if not skipna and x.isna().any():
-            return np.nan
-        return x.mean()
-
     # steps
-    hourly = v.resample('H').agg(_mean).rename('ENMO(mg)')  # ENMO, hourly
-    daily = v.resample('D').agg(_mean).rename('ENMO(mg)')  # ENMO, daily
-    minutely = v.resample('T').agg(_mean).rename('ENMO(mg)')  # ENMO, minutely
+    hourly = v.resample('H').agg(_mean, skipna=skipna).rename('ENMO(mg)')  # ENMO, hourly
+    daily = v.resample('D').agg(_mean, skipna=skipna).rename('ENMO(mg)')  # ENMO, daily
+    minutely = v = v.rename('ENMO(mg)')  # ENMO, minutely
 
     # steps, daily stats
     if not adjust_estimates:
