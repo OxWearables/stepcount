@@ -88,82 +88,114 @@ def main():
     # ENMO summary
     enmo_summary = summarize_enmo(data)
     info['ENMO(mg)'] = enmo_summary['avg']
-    enmo_summary['minutely'].to_csv(f"{outdir}/{basename}-MinutelyENMO.csv.gz")
-    enmo_summary['hourly'].to_csv(f"{outdir}/{basename}-HourlyENMO.csv.gz")
-    enmo_summary['daily'].to_csv(f"{outdir}/{basename}-DailyENMO.csv.gz")
 
     # ENMO summary, adjusted
     enmo_summary_adj = summarize_enmo(data, adjust_estimates=True)
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
-    enmo_summary_adj['minutely'].to_csv(f"{outdir}/{basename}-MinutelyENMOAdjusted.csv.gz")
-    enmo_summary_adj['hourly'].to_csv(f"{outdir}/{basename}-HourlyENMOAdjusted.csv.gz")
-    enmo_summary_adj['daily'].to_csv(f"{outdir}/{basename}-DailyENMOAdjusted.csv.gz")
 
     # Steps summary
-    summary = summarize_steps(Y, model.steptol)
-    summary['minutely'].to_csv(f"{outdir}/{basename}-MinutelySteps.csv.gz")
-    summary['hourly'].to_csv(f"{outdir}/{basename}-HourlySteps.csv.gz")
-    info['TotalSteps'] = summary['total']
-    info['StepsDayAvg'] = summary['daily_avg']
-    info['StepsDayMed'] = summary['daily_med']
-    info['StepsDayMin'] = summary['daily_min']
-    info['StepsDayMax'] = summary['daily_max']
-    info['TotalWalking(mins)'] = summary['total_walk']
-    info['WalkingDayAvg(mins)'] = summary['daily_walk_avg']
-    info['WalkingDayMed(mins)'] = summary['daily_walk_med']
-    info['WalkingDayMin(mins)'] = summary['daily_walk_min']
-    info['WalkingDayMax(mins)'] = summary['daily_walk_max']
-    info['Steps5thAt'] = summary['daily_ptile_at_avg']['p05_at']
-    info['Steps25thAt'] = summary['daily_ptile_at_avg']['p25_at']
-    info['Steps50thAt'] = summary['daily_ptile_at_avg']['p50_at']
-    info['Steps75thAt'] = summary['daily_ptile_at_avg']['p75_at']
-    info['Steps95thAt'] = summary['daily_ptile_at_avg']['p95_at']
+    steps_summary = summarize_steps(Y, model.steptol)
+    info['TotalSteps'] = steps_summary['total']
+    info['StepsDayAvg'] = steps_summary['daily_avg']
+    info['StepsDayMed'] = steps_summary['daily_med']
+    info['StepsDayMin'] = steps_summary['daily_min']
+    info['StepsDayMax'] = steps_summary['daily_max']
+    info['TotalWalking(mins)'] = steps_summary['total_walk']
+    info['WalkingDayAvg(mins)'] = steps_summary['daily_walk_avg']
+    info['WalkingDayMed(mins)'] = steps_summary['daily_walk_med']
+    info['WalkingDayMin(mins)'] = steps_summary['daily_walk_min']
+    info['WalkingDayMax(mins)'] = steps_summary['daily_walk_max']
+    info['Steps5thAt'] = steps_summary['daily_ptile_at_avg']['p05_at']
+    info['Steps25thAt'] = steps_summary['daily_ptile_at_avg']['p25_at']
+    info['Steps50thAt'] = steps_summary['daily_ptile_at_avg']['p50_at']
+    info['Steps75thAt'] = steps_summary['daily_ptile_at_avg']['p75_at']
+    info['Steps95thAt'] = steps_summary['daily_ptile_at_avg']['p95_at']
 
     # Steps summary, adjusted
-    summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
-    summary_adj['minutely'].to_csv(f"{outdir}/{basename}-MinutelyStepsAdjusted.csv.gz")
-    summary_adj['hourly'].to_csv(f"{outdir}/{basename}-HourlyStepsAdjusted.csv.gz")
-    info['TotalStepsAdjusted'] = summary_adj['total']
-    info['StepsDayAvgAdjusted'] = summary_adj['daily_avg']
-    info['StepsDayMedAdjusted'] = summary_adj['daily_med']
-    info['StepsDayMinAdjusted'] = summary_adj['daily_min']
-    info['StepsDayMaxAdjusted'] = summary_adj['daily_max']
-    info['TotalWalkingAdjusted(mins)'] = summary_adj['total_walk']
-    info['WalkingDayAvgAdjusted(mins)'] = summary_adj['daily_walk_avg']
-    info['WalkingDayMedAdjusted(mins)'] = summary_adj['daily_walk_med']
-    info['WalkingDayMinAdjusted(mins)'] = summary_adj['daily_walk_min']
-    info['WalkingDayMaxAdjusted(mins)'] = summary_adj['daily_walk_max']
-    info['Steps5thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p05_at']
-    info['Steps25thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p25_at']
-    info['Steps50thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p50_at']
-    info['Steps75thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p75_at']
-    info['Steps95thAtAdjusted'] = summary_adj['daily_ptile_at_avg']['p95_at']
+    steps_summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
+    info['TotalStepsAdjusted'] = steps_summary_adj['total']
+    info['StepsDayAvgAdjusted'] = steps_summary_adj['daily_avg']
+    info['StepsDayMedAdjusted'] = steps_summary_adj['daily_med']
+    info['StepsDayMinAdjusted'] = steps_summary_adj['daily_min']
+    info['StepsDayMaxAdjusted'] = steps_summary_adj['daily_max']
+    info['TotalWalkingAdjusted(mins)'] = steps_summary_adj['total_walk']
+    info['WalkingDayAvgAdjusted(mins)'] = steps_summary_adj['daily_walk_avg']
+    info['WalkingDayMedAdjusted(mins)'] = steps_summary_adj['daily_walk_med']
+    info['WalkingDayMinAdjusted(mins)'] = steps_summary_adj['daily_walk_min']
+    info['WalkingDayMaxAdjusted(mins)'] = steps_summary_adj['daily_walk_max']
+    info['Steps5thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p05_at']
+    info['Steps25thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p25_at']
+    info['Steps50thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p50_at']
+    info['Steps75thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p75_at']
+    info['Steps95thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p95_at']
 
+    # Cadence summary
     cadence_summary = summary_cadence(Y, model.steptol)
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
-    summary['daily'] = pd.concat([summary['daily'], cadence_summary['daily_cadence']], axis=1)
-    summary['daily'].to_csv(f"{outdir}/{basename}-DailySteps.csv.gz")
 
+    # Cadence summary, adjusted
     cadence_summary_adj = summary_cadence(Y, model.steptol, adjust_estimates=True)
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
-    summary_adj['daily'] = pd.concat([summary_adj['daily'], cadence_summary_adj['daily_cadence']], axis=1)
-    summary_adj['daily'].to_csv(f"{outdir}/{basename}-DailyStepsAdjusted.csv.gz")
 
-    # Save info
+    # Save Info.json
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
         json.dump(info, f, indent=4, cls=NpEncoder)
+
+    hourly = pd.concat([
+        steps_summary['hourly'],
+        enmo_summary['hourly'],
+    ], axis=1)
+    hourly.to_csv(f"{outdir}/{basename}-Hourly.csv.gz")
+    del hourly  # free memory
+
+    hourly_adj = pd.concat([
+        steps_summary_adj['hourly'],
+        enmo_summary_adj['hourly'],
+    ], axis=1)
+    hourly_adj.to_csv(f"{outdir}/{basename}-HourlyAdjusted.csv.gz")
+    del hourly_adj  # free memory
+
+    minutely = pd.concat([
+        steps_summary['minutely'],
+        enmo_summary['minutely'],
+    ], axis=1)
+    minutely.to_csv(f"{outdir}/{basename}-Minutely.csv.gz")
+    del minutely  # free memory
+
+    minutely_adj = pd.concat([
+        steps_summary_adj['minutely'],
+        enmo_summary_adj['minutely'],
+    ], axis=1)
+    minutely_adj.to_csv(f"{outdir}/{basename}-MinutelyAdjusted.csv.gz")
+    del minutely_adj  # free memory
+
+    daily = pd.concat([
+        steps_summary['daily'],
+        cadence_summary['daily'],
+        enmo_summary['daily'],
+    ], axis=1)
+    daily.to_csv(f"{outdir}/{basename}-Daily.csv.gz")
+    # del daily  # still needed for printing
+
+    daily_adj = pd.concat([
+        steps_summary_adj['daily'],
+        cadence_summary_adj['daily'],
+        enmo_summary_adj['daily'],
+    ], axis=1)
+    daily_adj.to_csv(f"{outdir}/{basename}-DailyAdjusted.csv.gz")
+    # del daily_adj  # still needed for printing
 
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
     print("\nEstimated Daily Stats\n---------------------")
-    print(summary['daily'])
+    print(daily)
     print("\nEstimated Daily Stats (Adjusted)\n---------------------")
-    print(summary_adj['daily'])
+    print(daily_adj)
 
     after = time.time()
     print(f"Done! ({round(after - before,2)}s)")
@@ -429,14 +461,14 @@ def summary_cadence(Y, steptol=3, adjust_estimates=False):
             cadence_peak30 = np.round(daily_cadence_peak30.median())
             cadence_p95 = np.round(daily_cadence_p95.median())
 
-    daily_cadence = pd.concat([
+    daily = pd.concat([
         daily_cadence_peak1.round().astype(pd.Int64Dtype()),
         daily_cadence_peak30.round().astype(pd.Int64Dtype()),
         daily_cadence_p95.round().astype(pd.Int64Dtype()),
     ], axis=1)
 
     return {
-        'daily_cadence': daily_cadence,
+        'daily': daily,
         'cadence_peak1': nanint(cadence_peak1),
         'cadence_peak30': nanint(cadence_peak30),
         'cadence_p95': nanint(cadence_p95),
