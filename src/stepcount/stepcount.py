@@ -196,6 +196,7 @@ def main():
     print(daily)
     print("\nEstimated Daily Stats (Adjusted)\n---------------------")
     print(daily_adj)
+    print("\nOutput files saved in:", outdir)
 
     after = time.time()
     print(f"Done! ({round(after - before,2)}s)")
