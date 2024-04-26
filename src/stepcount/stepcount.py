@@ -198,10 +198,10 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
 
     # steps, daily stats
     if not adjust_estimates:
-        avg = daily.mean()
+        avg = daily.agg(_mean, skipna=skipna)
     else:
-        day_of_week = daily.groupby(daily.index.weekday).mean()
-        avg = day_of_week.mean()
+        day_of_week = daily.groupby(daily.index.weekday).agg(_mean, skipna=skipna)
+        avg = day_of_week.agg(_mean, skipna=skipna)
 
     return {
         'avg': avg,
