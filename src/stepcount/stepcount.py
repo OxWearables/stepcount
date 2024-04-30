@@ -80,6 +80,14 @@ def main():
         print("Running step counter...")
     Y, W, T_steps = model.predict_from_frame(data)
 
+    # Quality control: Wear time coverage
+    coverage = Y.groupby(Y.index.hour).agg(lambda x: x.notna().mean())
+    if len(coverage) < 24 or coverage.min() < 0.01:
+        info['Covers24hOK'] = 0
+    else:
+        info['Covers24hOK'] = 1
+    del coverage  # free memory
+
     # Save step counts
     Y.to_csv(f"{outdir}/{basename}-Steps.csv.gz")
     # Save timestamps of each step
