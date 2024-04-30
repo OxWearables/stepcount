@@ -145,6 +145,7 @@ def main():
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
         json.dump(info, f, indent=4, cls=NpEncoder)
 
+    # Save hourly data
     hourly = pd.concat([
         steps_summary['hourly'],
         enmo_summary['hourly'],
@@ -152,6 +153,7 @@ def main():
     hourly.to_csv(f"{outdir}/{basename}-Hourly.csv.gz")
     del hourly  # free memory
 
+    # Save hourly data, adjusted
     hourly_adj = pd.concat([
         steps_summary_adj['hourly'],
         enmo_summary_adj['hourly'],
@@ -159,6 +161,7 @@ def main():
     hourly_adj.to_csv(f"{outdir}/{basename}-HourlyAdjusted.csv.gz")
     del hourly_adj  # free memory
 
+    # Save minutely data
     minutely = pd.concat([
         steps_summary['minutely'],
         enmo_summary['minutely'],
@@ -166,6 +169,7 @@ def main():
     minutely.to_csv(f"{outdir}/{basename}-Minutely.csv.gz")
     del minutely  # free memory
 
+    # Save minutely data, adjusted
     minutely_adj = pd.concat([
         steps_summary_adj['minutely'],
         enmo_summary_adj['minutely'],
@@ -173,6 +177,7 @@ def main():
     minutely_adj.to_csv(f"{outdir}/{basename}-MinutelyAdjusted.csv.gz")
     del minutely_adj  # free memory
 
+    # Save daily data
     daily = pd.concat([
         steps_summary['daily'],
         cadence_summary['daily'],
@@ -181,6 +186,7 @@ def main():
     daily.to_csv(f"{outdir}/{basename}-Daily.csv.gz")
     # del daily  # still needed for printing
 
+    # Save daily data, adjusted
     daily_adj = pd.concat([
         steps_summary_adj['daily'],
         cadence_summary_adj['daily'],
