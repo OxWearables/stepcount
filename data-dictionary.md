@@ -19,6 +19,7 @@
 - **NumNonwearEpisodes**: Number of separate episodes when the device was not worn.
 - **ResampleRate**: The new sampling rate after data has been resampled.
 - **NumTicksAfterResample**: Number of data points after resampling.
+- **Covers24hOK**: Indicates whether data is available for each hour bin of the 24h across any day. For example, if data is absent from 14:00-15:00 on Day 1 (and all other hours are covered), and then it is available during 14:00-15:00 on Day 2, then `Covers24hOK=1`.
 - **ENMO(mg)**: Average energy expenditure metric, measured in milli-g.
 - **TotalSteps**: Total number of steps recorded.
 - **StepsDayAvg**: Average number of steps per day.
