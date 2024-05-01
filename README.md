@@ -1,10 +1,12 @@
 # stepcount
 
-A Python package to estimate step counts from accelerometer data.
+A step-counting model based on self-supervised learning for wrist-worn accelerometer data
 
-The algorithm is tuned for wrist-worn AX3 data collected at 100 Hz, using data from the open-source [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7), making it compatible with the [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649).
+The SSL model was pre-trained using the large-scale [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649), and fine-tuned on the [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
 
-Two underlying models are available:
+The command-line tool can process Axivity AX3 files (UK Biobank, China Kadoorie Biobank) directly. For consumer devices like Fitbit and Apple Watch, convert them to raw CSV first.
+
+Available models:
 - Self-supervised learning model of Hang et al. (default): https://www.nature.com/articles/s41746-024-01062-3
 - Random forest (enable with the flag `-t rf`)
 
