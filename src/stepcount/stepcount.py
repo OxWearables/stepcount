@@ -145,13 +145,13 @@ def main():
     info['Steps95thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p95_at']
 
     # Cadence summary
-    cadence_summary = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
+    cadence_summary = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
 
     # Cadence summary, adjusted
-    cadence_summary_adj = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
+    cadence_summary_adj = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
@@ -260,6 +260,7 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
     if not adjust_estimates:
         avg = daily.agg(_mean, skipna=skipna)
     else:
+        # TODO: make 7 days?
         day_of_week = daily.groupby(daily.index.weekday).agg(_mean, skipna=skipna)
         avg = day_of_week.agg(_mean, skipna=skipna)
 
@@ -358,6 +359,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_min = np.round(daily.agg(_min))
         daily_max = np.round(daily.agg(_max))
     else:
+        # TODO: make 7 days?
         day_of_week = daily.groupby(daily.index.weekday).agg(_mean)
         daily_avg = np.round(day_of_week.agg(_mean))
         daily_med = np.round(day_of_week.agg(_median))
@@ -375,6 +377,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_walk_min = np.round(daily_walk.agg(_min))
         daily_walk_max = np.round(daily_walk.agg(_max))
     else:
+        # TODO: make 7 days?
         day_of_week_walk = daily_walk.groupby(daily_walk.index.weekday).agg(_mean)
         daily_walk_avg = np.round(day_of_week_walk.agg(_mean))
         daily_walk_med = np.round(day_of_week_walk.agg(_median))
@@ -430,7 +433,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     }
 
 
-def summary_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
+def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize cadence data """
 
     # TODO: split walking and running cadence?
@@ -487,7 +490,7 @@ def summary_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
             daily_cadence_peak30 = _impute_days(daily_cadence_peak30)
             daily_cadence_p95 = _impute_days(daily_cadence_p95)
 
-            # representative week
+            # representative week - TODO: make 7 days?
             day_of_week_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).median()
             day_of_week_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).median()
             day_of_week_cadence_p95 = daily_cadence_p95.groupby(daily_cadence_p95.index.weekday).median()
