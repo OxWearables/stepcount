@@ -44,6 +44,9 @@ def main():
                               "in the input file, in that order. Use a comma-separated string. "
                               "Default: 'time,x,y,z'"),
                         type=str, default="time,x,y,z")
+    parser.add_argument("--exclude-first-last", "-e",
+                        help="Exclude first, last or both days of data. Default: None (no exclusion)",
+                        type=str, choices=['first', 'last', 'both'], default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -98,15 +101,15 @@ def main():
     T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv.gz", index=False)
 
     # ENMO summary
-    enmo_summary = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below)
+    enmo_summary = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
     info['ENMO(mg)'] = enmo_summary['avg']
 
     # ENMO summary, adjusted
-    enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
+    enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
 
     # Steps summary
-    steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below)
+    steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
     info['TotalSteps'] = steps_summary['total']
     info['StepsDayAvg'] = steps_summary['daily_avg']
     info['StepsDayMed'] = steps_summary['daily_med']
@@ -124,7 +127,7 @@ def main():
     info['Steps95thAt'] = steps_summary['daily_ptile_at_avg']['p95_at']
 
     # Steps summary, adjusted
-    steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
+    steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
     info['TotalStepsAdjusted'] = steps_summary_adj['total']
     info['StepsDayAvgAdjusted'] = steps_summary_adj['daily_avg']
     info['StepsDayMedAdjusted'] = steps_summary_adj['daily_med']
@@ -142,13 +145,13 @@ def main():
     info['Steps95thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p95_at']
 
     # Cadence summary
-    cadence_summary = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below)
+    cadence_summary = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
 
     # Cadence summary, adjusted
-    cadence_summary_adj = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
+    cadence_summary_adj = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
@@ -220,7 +223,7 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
-def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, adjust_estimates=False):
+def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize ENMO data """
 
     def _mean(x, skipna=True):
@@ -234,6 +237,9 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, adjust_estimates
     v *= 1000  # convert to mg
     # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
     v = v.resample('T').agg(_mean, skipna=False)
+
+    if exclude_first_last is not None:
+        v = exclude_first_last_days(v, exclude_first_last)
 
     if exclude_wear_below is not None:
         v = exclude_wear_below_days(v, exclude_wear_below)
@@ -265,8 +271,11 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, adjust_estimates
     }
 
 
-def summarize_steps(Y, steptol=3, exclude_wear_below=None, adjust_estimates=False):
+def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize step count data """
+
+    if exclude_first_last is not None:
+        Y = exclude_first_last_days(Y, exclude_first_last)
 
     if exclude_wear_below is not None:
         Y = exclude_wear_below_days(Y, exclude_wear_below)
@@ -421,10 +430,13 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, adjust_estimates=Fals
     }
 
 
-def summary_cadence(Y, steptol=3, exclude_wear_below=None, adjust_estimates=False):
+def summary_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize cadence data """
 
     # TODO: split walking and running cadence?
+
+    if exclude_first_last is not None:
+        Y = exclude_first_last_days(Y, exclude_first_last)
 
     if exclude_wear_below is not None:
         Y = exclude_wear_below_days(Y, exclude_wear_below)
@@ -520,6 +532,19 @@ def exclude_wear_below_days(x: pd.Series, min_wear: str):
     # keep ok days, rest is set to NaN
     x = x.copy()  # make a copy to avoid modifying the original data
     x[np.isin(x.index.date, ok[~ok].index)] = np.nan
+    return x
+
+
+def exclude_first_last_days(x: pd.Series, first_or_last='both'):
+    """ Exclude first day, last day, or both """
+
+    x = x.copy()  # make a copy to avoid modifying the original data
+    if first_or_last == 'first':
+        x[x.index.date == x.index.date[0]] = np.nan
+    elif first_or_last == 'last':
+        x[x.index.date == x.index.date[-1]] = np.nan
+    elif first_or_last == 'both':
+        x[(x.index.date == x.index.date[0]) | (x.index.date == x.index.date[-1])] = np.nan
     return x
 
 
