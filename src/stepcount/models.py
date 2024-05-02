@@ -383,6 +383,8 @@ class WalkDetectorSSL:
         self.batch_size = batch_size
         self.state_dict = None
 
+        self.model = None
+
         self.verbose = verbose
 
         hmm_params = hmm_params or dict()
@@ -455,11 +457,15 @@ class WalkDetectorSSL:
 
     def predict(self, X, groups=None):
 
+        sslmodel.verbose = self.verbose
+
         if len(X) == 0:
             warnings.warn("No data to predict")
             return np.array([], dtype='int')
 
-        sslmodel.verbose = self.verbose
+        if not hasattr(self, 'model') or self.model is None:
+            # warnings.warn("Model not loaded. Loading model...")
+            self.model = self.load_model()
 
         dataset = sslmodel.NormalDataset(X, name='prediction')
         dataloader = DataLoader(
@@ -469,15 +475,18 @@ class WalkDetectorSSL:
             num_workers=0,
         )
 
+        _, y_pred, _ = sslmodel.predict(self.model, dataloader, self.device, output_logits=False)
+        y_pred = self.hmms.predict(y_pred, groups=groups)
+
+        return y_pred
+
+    def load_model(self):
+
         model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False)
         model.load_state_dict(self.state_dict)
         model.to(self.device)
 
-        _, y_pred, _ = sslmodel.predict(model, dataloader, self.device, output_logits=False)
-
-        y_pred = self.hmms.predict(y_pred, groups=groups)
-
-        return y_pred
+        return model
 
 
 def make_windows(data, window_sec, fn=None, return_index=False, verbose=True):
