@@ -35,6 +35,10 @@ def main():
                         type=str, default='cpu')
     parser.add_argument("--sample-rate", "-r", help="Sample rate for measurement, otherwise inferred.",
                         type=int, default=None)
+    parser.add_argument("--exclude-wear-below", "-w",
+                        help=("Minimum wear time for a day to be considered valid, otherwise exclude it. "
+                              "Pass values as strings, e.g.: '12H', '30min'. Default: None (no exclusion)"),
+                        type=str, default=None)
     parser.add_argument("--txyz",
                         help=("Use this option to specify the column names for time, x, y, z "
                               "in the input file, in that order. Use a comma-separated string. "
@@ -94,15 +98,15 @@ def main():
     T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv.gz", index=False)
 
     # ENMO summary
-    enmo_summary = summarize_enmo(data)
+    enmo_summary = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below)
     info['ENMO(mg)'] = enmo_summary['avg']
 
     # ENMO summary, adjusted
-    enmo_summary_adj = summarize_enmo(data, adjust_estimates=True)
+    enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
 
     # Steps summary
-    steps_summary = summarize_steps(Y, model.steptol)
+    steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below)
     info['TotalSteps'] = steps_summary['total']
     info['StepsDayAvg'] = steps_summary['daily_avg']
     info['StepsDayMed'] = steps_summary['daily_med']
@@ -120,7 +124,7 @@ def main():
     info['Steps95thAt'] = steps_summary['daily_ptile_at_avg']['p95_at']
 
     # Steps summary, adjusted
-    steps_summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
+    steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
     info['TotalStepsAdjusted'] = steps_summary_adj['total']
     info['StepsDayAvgAdjusted'] = steps_summary_adj['daily_avg']
     info['StepsDayMedAdjusted'] = steps_summary_adj['daily_med']
@@ -138,13 +142,13 @@ def main():
     info['Steps95thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p95_at']
 
     # Cadence summary
-    cadence_summary = summary_cadence(Y, model.steptol)
+    cadence_summary = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below)
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
     info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
 
     # Cadence summary, adjusted
-    cadence_summary_adj = summary_cadence(Y, model.steptol, adjust_estimates=True)
+    cadence_summary_adj = summary_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, adjust_estimates=True)
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
@@ -216,7 +220,7 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
-def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
+def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, adjust_estimates=False):
     """ Summarize ENMO data """
 
     def _mean(x, skipna=True):
@@ -230,6 +234,9 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
     v *= 1000  # convert to mg
     # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
     v = v.resample('T').agg(_mean, skipna=False)
+
+    if exclude_wear_below is not None:
+        v = exclude_wear_below_days(v, exclude_wear_below)
 
     if adjust_estimates:
         v = impute_missing(v)
@@ -258,8 +265,11 @@ def summarize_enmo(data: pd.DataFrame, adjust_estimates=False):
     }
 
 
-def summarize_steps(Y, steptol=3, adjust_estimates=False):
+def summarize_steps(Y, steptol=3, exclude_wear_below=None, adjust_estimates=False):
     """ Summarize step count data """
+
+    if exclude_wear_below is not None:
+        Y = exclude_wear_below_days(Y, exclude_wear_below)
 
     dt = infer_freq(Y.index).total_seconds()
     W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
@@ -411,10 +421,13 @@ def summarize_steps(Y, steptol=3, adjust_estimates=False):
     }
 
 
-def summary_cadence(Y, steptol=3, adjust_estimates=False):
+def summary_cadence(Y, steptol=3, exclude_wear_below=None, adjust_estimates=False):
     """ Summarize cadence data """
 
     # TODO: split walking and running cadence?
+
+    if exclude_wear_below is not None:
+        Y = exclude_wear_below_days(Y, exclude_wear_below)
 
     def _cadence_max(x, steptol, walktol=30, n=1):
         y = x[x >= steptol]
@@ -488,6 +501,26 @@ def summary_cadence(Y, steptol=3, adjust_estimates=False):
         'cadence_peak30': nanint(cadence_peak30),
         'cadence_p95': nanint(cadence_p95),
     }
+
+
+def exclude_wear_below_days(x: pd.Series, min_wear: str):
+    """ Exclude days with less than `min_wear` of valid data """
+
+    min_wear = pd.Timedelta(min_wear)
+    dt = infer_freq(x.index)
+    ok = x.notna()
+    if isinstance(ok, pd.DataFrame):
+        ok = ok.all(axis=1)
+    ok = (
+        ok
+        .groupby(x.index.date)
+        .sum() * dt
+        >= min_wear
+    )
+    # keep ok days, rest is set to NaN
+    x = x.copy()  # make a copy to avoid modifying the original data
+    x[np.isin(x.index.date, ok[~ok].index)] = np.nan
+    return x
 
 
 def impute_missing(data: pd.DataFrame, extrapolate=True):
