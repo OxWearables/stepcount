@@ -11,8 +11,45 @@ on:
       - master
 
 jobs:
-  cwa:
 
+  prepare-artifacts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .  # install as editable to locate the torch hub cache more easily
+
+      - name: Download test files
+        run: |
+          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
+          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
+
+      # Perform a run to cache the torch hub repo
+      - name: Smoke test
+        run: stepcount tiny-sample.cwa.gz
+
+      - name: Upload test files
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-files
+          path: |
+            mini-sample.csv.gz
+            tiny-sample.cwa.gz
+
+      - name: Upload torch_hub_cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: torch_hub_cache
+          path: src/stepcount/torch_hub_cache
+
+  cwa:
+    needs: prepare-artifacts
     runs-on: ${{matrix.os}}
     strategy:
       matrix:
@@ -30,17 +67,27 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install .
+          python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
-      - name: Download test file
-        run: |
-          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
-          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
+      - name: Download test files
+        uses: actions/download-artifact@v4
+        with:
+          name: test-files
 
-      - name: Smoke test
-        run: |
-          stepcount tiny-sample.cwa.gz
-          stepcount tiny-sample.cwa.gz -t rf
-          stepcount mini-sample.csv.gz
-          stepcount mini-sample.csv.gz -t rf
-            
+      - name: Download torch_hub_cache
+        uses: actions/download-artifact@v4
+        with:
+          name: torch_hub_cache
+          path: src/stepcount/torch_hub_cache
+
+      - name: Smoke test, mini-sample.csv.gz
+        run: stepcount mini-sample.csv.gz
+
+      - name: Smoke test, tiny-sample.cwa.gz
+        run: stepcount tiny-sample.cwa.gz
+
+      - name: Smoke test, mini-sample.csv.gz (RF)
+        run: stepcount mini-sample.csv.gz -t rf
+
+      - name: Smoke test, tiny-sample.cwa.gz (RF)
+        run: stepcount tiny-sample.cwa.gz -t rf
