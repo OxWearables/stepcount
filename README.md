@@ -1,6 +1,6 @@
 # stepcount
 
-A step-counting model based on self-supervised learning for wrist-worn accelerometer data
+A step-counting model based on self-supervised learning for wrist-worn accelerometer data.
 
 The SSL model was pre-trained using the large-scale [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649), and fine-tuned on the [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
 
@@ -98,15 +98,13 @@ By default, output files will be stored in a folder named after the input file, 
 $ stepcount sample.cwa -o /path/to/some/folder/
 ```
 
-The following output files are created:
+The following output files will be generated:
 
 - *Info.json* Summary info, as shown above.
 - *Steps.csv* Raw time-series of step counts
-- *HourlySteps.csv* Hourly step counts
-- *DailySteps.csv* Daily step counts
-- *HourlyStepsAdjusted.csv* Like HourlySteps but accounting for missing data (see section below).
-- *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
-
+- *Minutely.csv* Minutely summaries
+- *Hourly.csv* Hourly summaries
+- *Daily.csv* Daily summaries
 
 ### Machine learning model type
 By default, the `stepcount` tool employs a self-supervised Resnet18 model to detect walking periods.
