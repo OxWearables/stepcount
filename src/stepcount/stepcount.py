@@ -619,7 +619,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
     return data
 
 
-def impute_days(x, method='median'):
+def impute_days(x, method='mean'):
 
     if x.isna().all():
         return x
