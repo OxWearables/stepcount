@@ -486,14 +486,10 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
         warnings.filterwarnings('ignore', message='Mean of empty slice')
 
         if adjust_estimates:
-            daily_cadence_peak1 = _impute_days(daily_cadence_peak1)
-            daily_cadence_peak30 = _impute_days(daily_cadence_peak30)
-            daily_cadence_p95 = _impute_days(daily_cadence_p95)
-
             # representative week - TODO: make 7 days?
-            day_of_week_cadence_peak1 = daily_cadence_peak1.groupby(daily_cadence_peak1.index.weekday).median()
-            day_of_week_cadence_peak30 = daily_cadence_peak30.groupby(daily_cadence_peak30.index.weekday).median()
-            day_of_week_cadence_p95 = daily_cadence_p95.groupby(daily_cadence_p95.index.weekday).median()
+            day_of_week_cadence_peak1 = _impute_days(daily_cadence_peak1).groupby(daily_cadence_peak1.index.weekday).median()
+            day_of_week_cadence_peak30 = _impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
+            day_of_week_cadence_p95 = _impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
 
             cadence_peak1 = np.round(day_of_week_cadence_peak1.median())
             cadence_peak30 = np.round(day_of_week_cadence_peak30.median())
