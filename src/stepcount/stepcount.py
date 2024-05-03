@@ -226,8 +226,15 @@ def main():
 def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize ENMO data """
 
-    def _mean(x, skipna=True):
-        if not skipna and x.isna().any():
+    def _is_enough(x, min_wear=None, dt=None):
+        if min_wear is None:
+            return True  # no minimum wear time, then default to True
+        if dt is None:
+            dt = infer_freq(x.index).total_seconds()
+        return x.notna().sum() * dt / 60 > min_wear
+
+    def _mean(x, min_wear=None, dt=None):
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.mean()
 
@@ -236,7 +243,9 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
     v = np.clip(v - 1, a_min=0, a_max=None)
     v *= 1000  # convert to mg
     # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
-    v = v.resample('T').agg(_mean, skipna=False)
+    v = v.resample('T').agg(_mean)
+
+    dt = infer_freq(v.index).total_seconds()
 
     if exclude_first_last is not None:
         v = exclude_first_last_days(v, exclude_first_last)
@@ -246,23 +255,22 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
 
     if adjust_estimates:
         v = impute_missing(v)
-        skipna = False
-    else:
-        # crude summary ignores missing data
-        skipna = True
 
-    # steps
-    hourly = v.resample('H').agg(_mean, skipna=skipna).rename('ENMO(mg)')  # ENMO, hourly
-    daily = v.resample('D').agg(_mean, skipna=skipna).rename('ENMO(mg)')  # ENMO, daily
-    minutely = v = v.rename('ENMO(mg)')  # ENMO, minutely
-
-    # steps, daily stats
-    if not adjust_estimates:
-        avg = daily.agg(_mean, skipna=skipna)
+    if adjust_estimates:
+        # adjusted estimates account for NAs
+        minutely = v.resample('T').agg(_mean, min_wear=0.5, dt=dt).rename('ENMO(mg)')  # up to 30s/min missingness
+        hourly = v.resample('H').agg(_mean, min_wear=50, dt=dt).rename('ENMO(mg)')  # up to 10min/h missingness
+        daily = v.resample('D').agg(_mean, min_wear=21*60, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
+        # adjusted estimates first form a 7-day representative week before final aggregation
+        # TODO: 7-day padding for shorter recordings
+        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
+        avg = day_of_week.agg(_mean)
     else:
-        # TODO: make 7 days?
-        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean, skipna=skipna)
-        avg = day_of_week.agg(_mean, skipna=skipna)
+        # crude (unadjusted) estimates ignore NAs
+        minutely = v.resample('T').agg(_mean).rename('ENMO(mg)')
+        hourly = v.resample('H').agg(_mean).rename('ENMO(mg)')
+        daily = v.resample('D').agg(_mean).rename('ENMO(mg')
+        avg = daily.agg(_mean)
 
     return {
         'avg': avg,
@@ -275,56 +283,48 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
 def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
     """ Summarize step count data """
 
-    if exclude_first_last is not None:
-        Y = exclude_first_last_days(Y, exclude_first_last)
+    # there's a bug with .resample().sum(skipna)
+    # https://github.com/pandas-dev/pandas/issues/29382
 
-    if exclude_wear_below is not None:
-        Y = exclude_wear_below_days(Y, exclude_wear_below)
+    def _is_enough(x, min_wear=None, dt=None):
+        if min_wear is None:
+            return True  # no minimum wear time, then default to True
+        if dt is None:
+            dt = infer_freq(x.index).total_seconds()
+        return x.notna().sum() * dt / 60 > min_wear
 
-    dt = infer_freq(Y.index).total_seconds()
-    W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
-
-    if adjust_estimates:
-        Y = impute_missing(Y)
-        W = impute_missing(W)
-        skipna = False
-    else:
-        # crude summary ignores missing data
-        skipna = True
-
-    def _sum(x):
-        na = x.isna()
-        if not skipna and na.any():
+    def _sum(x, min_wear=None, dt=None):
+        if x.isna().all():  # have to explicitly check this because pandas' .sum() returns 0 if all-NaN
             return np.nan
-        if na.all():  # have to do this explicitly because pandas' .sum() returns 0 if all-NaN
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.sum()
 
-    def _mean(x):
-        if not skipna and x.isna().any():
+    def _mean(x, min_wear=None, dt=None):
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.mean()
 
-    def _min(x):
-        if not skipna and x.isna().any():
+    def _min(x, min_wear=None, dt=None):
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.min()
 
-    def _max(x):
-        if not skipna and x.isna().any():
+    def _max(x, min_wear=None, dt=None):
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.max()
 
-    def _median(x):
-        if not skipna and x.isna().any():
+    def _median(x, min_wear=None, dt=None):
+        if not _is_enough(x, min_wear, dt):
             return np.nan
         with warnings.catch_warnings():
             warnings.filterwarnings('ignore', message='Mean of empty slice')
             return x.median()
 
-    def _percentile_at(x, ps=(5, 25, 50, 75, 95)):
+    def _percentile_at(x, ps=(5, 25, 50, 75, 95), min_wear=None, dt=None):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
-        if not skipna and x.isna().any():
+        if not _is_enough(x, min_wear, dt):
             return percentiles
         z = x.cumsum() / x.sum()
         for p in ps:
@@ -343,48 +343,72 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         minutes, seconds = divmod(rem, 60)
         return f"{hours:02}:{minutes:02}:{seconds:02}"
 
-    # there's a bug with .resample().sum(skipna)
-    # https://github.com/pandas-dev/pandas/issues/29382
+    if exclude_first_last is not None:
+        Y = exclude_first_last_days(Y, exclude_first_last)
+
+    if exclude_wear_below is not None:
+        Y = exclude_wear_below_days(Y, exclude_wear_below)
+
+    dt = infer_freq(Y.index).total_seconds()
+    W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
+
+    if adjust_estimates:
+        Y = impute_missing(Y)
+        W = impute_missing(W)
 
     # steps
-    total = Y.sum() if Y.notna().any() else np.nan
-    hourly = Y.resample('H').agg(_sum).rename('Steps')  # steps, hourly
-    daily = Y.resample('D').agg(_sum).rename('Steps')  # steps, daily
-    minutely = Y.resample('T').agg(_sum).rename('Steps')  # steps, minutely
-
-    # steps, daily stats
-    if not adjust_estimates:
-        daily_avg = np.round(daily.agg(_mean))
-        daily_med = np.round(daily.agg(_median))
-        daily_min = np.round(daily.agg(_min))
-        daily_max = np.round(daily.agg(_max))
-    else:
-        # TODO: make 7 days?
+    if adjust_estimates:
+        # adjusted estimates account for NAs
+        minutely = Y.resample('T').agg(_sum, min_wear=0.5, dt=dt).rename('Steps')  # up to 30s/min missingness
+        hourly = Y.resample('H').agg(_sum, min_wear=50, dt=dt).rename('Steps')  # up to 10min/h missingness
+        daily = Y.resample('D').agg(_sum, min_wear=21*60, dt=dt).rename('Steps')  # up to 3h/d missingness
+        # adjusted estimates first form a 7-day representative week before final aggregation
+        # TODO: 7-day padding for shorter recordings
         day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
         daily_avg = np.round(day_of_week.agg(_mean))
         daily_med = np.round(day_of_week.agg(_median))
         daily_min = np.round(day_of_week.agg(_min))
         daily_max = np.round(day_of_week.agg(_max))
+    else:
+        # crude (unadjusted) estimates ignore NAs
+        minutely = Y.resample('T').agg(_sum).rename('Steps')
+        hourly = Y.resample('H').agg(_sum).rename('Steps')
+        daily = Y.resample('D').agg(_sum).rename('Steps')
+        daily_avg = np.round(daily.agg(_mean))
+        daily_med = np.round(daily.agg(_median))
+        daily_min = np.round(daily.agg(_min))
+        daily_max = np.round(daily.agg(_max))
+
+    total = daily.sum() if not daily.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
 
     # walking
-    total_walk = W.sum() * dt / 60 if W.notna().any() else np.nan
-    daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
-
-    # walking, daily stats
-    if not adjust_estimates:
-        daily_walk_avg = np.round(daily_walk.agg(_mean))
-        daily_walk_med = np.round(daily_walk.agg(_median))
-        daily_walk_min = np.round(daily_walk.agg(_min))
-        daily_walk_max = np.round(daily_walk.agg(_max))
-    else:
-        # TODO: make 7 days?
+    if adjust_estimates:
+        # adjusted estimates account for NAs
+        daily_walk = (W.resample('D').agg(_sum, min_wear=21*60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
+        # adjusted estimates first form a 7-day representative week before final aggregation
+        # TODO: 7-day padding for shorter recordings
         day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).agg(_mean)
         daily_walk_avg = np.round(day_of_week_walk.agg(_mean))
         daily_walk_med = np.round(day_of_week_walk.agg(_median))
         daily_walk_min = np.round(day_of_week_walk.agg(_min))
         daily_walk_max = np.round(day_of_week_walk.agg(_max))
+    else:
+        # crude (unadjusted) estimates ignore NAs
+        daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
+        daily_walk_avg = np.round(daily_walk.agg(_mean))
+        daily_walk_med = np.round(daily_walk.agg(_median))
+        daily_walk_min = np.round(daily_walk.agg(_min))
+        daily_walk_max = np.round(daily_walk.agg(_max))
 
-    daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
+    total_walk = daily_walk.sum() if not daily_walk.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
+
+    # time of accumulated steps
+    if adjust_estimates:
+        # adjusted estimates account for NAs
+        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at, min_wear=21*60, dt=dt).unstack(1)  # up to 3h/d missingness
+    else:
+        # crude (unadjusted) estimates ignore NAs
+        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
     daily_ptile_at_avg = daily_ptile_at.mean()
 
     # daily stats
@@ -474,7 +498,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
         warnings.filterwarnings('ignore', message='Mean of empty slice')
 
         if adjust_estimates:
-            # representative week - TODO: make 7 days?
+            # adjusted estimates first form a 7-day representative week before final aggregation
+            # TODO: 7-day padding for shorter recordings
+            # TODO: maybe impute output daily_cadence? but skip user-excluded days
             day_of_week_cadence_peak1 = impute_days(daily_cadence_peak1).groupby(daily_cadence_peak1.index.weekday).median()
             day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
             day_of_week_cadence_p95 = impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
