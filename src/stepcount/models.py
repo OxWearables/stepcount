@@ -459,13 +459,13 @@ class WalkDetectorSSL:
 
         sslmodel.verbose = self.verbose
 
-        if len(X) == 0:
-            warnings.warn("No data to predict")
-            return np.array([], dtype='int')
-
         if not hasattr(self, 'model') or self.model is None:
             # warnings.warn("Model not loaded. Loading model...")
             self.model = self.load_model()
+
+        if len(X) == 0:
+            warnings.warn("No data to predict")
+            return np.array([], dtype='int')
 
         dataset = sslmodel.NormalDataset(X, name='prediction')
         dataloader = DataLoader(
