@@ -261,7 +261,7 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         avg = daily.agg(_mean, skipna=skipna)
     else:
         # TODO: make 7 days?
-        day_of_week = daily.groupby(daily.index.weekday).agg(_mean, skipna=skipna)
+        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean, skipna=skipna)
         avg = day_of_week.agg(_mean, skipna=skipna)
 
     return {
@@ -347,7 +347,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     # https://github.com/pandas-dev/pandas/issues/29382
 
     # steps
-    total = np.round(Y.agg(_sum))  # total steps
+    total = Y.sum() if Y.notna().any() else np.nan
     hourly = Y.resample('H').agg(_sum).rename('Steps')  # steps, hourly
     daily = Y.resample('D').agg(_sum).rename('Steps')  # steps, daily
     minutely = Y.resample('T').agg(_sum).rename('Steps')  # steps, minutely
@@ -360,14 +360,14 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_max = np.round(daily.agg(_max))
     else:
         # TODO: make 7 days?
-        day_of_week = daily.groupby(daily.index.weekday).agg(_mean)
+        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
         daily_avg = np.round(day_of_week.agg(_mean))
         daily_med = np.round(day_of_week.agg(_median))
         daily_min = np.round(day_of_week.agg(_min))
         daily_max = np.round(day_of_week.agg(_max))
 
     # walking
-    total_walk = np.round(W.agg(_sum) * dt / 60)
+    total_walk = W.sum() * dt / 60 if W.notna().any() else np.nan
     daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
 
     # walking, daily stats
@@ -378,7 +378,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_walk_max = np.round(daily_walk.agg(_max))
     else:
         # TODO: make 7 days?
-        day_of_week_walk = daily_walk.groupby(daily_walk.index.weekday).agg(_mean)
+        day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).agg(_mean)
         daily_walk_avg = np.round(day_of_week_walk.agg(_mean))
         daily_walk_med = np.round(day_of_week_walk.agg(_median))
         daily_walk_min = np.round(day_of_week_walk.agg(_min))
@@ -401,14 +401,14 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     ], axis=1)
 
     # convert units
-    total = nanint(total)
+    total = nanint(np.round(total))
     minutely = pd.to_numeric(minutely.round(), downcast='integer')
     hourly = pd.to_numeric(hourly.round(), downcast='integer')
     daily_avg = nanint(daily_avg)
     daily_med = nanint(daily_med)
     daily_min = nanint(daily_min)
     daily_max = nanint(daily_max)
-    total_walk = nanint(total_walk)
+    total_walk = nanint(np.round(total_walk))
     daily_walk_avg = nanint(daily_walk_avg)
     daily_walk_med = nanint(daily_walk_med)
     daily_walk_min = nanint(daily_walk_min)
@@ -460,18 +460,6 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
             return np.nan
         return y.quantile(.95)
 
-    def _impute_days(x):
-        def na_to_median(x):
-            return x.fillna(x.median())
-        if x.isna().all():
-            return x
-        return (
-            x
-            .groupby(x.index.weekday).transform(na_to_median)
-            .groupby(x.index.weekday >= 5).transform(na_to_median)
-            .transform(na_to_median)
-        )
-
     dt = infer_freq(Y.index).total_seconds()
     steptol_in_minutes = steptol * 60 / dt  # rescale steptol to steps/min
     minutely = Y.resample('T').sum().rename('Steps')  # steps/min
@@ -487,9 +475,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
 
         if adjust_estimates:
             # representative week - TODO: make 7 days?
-            day_of_week_cadence_peak1 = _impute_days(daily_cadence_peak1).groupby(daily_cadence_peak1.index.weekday).median()
-            day_of_week_cadence_peak30 = _impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
-            day_of_week_cadence_p95 = _impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
+            day_of_week_cadence_peak1 = impute_days(daily_cadence_peak1).groupby(daily_cadence_peak1.index.weekday).median()
+            day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
+            day_of_week_cadence_p95 = impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
 
             cadence_peak1 = np.round(day_of_week_cadence_peak1.median())
             cadence_peak30 = np.round(day_of_week_cadence_peak30.median())
@@ -603,6 +591,29 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
         data = impute(data)
 
     return data
+
+
+def impute_days(x, method='median'):
+
+    if x.isna().all():
+        return x
+
+    def fillna(x):
+        if method == 'mean':
+            return x.fillna(x.mean())
+        elif method == 'median':
+            return x.fillna(x.median())
+        else:
+            raise ValueError(f"Unknown method: {method}")
+
+    with warnings.catch_warnings():
+        warnings.filterwarnings('ignore', message='Mean of empty slice')
+        return (
+            x
+            .groupby(x.index.weekday).transform(fillna)
+            .groupby(x.index.weekday >= 5).transform(fillna)
+            .transform(fillna)
+        )
 
 
 def nanint(x):
