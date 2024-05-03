@@ -551,7 +551,32 @@ def exclude_first_last_days(x: pd.Series, first_or_last='both'):
     return x
 
 
-def impute_missing(data: pd.DataFrame, extrapolate=True):
+def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=True):
+
+    def fillna(subframe):
+        if isinstance(subframe, pd.Series):
+            x = subframe.to_numpy()
+            nan = np.isnan(x)
+            nanlen = len(x[nan])
+            if 0 < nanlen < len(x):  # check x contains a NaN and is not all NaN
+                x[nan] = np.nanmean(x)
+                return x  # will be cast back to a Series automatically
+            else:
+                return subframe
+
+    def impute(data):
+        return (
+            data
+            # first attempt imputation using same day of week
+            .groupby([data.index.weekday, data.index.hour, data.index.minute // 5])
+            .transform(fillna)
+            # then try within weekday/weekend
+            .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute // 5])
+            .transform(fillna)
+            # finally, use all other days
+            .groupby([data.index.hour, data.index.minute // 5])
+            .transform(fillna)
+        )
 
     if extrapolate:  # extrapolate beyond start/end times to have full 24h
         freq = infer_freq(data.index)
@@ -572,29 +597,14 @@ def impute_missing(data: pd.DataFrame, extrapolate=True):
             tolerance=pd.Timedelta('1m'),
             limit=1)
 
-    def fillna(subframe):
-        if isinstance(subframe, pd.Series):
-            x = subframe.to_numpy()
-            nan = np.isnan(x)
-            nanlen = len(x[nan])
-            if 0 < nanlen < len(x):  # check x contains a NaN and is not all NaN
-                x[nan] = np.nanmean(x)
-                return x  # will be cast back to a Series automatically
-            else:
-                return subframe
-
-    data = (
-        data
-        # first attempt imputation using same day of week
-        .groupby([data.index.weekday, data.index.hour, data.index.minute // 5])
-        .transform(fillna)
-        # then try within weekday/weekend
-        .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute // 5])
-        .transform(fillna)
-        # finally, use all other days
-        .groupby([data.index.hour, data.index.minute // 5])
-        .transform(fillna)
-    )
+    if skip_full_missing_days:
+        # find ok days
+        ok = data.notna().groupby(data.index.date).all()
+        ok = np.isin(data.index.date, ok[ok].index)
+        # impute only on ok days
+        data.loc[ok] = impute(data.loc[ok])
+    else:
+        data = impute(data)
 
     return data
 
