@@ -583,7 +583,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
 
     if skip_full_missing_days:
         # find ok days
-        ok = data.notna().groupby(data.index.date).all()
+        ok = data.notna().groupby(data.index.date).any()
         ok = np.isin(data.index.date, ok[ok].index)
         # impute only on ok days
         data.loc[ok] = impute(data.loc[ok])
