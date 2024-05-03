@@ -30,9 +30,13 @@ jobs:
           wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
           wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
 
-      # Perform a run to cache the torch hub repo
+      # Perform a run to cache the torch hub repo and download the model files (SSL)
       - name: Smoke test
         run: stepcount mini-sample.csv.gz
+
+      # Perform a run to download the model files (RF)
+      - name: Smoke test (RF)
+        run: stepcount mini-sample.csv.gz -t rf
 
       - name: Upload test files
         uses: actions/upload-artifact@v4
@@ -41,6 +45,12 @@ jobs:
           path: |
             mini-sample.csv.gz
             tiny-sample.cwa.gz
+
+      - name: Upload model joblib files
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-files
+          path: src/stepcount/*.joblib.lzma  # our model files have the extension .joblib.lzma
 
       - name: Upload torch_hub_cache
         uses: actions/upload-artifact@v4
@@ -73,6 +83,12 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: test-files
+
+      - name: Download model files
+        uses: actions/download-artifact@v4
+        with:
+          name: model-files
+          path: src/stepcount
 
       - name: Download torch_hub_cache
         uses: actions/download-artifact@v4
