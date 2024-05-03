@@ -32,7 +32,7 @@ jobs:
 
       # Perform a run to cache the torch hub repo
       - name: Smoke test
-        run: stepcount tiny-sample.cwa.gz
+        run: stepcount mini-sample.csv.gz
 
       - name: Upload test files
         uses: actions/upload-artifact@v4
