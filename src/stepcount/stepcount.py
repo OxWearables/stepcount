@@ -466,9 +466,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
 
-    daily_cadence_peak1 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, n=1).rename('CadencePeak1(steps/min)')
-    daily_cadence_peak30 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, n=30).rename('CadencePeak30(steps/min)')
-    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95, steptol=steptol_in_minutes).rename('Cadence95th(steps/min)')
+    daily_cadence_peak1 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, walktol=10, n=1).rename('CadencePeak1(steps/min)')
+    daily_cadence_peak30 = minutely.resample('D').agg(_cadence_max, steptol=steptol_in_minutes, walktol=30, n=30).rename('CadencePeak30(steps/min)')
+    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95, walktol=10, steptol=steptol_in_minutes).rename('Cadence95th(steps/min)')
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Mean of empty slice')
