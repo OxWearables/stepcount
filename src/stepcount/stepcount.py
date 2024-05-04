@@ -501,9 +501,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
             # adjusted estimates first form a 7-day representative week before final aggregation
             # TODO: 7-day padding for shorter recordings
             # TODO: maybe impute output daily_cadence? but skip user-excluded days
-            day_of_week_cadence_peak1 = impute_days(daily_cadence_peak1).groupby(daily_cadence_peak1.index.weekday).median()
-            day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
-            day_of_week_cadence_p95 = impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
+            day_of_week_cadence_peak1 = impute_days(daily_cadence_peak1, method='median').groupby(daily_cadence_peak1.index.weekday).median()
+            day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30, method='median').groupby(daily_cadence_peak30.index.weekday).median()
+            day_of_week_cadence_p95 = impute_days(daily_cadence_p95, method='median').groupby(daily_cadence_p95.index.weekday).median()
 
             cadence_peak1 = day_of_week_cadence_peak1.median()
             cadence_peak30 = day_of_week_cadence_peak30.median()
