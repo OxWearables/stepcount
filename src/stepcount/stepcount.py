@@ -365,19 +365,19 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
-        daily_avg = np.round(day_of_week.agg(_mean))
-        daily_med = np.round(day_of_week.agg(_median))
-        daily_min = np.round(day_of_week.agg(_min))
-        daily_max = np.round(day_of_week.agg(_max))
+        daily_avg = day_of_week.agg(_mean)
+        daily_med = day_of_week.agg(_median)
+        daily_min = day_of_week.agg(_min)
+        daily_max = day_of_week.agg(_max)
     else:
         # crude (unadjusted) estimates ignore NAs
         minutely = Y.resample('T').agg(_sum).rename('Steps')
         hourly = Y.resample('H').agg(_sum).rename('Steps')
         daily = Y.resample('D').agg(_sum).rename('Steps')
-        daily_avg = np.round(daily.agg(_mean))
-        daily_med = np.round(daily.agg(_median))
-        daily_min = np.round(daily.agg(_min))
-        daily_max = np.round(daily.agg(_max))
+        daily_avg = daily.agg(_mean)
+        daily_med = daily.agg(_median)
+        daily_min = daily.agg(_min)
+        daily_max = daily.agg(_max)
 
     total = daily.sum() if not daily.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
 
@@ -388,17 +388,17 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).agg(_mean)
-        daily_walk_avg = np.round(day_of_week_walk.agg(_mean))
-        daily_walk_med = np.round(day_of_week_walk.agg(_median))
-        daily_walk_min = np.round(day_of_week_walk.agg(_min))
-        daily_walk_max = np.round(day_of_week_walk.agg(_max))
+        daily_walk_avg = day_of_week_walk.agg(_mean)
+        daily_walk_med = day_of_week_walk.agg(_median)
+        daily_walk_min = day_of_week_walk.agg(_min)
+        daily_walk_max = day_of_week_walk.agg(_max)
     else:
         # crude (unadjusted) estimates ignore NAs
         daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
-        daily_walk_avg = np.round(daily_walk.agg(_mean))
-        daily_walk_med = np.round(daily_walk.agg(_median))
-        daily_walk_min = np.round(daily_walk.agg(_min))
-        daily_walk_max = np.round(daily_walk.agg(_max))
+        daily_walk_avg = daily_walk.agg(_mean)
+        daily_walk_med = daily_walk.agg(_median)
+        daily_walk_min = daily_walk.agg(_min)
+        daily_walk_max = daily_walk.agg(_max)
 
     total_walk = daily_walk.sum() if not daily_walk.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
 
@@ -413,30 +413,30 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
 
     # daily stats
     daily = pd.concat([
-        pd.to_numeric(daily_walk.round(), downcast='integer'),
-        pd.to_numeric(daily.round(), downcast='integer'),
+        daily_walk.round().astype(pd.Int64Dtype()),
+        daily.round().astype(pd.Int64Dtype()),
         daily_ptile_at.rename(columns={
             'p05_at': 'Steps5thAt',
             'p25_at': 'Steps25thAt',
             'p50_at': 'Steps50thAt',
             'p75_at': 'Steps75thAt',
             'p95_at': 'Steps95thAt'
-        }).applymap(_tdelta_to_str),
+        }).applymap(_tdelta_to_str).astype(pd.StringDtype()),
     ], axis=1)
 
     # convert units
     total = nanint(np.round(total))
-    minutely = pd.to_numeric(minutely.round(), downcast='integer')
-    hourly = pd.to_numeric(hourly.round(), downcast='integer')
-    daily_avg = nanint(daily_avg)
-    daily_med = nanint(daily_med)
-    daily_min = nanint(daily_min)
-    daily_max = nanint(daily_max)
+    minutely = minutely.round().astype(pd.Int64Dtype())
+    hourly = hourly.round().astype(pd.Int64Dtype())
+    daily_avg = nanint(np.round(daily_avg))
+    daily_med = nanint(np.round(daily_med))
+    daily_min = nanint(np.round(daily_min))
+    daily_max = nanint(np.round(daily_max))
     total_walk = nanint(np.round(total_walk))
-    daily_walk_avg = nanint(daily_walk_avg)
-    daily_walk_med = nanint(daily_walk_med)
-    daily_walk_min = nanint(daily_walk_min)
-    daily_walk_max = nanint(daily_walk_max)
+    daily_walk_avg = nanint(np.round(daily_walk_avg))
+    daily_walk_med = nanint(np.round(daily_walk_med))
+    daily_walk_min = nanint(np.round(daily_walk_min))
+    daily_walk_max = nanint(np.round(daily_walk_max))
     daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
 
     return {
@@ -505,14 +505,14 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
             day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30).groupby(daily_cadence_peak30.index.weekday).median()
             day_of_week_cadence_p95 = impute_days(daily_cadence_p95).groupby(daily_cadence_p95.index.weekday).median()
 
-            cadence_peak1 = np.round(day_of_week_cadence_peak1.median())
-            cadence_peak30 = np.round(day_of_week_cadence_peak30.median())
-            cadence_p95 = np.round(day_of_week_cadence_p95.median())
+            cadence_peak1 = day_of_week_cadence_peak1.median()
+            cadence_peak30 = day_of_week_cadence_peak30.median()
+            cadence_p95 = day_of_week_cadence_p95.median()
 
         else:
-            cadence_peak1 = np.round(daily_cadence_peak1.median())
-            cadence_peak30 = np.round(daily_cadence_peak30.median())
-            cadence_p95 = np.round(daily_cadence_p95.median())
+            cadence_peak1 = daily_cadence_peak1.median()
+            cadence_peak30 = daily_cadence_peak30.median()
+            cadence_p95 = daily_cadence_p95.median()
 
     daily = pd.concat([
         daily_cadence_peak1.round().astype(pd.Int64Dtype()),
@@ -522,9 +522,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
 
     return {
         'daily': daily,
-        'cadence_peak1': nanint(cadence_peak1),
-        'cadence_peak30': nanint(cadence_peak30),
-        'cadence_p95': nanint(cadence_p95),
+        'cadence_peak1': nanint(np.round(cadence_peak1)),
+        'cadence_peak30': nanint(np.round(cadence_peak30)),
+        'cadence_p95': nanint(np.round(cadence_p95)),
     }
 
 
