@@ -165,7 +165,10 @@ def main():
         steps_summary['hourly'],
         enmo_summary['hourly'],
     ], axis=1)
-    hourly.to_csv(f"{outdir}/{basename}-Hourly.csv.gz")
+    hourly.index.name = 'Time'
+    hourly.reset_index(inplace=True)
+    hourly.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    hourly.to_csv(f"{outdir}/{basename}-Hourly.csv.gz", index=False)
     del hourly  # free memory
 
     # Save hourly data, adjusted
@@ -173,7 +176,10 @@ def main():
         steps_summary_adj['hourly'],
         enmo_summary_adj['hourly'],
     ], axis=1)
-    hourly_adj.to_csv(f"{outdir}/{basename}-HourlyAdjusted.csv.gz")
+    hourly_adj.index.name = 'Time'
+    hourly_adj.reset_index(inplace=True)
+    hourly_adj.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    hourly_adj.to_csv(f"{outdir}/{basename}-HourlyAdjusted.csv.gz", index=False)
     del hourly_adj  # free memory
 
     # Save minutely data
@@ -181,7 +187,10 @@ def main():
         steps_summary['minutely'],
         enmo_summary['minutely'],
     ], axis=1)
-    minutely.to_csv(f"{outdir}/{basename}-Minutely.csv.gz")
+    minutely.index.name = 'Time'
+    minutely.reset_index(inplace=True)
+    minutely.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    minutely.to_csv(f"{outdir}/{basename}-Minutely.csv.gz", index=False)
     del minutely  # free memory
 
     # Save minutely data, adjusted
@@ -189,7 +198,10 @@ def main():
         steps_summary_adj['minutely'],
         enmo_summary_adj['minutely'],
     ], axis=1)
-    minutely_adj.to_csv(f"{outdir}/{basename}-MinutelyAdjusted.csv.gz")
+    minutely_adj.index.name = 'Time'
+    minutely_adj.reset_index(inplace=True)
+    minutely_adj.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    minutely_adj.to_csv(f"{outdir}/{basename}-MinutelyAdjusted.csv.gz", index=False)
     del minutely_adj  # free memory
 
     # Save daily data
@@ -198,7 +210,10 @@ def main():
         cadence_summary['daily'],
         enmo_summary['daily'],
     ], axis=1)
-    daily.to_csv(f"{outdir}/{basename}-Daily.csv.gz")
+    daily.index.name = 'Date'
+    daily.reset_index(inplace=True)
+    daily.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    daily.to_csv(f"{outdir}/{basename}-Daily.csv.gz", index=False)
     # del daily  # still needed for printing
 
     # Save daily data, adjusted
@@ -207,16 +222,19 @@ def main():
         cadence_summary_adj['daily'],
         enmo_summary_adj['daily'],
     ], axis=1)
-    daily_adj.to_csv(f"{outdir}/{basename}-DailyAdjusted.csv.gz")
+    daily_adj.index.name = 'Date'
+    daily_adj.reset_index(inplace=True)
+    daily_adj.insert(0, 'Filename', info['Filename'])  # add filename for reference
+    daily_adj.to_csv(f"{outdir}/{basename}-DailyAdjusted.csv.gz", index=False)
     # del daily_adj  # still needed for printing
 
     # Print
     print("\nSummary\n-------")
     print(json.dumps(info, indent=4, cls=NpEncoder))
     print("\nEstimated Daily Stats\n---------------------")
-    print(daily)
+    print(daily.set_index('Date').drop(columns='Filename'))
     print("\nEstimated Daily Stats (Adjusted)\n---------------------")
-    print(daily_adj)
+    print(daily_adj.set_index('Date').drop(columns='Filename'))
     print("\nOutput files saved in:", outdir)
 
     after = time.time()
