@@ -269,7 +269,7 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         # crude (unadjusted) estimates ignore NAs
         minutely = v.resample('T').agg(_mean).rename('ENMO(mg)')
         hourly = v.resample('H').agg(_mean).rename('ENMO(mg)')
-        daily = v.resample('D').agg(_mean).rename('ENMO(mg')
+        daily = v.resample('D').agg(_mean).rename('ENMO(mg)')
         avg = daily.agg(_mean)
 
     return {
