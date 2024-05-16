@@ -61,6 +61,7 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
         with open(file, 'r') as f:
             info.append(json.load(f, object_pairs_hook=OrderedDict))
     info = pd.DataFrame.from_dict(info)  # merge to a dataframe
+    info = info.applymap(convert_ordereddict)  # convert any OrderedDict cell values to regular dict
     info_file = outdir / "Info.csv.gz" 
     info.to_csv(info_file, index=False)
     print('Collated info CSV written to', info_file)
@@ -123,6 +124,13 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
         print('Collated adjusted minutes CSV written to', minutesadj_file)
 
     return
+
+
+def convert_ordereddict(value):
+    """ Convert OrderedDict to regular dict """
+    if isinstance(value, OrderedDict):
+        return dict(value)
+    return value
 
 
 def main():
