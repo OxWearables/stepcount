@@ -14,6 +14,7 @@ from pandas.tseries.frequencies import to_offset
 
 import actipy
 
+from stepcount import __version__
 from stepcount import __model_version__
 from stepcount import __model_md5__
 
@@ -35,15 +36,15 @@ def main():
                         type=str, default='cpu')
     parser.add_argument("--sample-rate", "-r", help="Sample rate for measurement, otherwise inferred.",
                         type=int, default=None)
-    parser.add_argument("--exclude-wear-below", "-w",
-                        help=("Minimum wear time for a day to be considered valid, otherwise exclude it. "
-                              "Pass values as strings, e.g.: '12H', '30min'. Default: None (no exclusion)"),
-                        type=str, default=None)
     parser.add_argument("--txyz",
                         help=("Use this option to specify the column names for time, x, y, z "
                               "in the input file, in that order. Use a comma-separated string. "
                               "Default: 'time,x,y,z'"),
                         type=str, default="time,x,y,z")
+    parser.add_argument("--exclude-wear-below", "-w",
+                        help=("Minimum wear time for a day to be considered valid, otherwise exclude it. "
+                              "Pass values as strings, e.g.: '12H', '30min'. Default: None (no exclusion)"),
+                        type=str, default=None)
     parser.add_argument("--exclude-first-last", "-e",
                         help="Exclude first, last or both days of data. Default: None (no exclusion)",
                         type=str, choices=['first', 'last', 'both'], default=None)
@@ -54,14 +55,19 @@ def main():
 
     verbose = not args.quiet
 
+    info = {}
+    info['StepCountVersion'] = __version__
+    info['StepCountArgs'] = vars(args)
+
     # Load file
-    data, info = read(
+    data, info_read = read(
         args.filepath, 
         usecols=args.txyz, 
         resample_hz=30 if args.model_type == 'ssl' else None,
         sample_rate=args.sample_rate, 
         verbose=verbose
     )
+    info.update(info_read)
 
     # Output paths
     basename = resolve_path(args.filepath)[1]
