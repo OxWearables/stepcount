@@ -187,9 +187,15 @@ $ stepcount-collate-outputs outputs/
 ```
 This will collate all *-Info.json files found in outputs/ and generate a CSV file.
 
+
 ## Validation
 
 Validation for this algorithm is presented in a preprint on medRxiv at: [https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1). 
+
+
+## Contributing
+If you would like to contribute to this repository, please check out [CONTRIBUTING.md](https://github.com/OxWearables/stepcount/blob/main/CONTRIBUTING.md).
+We welcome contributions in the form of bug reports, feature requests, and pull requests. 
 
 
 ## Citing our work
