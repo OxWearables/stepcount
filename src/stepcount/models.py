@@ -369,13 +369,13 @@ class WalkDetectorRF:
 
 class WalkDetectorSSL:
     def __init__(
-            self,
-            device='cpu',
-            batch_size=100,
-            weights_path='state_dict.pt',
-            repo_tag='v1.0.0',
-            hmm_params=None,
-            verbose=False,
+        self,
+        device='cpu',
+        batch_size=100,
+        weights_path='state_dict.pt',
+        repo_tag='v1.0.0',
+        hmm_params=None,
+        verbose=False,
     ):
         self.device = device
         self.weights_path = weights_path
