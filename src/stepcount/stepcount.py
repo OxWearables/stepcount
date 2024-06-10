@@ -451,8 +451,9 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
 
     # daily stats
     daily = pd.concat([
-        daily_walk.round().astype(pd.Int64Dtype()),
+        daily_walk,
         daily.round().astype(pd.Int64Dtype()),
+        # convert timedelta to human-friendly format
         daily_ptile_at.rename(columns={
             'p05_at': 'Steps5thAt',
             'p25_at': 'Steps25thAt',
@@ -466,7 +467,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     hour_steps = hourly.groupby(hourly.index.hour).agg(_mean).reindex(range(24))
     hour_walks = hourly_walk.groupby(hourly_walk.index.hour).agg(_mean).reindex(range(24))
 
-    # convert units
+    # round steps
     total = nanint(np.round(total))
     minutely = minutely.round().astype(pd.Int64Dtype())
     hourly = hourly.round().astype(pd.Int64Dtype())
@@ -474,13 +475,9 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     daily_med = nanint(np.round(daily_med))
     daily_min = nanint(np.round(daily_min))
     daily_max = nanint(np.round(daily_max))
-    total_walk = nanint(np.round(total_walk))
-    daily_walk_avg = nanint(np.round(daily_walk_avg))
-    daily_walk_med = nanint(np.round(daily_walk_med))
-    daily_walk_min = nanint(np.round(daily_walk_min))
-    daily_walk_max = nanint(np.round(daily_walk_max))
-    daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
     hour_steps = hour_steps.round().astype(pd.Int64Dtype())
+    # convert timedelta to human-friendly format
+    daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
 
     return {
         'total': total,
