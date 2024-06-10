@@ -830,6 +830,8 @@ class NpEncoder(json.JSONEncoder):
             return float(obj)
         if isinstance(obj, np.ndarray):
             return obj.tolist()
+        if pd.isnull(obj):  # handles pandas NAType
+            return np.nan
         return json.JSONEncoder.default(self, obj)
 
 
