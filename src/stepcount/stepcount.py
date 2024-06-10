@@ -7,6 +7,7 @@ import time
 import argparse
 import json
 import hashlib
+import re
 import numpy as np
 import pandas as pd
 import joblib
@@ -242,7 +243,11 @@ def main():
 
     # Print
     print("\nSummary\n-------")
-    print(json.dumps(info, indent=4, cls=NpEncoder))
+    print(json.dumps(
+        # exclude hour-of-day metrics to avoid spamming the console
+        {k: v for k, v in info.items() if not re.search(r'_Hour\d{2}', k)},
+        indent=4, cls=NpEncoder
+    ))
     print("\nEstimated Daily Stats\n---------------------")
     print(daily.set_index('Date').drop(columns='Filename'))
     print("\nEstimated Daily Stats (Adjusted)\n---------------------")
