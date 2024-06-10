@@ -109,10 +109,12 @@ def main():
     # ENMO summary
     enmo_summary = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
     info['ENMO(mg)'] = enmo_summary['avg']
+    info.update({f'ENMO(mg)_Hour{h:02}': enmo_summary['hour_avgs'].loc[h] for h in range(24)})
 
     # ENMO summary, adjusted
     enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
+    info.update({f'ENMOAdjusted(mg)_Hour{h:02}': enmo_summary_adj['hour_avgs'].loc[h] for h in range(24)})
 
     # Steps summary
     steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
@@ -131,6 +133,8 @@ def main():
     info['Steps50thAt'] = steps_summary['daily_ptile_at_avg']['p50_at']
     info['Steps75thAt'] = steps_summary['daily_ptile_at_avg']['p75_at']
     info['Steps95thAt'] = steps_summary['daily_ptile_at_avg']['p95_at']
+    info.update({f'Steps_Hour{h:02}': steps_summary['hour_steps'].loc[h] for h in range(24)})
+    info.update({f'Walking(mins)_Hour{h:02}': steps_summary['hour_walks'].loc[h] for h in range(24)})
 
     # Steps summary, adjusted
     steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
@@ -149,6 +153,8 @@ def main():
     info['Steps50thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p50_at']
     info['Steps75thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p75_at']
     info['Steps95thAtAdjusted'] = steps_summary_adj['daily_ptile_at_avg']['p95_at']
+    info.update({f'StepsAdjusted_Hour{h:02}': steps_summary_adj['hour_steps'].loc[h] for h in range(24)})
+    info.update({f'WalkingAdjusted(mins)_Hour{h:02}': steps_summary_adj['hour_walks'].loc[h] for h in range(24)})
 
     # Cadence summary
     cadence_summary = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
@@ -296,11 +302,15 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         daily = v.resample('D').agg(_mean).rename('ENMO(mg)')
         avg = daily.agg(_mean)
 
+    # hour of day averages, 24-hour profile
+    hour_avgs = hourly.groupby(hourly.index.hour).agg(_mean).reindex(range(24))
+
     return {
         'avg': avg,
         'hourly': hourly,
         'daily': daily,
         'minutely': minutely,
+        'hour_avgs': hour_avgs,
     }
 
 
@@ -408,6 +418,8 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     # walking
     if adjust_estimates:
         # adjusted estimates account for NAs
+        # minutely_walk = (W.resample('T').agg(_sum, min_wear=0.5, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 30s/min missingness
+        hourly_walk = (W.resample('H').agg(_sum, min_wear=50, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
         daily_walk = (W.resample('D').agg(_sum, min_wear=21*60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
@@ -418,6 +430,8 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_walk_max = day_of_week_walk.agg(_max)
     else:
         # crude (unadjusted) estimates ignore NAs
+        # minutely_walk = (W.resample('T').agg(_sum) * dt / 60).rename('Walk(mins)')
+        hourly_walk = (W.resample('H').agg(_sum) * dt / 60).rename('Walk(mins)')
         daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
         daily_walk_avg = daily_walk.agg(_mean)
         daily_walk_med = daily_walk.agg(_median)
@@ -448,6 +462,10 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         }).applymap(_tdelta_to_str).astype(pd.StringDtype()),
     ], axis=1)
 
+    # hour of day averages, 24-hour profile
+    hour_steps = hourly.groupby(hourly.index.hour).agg(_mean).reindex(range(24))
+    hour_walks = hourly_walk.groupby(hourly_walk.index.hour).agg(_mean).reindex(range(24))
+
     # convert units
     total = nanint(np.round(total))
     minutely = minutely.round().astype(pd.Int64Dtype())
@@ -462,6 +480,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     daily_walk_min = nanint(np.round(daily_walk_min))
     daily_walk_max = nanint(np.round(daily_walk_max))
     daily_ptile_at_avg = daily_ptile_at_avg.map(_tdelta_to_str)
+    hour_steps = hour_steps.round().astype(pd.Int64Dtype())
 
     return {
         'total': total,
@@ -478,6 +497,8 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         'daily_walk_min': daily_walk_min,
         'daily_walk_max': daily_walk_max,
         'daily_ptile_at_avg': daily_ptile_at_avg,
+        'hour_steps': hour_steps,
+        'hour_walks': hour_walks,
     }
 
 
