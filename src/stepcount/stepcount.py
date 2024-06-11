@@ -333,8 +333,7 @@ def main():
     # Print
     print("\nSummary\n-------")
     print(json.dumps(
-        # exclude hour-of-day metrics to avoid spamming the console
-        {k: v for k, v in info.items() if not re.search(r'_Hour\d{2}', k)},
+        {k: v for k, v in info.items() if not re.search(r'_Weekend|_Weekday|_Hour\d{2}', k)},
         indent=4, cls=NpEncoder
     ))
     print("\nEstimated Daily Stats\n---------------------")
