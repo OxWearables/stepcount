@@ -116,8 +116,8 @@ def main():
     info['ENMO(mg)_Weekend'] = enmo_summary['weekend_avg']
     info['ENMO(mg)_Weekday'] = enmo_summary['weekday_avg']
     info.update({f'ENMO(mg)_Hour{h:02}': enmo_summary['hour_avgs'].loc[h] for h in range(24)})
-    info.update({f'ENMO(mg)_WeekendHour{h:02}': enmo_summary['hour_weekend_avgs'].loc[h] for h in range(24)})
-    info.update({f'ENMO(mg)_WeekdayHour{h:02}': enmo_summary['hour_weekday_avgs'].loc[h] for h in range(24)})
+    info.update({f'ENMO(mg)_Hour{h:02}_Weekend': enmo_summary['weekend_hour_avgs'].loc[h] for h in range(24)})
+    info.update({f'ENMO(mg)_Hour{h:02}_Weekday': enmo_summary['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # ENMO summary, adjusted
     enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
@@ -125,8 +125,8 @@ def main():
     info['ENMOAdjusted(mg)_Weekend'] = enmo_summary_adj['weekend_avg']
     info['ENMOAdjusted(mg)_Weekday'] = enmo_summary_adj['weekday_avg']
     info.update({f'ENMOAdjusted(mg)_Hour{h:02}': enmo_summary_adj['hour_avgs'].loc[h] for h in range(24)})
-    info.update({f'ENMOAdjusted(mg)_Weekend_Hour{h:02}': enmo_summary_adj['hour_weekend_avgs'].loc[h] for h in range(24)})
-    info.update({f'ENMOAdjusted(mg)_Weekday_Hour{h:02}': enmo_summary_adj['hour_weekday_avgs'].loc[h] for h in range(24)})
+    info.update({f'ENMOAdjusted(mg)_Hour{h:02}_Weekend': enmo_summary_adj['weekend_hour_avgs'].loc[h] for h in range(24)})
+    info.update({f'ENMOAdjusted(mg)_Hour{h:02}_Weekday': enmo_summary_adj['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # Steps summary
     steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
@@ -174,11 +174,11 @@ def main():
     info['Steps95thAt'] = steps_summary['ptile_at_avgs']['p95_at']
     # hour-of-day averages
     info.update({f'Steps_Hour{h:02}': steps_summary['hour_steps'].loc[h] for h in range(24)})
-    info.update({f'Steps_Weekend_Hour{h:02}': steps_summary['weekend_hour_steps'].loc[h] for h in range(24)})
-    info.update({f'Steps_Weekday_Hour{h:02}': steps_summary['weekday_hour_steps'].loc[h] for h in range(24)})
+    info.update({f'Steps_Hour{h:02}_Weekend': steps_summary['weekend_hour_steps'].loc[h] for h in range(24)})
+    info.update({f'Steps_Hour{h:02}_Weekday': steps_summary['weekday_hour_steps'].loc[h] for h in range(24)})
     info.update({f'Walking(mins)_Hour{h:02}': steps_summary['hour_walks'].loc[h] for h in range(24)})
-    info.update({f'Walking(mins)_Weekend_Hour{h:02}': steps_summary['weekend_hour_walks'].loc[h] for h in range(24)})
-    info.update({f'Walking(mins)_Weekday_Hour{h:02}': steps_summary['weekday_hour_walks'].loc[h] for h in range(24)})
+    info.update({f'Walking(mins)_Hour{h:02}_Weekend': steps_summary['weekend_hour_walks'].loc[h] for h in range(24)})
+    info.update({f'Walking(mins)_Hour{h:02}_Weekday': steps_summary['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Steps summary, adjusted
     steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
@@ -226,11 +226,11 @@ def main():
     info['Steps95thAtAdjusted'] = steps_summary_adj['ptile_at_avgs']['p95_at']
     # hour-of-day averages
     info.update({f'StepsAdjusted_Hour{h:02}': steps_summary_adj['hour_steps'].loc[h] for h in range(24)})
-    info.update({f'StepsAdjusted_Weekend_Hour{h:02}': steps_summary_adj['weekend_hour_steps'].loc[h] for h in range(24)})
-    info.update({f'StepsAdjusted_Weekday_Hour{h:02}': steps_summary_adj['weekday_hour_steps'].loc[h] for h in range(24)})
+    info.update({f'StepsAdjusted_Hour{h:02}_Weekend': steps_summary_adj['weekend_hour_steps'].loc[h] for h in range(24)})
+    info.update({f'StepsAdjusted_Hour{h:02}_Weekday': steps_summary_adj['weekday_hour_steps'].loc[h] for h in range(24)})
     info.update({f'WalkingAdjusted(mins)_Hour{h:02}': steps_summary_adj['hour_walks'].loc[h] for h in range(24)})
-    info.update({f'WalkingAdjusted(mins)_Weekend_Hour{h:02}': steps_summary_adj['weekend_hour_walks'].loc[h] for h in range(24)})
-    info.update({f'WalkingAdjusted(mins)_Weekday_Hour{h:02}': steps_summary_adj['weekday_hour_walks'].loc[h] for h in range(24)})
+    info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekend': steps_summary_adj['weekend_hour_walks'].loc[h] for h in range(24)})
+    info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekday': steps_summary_adj['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Cadence summary
     cadence_summary = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
@@ -404,8 +404,8 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
 
     # hour of day averages, 24-hour profile
     hour_avgs = hourly.groupby(hourly.index.hour).mean().reindex(range(24))
-    hour_weekend_avgs = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
-    hour_weekday_avgs = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    weekend_hour_avgs = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    weekday_hour_avgs = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
 
     return {
         'avg': avg,
@@ -415,8 +415,8 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         'daily': daily,
         'minutely': minutely,
         'hour_avgs': hour_avgs,
-        'hour_weekend_avgs': hour_weekend_avgs,
-        'hour_weekday_avgs': hour_weekday_avgs,
+        'weekend_hour_avgs': weekend_hour_avgs,
+        'weekday_hour_avgs': weekday_hour_avgs,
     }
 
 
