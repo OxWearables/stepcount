@@ -369,7 +369,7 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
     v = np.clip(v - 1, a_min=0, a_max=None)
     v *= 1000  # convert to mg
     # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
-    v = v.resample('T').agg(_mean)
+    v = v.resample('T').mean()
 
     dt = infer_freq(v.index).total_seconds()
 
@@ -389,24 +389,23 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         daily = v.resample('D').agg(_mean, min_wear=21*60, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
+        day_of_week = impute_days(daily).groupby(daily.index.weekday).mean()
         avg = day_of_week.mean()
         weekend_avg = day_of_week[day_of_week.index >= 5].mean()
         weekday_avg = day_of_week[day_of_week.index < 5].mean()
     else:
         # crude (unadjusted) estimates ignore NAs
-        minutely = v.resample('T').agg(_mean).rename('ENMO(mg)')
-        hourly = v.resample('H').agg(_mean).rename('ENMO(mg)')
-        daily = v.resample('D').agg(_mean).rename('ENMO(mg)')
+        minutely = v.resample('T').mean().rename('ENMO(mg)')
+        hourly = v.resample('H').mean().rename('ENMO(mg)')
+        daily = v.resample('D').mean().rename('ENMO(mg)')
         avg = daily.mean()
-        # weekend/weekday averages
         weekend_avg = daily[daily.index.weekday >= 5].mean()
         weekday_avg = daily[daily.index.weekday < 5].mean()
 
     # hour of day averages, 24-hour profile
-    hour_avgs = hourly.groupby(hourly.index.hour).agg(_mean).reindex(range(24))
-    hour_weekend_avgs = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
-    hour_weekday_avgs = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
+    hour_avgs = hourly.groupby(hourly.index.hour).mean().reindex(range(24))
+    hour_weekend_avgs = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    hour_weekday_avgs = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
 
     return {
         'avg': avg,
@@ -503,11 +502,11 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily = Y.resample('D').agg(_sum, min_wear=21*60, dt=dt).rename('Steps')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week = impute_days(daily).groupby(daily.index.weekday).agg(_mean)
-        daily_avg = day_of_week.agg(_mean)
-        daily_med = day_of_week.agg(_median)
-        daily_min = day_of_week.agg(_min)
-        daily_max = day_of_week.agg(_max)
+        day_of_week = impute_days(daily).groupby(daily.index.weekday).mean()
+        daily_avg = day_of_week.mean()
+        daily_med = day_of_week.median()
+        daily_min = day_of_week.min()
+        daily_max = day_of_week.max()
         # weekend stats
         weekend_avg = day_of_week[day_of_week.index >= 5].mean()
         weekend_med = day_of_week[day_of_week.index >= 5].median()
@@ -523,10 +522,10 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         minutely = Y.resample('T').agg(_sum).rename('Steps')
         hourly = Y.resample('H').agg(_sum).rename('Steps')
         daily = Y.resample('D').agg(_sum).rename('Steps')
-        daily_avg = daily.agg(_mean)
-        daily_med = daily.agg(_median)
-        daily_min = daily.agg(_min)
-        daily_max = daily.agg(_max)
+        daily_avg = daily.mean()
+        daily_med = daily.median()
+        daily_min = daily.min()
+        daily_max = daily.max()
         # weekend stats
         weekend_avg = daily[daily.index.weekday >= 5].mean()
         weekend_med = daily[daily.index.weekday >= 5].median()
@@ -551,11 +550,11 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         daily_walk = (W.resample('D').agg(_sum, min_wear=21*60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).agg(_mean)
-        daily_walk_avg = day_of_week_walk.agg(_mean)
-        daily_walk_med = day_of_week_walk.agg(_median)
-        daily_walk_min = day_of_week_walk.agg(_min)
-        daily_walk_max = day_of_week_walk.agg(_max)
+        day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).mean()
+        daily_walk_avg = day_of_week_walk.mean()
+        daily_walk_med = day_of_week_walk.median()
+        daily_walk_min = day_of_week_walk.min()
+        daily_walk_max = day_of_week_walk.max()
         # weekend stats
         weekend_walk_avg = day_of_week_walk[day_of_week_walk.index >= 5].mean()
         weekend_walk_med = day_of_week_walk[day_of_week_walk.index >= 5].median()
@@ -571,10 +570,10 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         # minutely_walk = (W.resample('T').agg(_sum) * dt / 60).rename('Walk(mins)')
         hourly_walk = (W.resample('H').agg(_sum) * dt / 60).rename('Walk(mins)')
         daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
-        daily_walk_avg = daily_walk.agg(_mean)
-        daily_walk_med = daily_walk.agg(_median)
-        daily_walk_min = daily_walk.agg(_min)
-        daily_walk_max = daily_walk.agg(_max)
+        daily_walk_avg = daily_walk.mean()
+        daily_walk_med = daily_walk.median()
+        daily_walk_min = daily_walk.min()
+        daily_walk_max = daily_walk.max()
         # weekend stats
         weekend_walk_avg = daily_walk[daily_walk.index.weekday >= 5].mean()
         weekend_walk_med = daily_walk[daily_walk.index.weekday >= 5].median()
@@ -601,12 +600,12 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     daily_ptile_at_avg = daily_ptile_at.mean()
 
     # hour of day averages, 24-hour profile
-    hour_steps = hourly.groupby(hourly.index.hour).agg(_mean).reindex(range(24))
-    weekend_hour_steps = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
-    weekday_hour_steps = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
-    hour_walks = hourly_walk.groupby(hourly_walk.index.hour).agg(_mean).reindex(range(24))
-    weekend_hour_walks = hourly_walk[hourly_walk.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
-    weekday_hour_walks = hourly_walk[hourly_walk.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).agg(_mean)).reindex(range(24))
+    hour_steps = hourly.groupby(hourly.index.hour).mean().reindex(range(24))
+    weekend_hour_steps = hourly[hourly.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    weekday_hour_steps = hourly[hourly.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    hour_walks = hourly_walk.groupby(hourly_walk.index.hour).mean().reindex(range(24))
+    weekend_hour_walks = hourly_walk[hourly_walk.index.weekday >= 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
+    weekday_hour_walks = hourly_walk[hourly_walk.index.weekday < 5].pipe(lambda x: x.groupby(x.index.hour).mean()).reindex(range(24))
 
     # daily stats
     daily = pd.concat([
