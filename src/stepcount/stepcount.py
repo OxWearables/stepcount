@@ -19,6 +19,9 @@ from stepcount import __version__
 from stepcount import __model_version__
 from stepcount import __model_md5__
 
+warnings.filterwarnings('ignore', message='Mean of empty slice')  # shut .median() warning when all-NaN
+
+
 
 def main():
 
@@ -456,9 +459,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     def _median(x, min_wear=None, dt=None):
         if not _is_enough(x, min_wear, dt):
             return np.nan
-        with warnings.catch_warnings():
-            warnings.filterwarnings('ignore', message='Mean of empty slice')
-            return x.median()
+        return x.median()
 
     def _percentile_at(x, ps=(5, 25, 50, 75, 95), min_wear=None, dt=None):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
