@@ -963,13 +963,14 @@ def read(
             verbose=verbose,
         )
 
-        info = {
-            **{"Filename": filepath,
-                "Device": ftype,
-                "Filesize(MB)": fsize,
-                "SampleRate": sample_rate},
-            **info
-        }
+        info.update({
+            "Filename": filepath,
+            "Device": ftype,
+            "Filesize(MB)": fsize,
+            "SampleRate": sample_rate,
+            "StartTime": data.index[0].strftime('%Y-%m-%d %H:%M:%S'),
+            "EndTime": data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
+        })
 
     elif ftype in (".cwa", ".gt3x", ".bin"):
 
