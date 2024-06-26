@@ -31,59 +31,59 @@
     - **ENMO(mg)_Weekday**: Euclidean norm minus one and zero-truncated, measured in milli-g. Weekdays only.
     - **ENMO(mg)_Hour{XX}_Weekday**: ENMO for each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `ENMO(mg)_Hour12_Weekend` is the ENMO during 12:00 - 13:00, averaged across all days. Weekdays only.
 1. Steps
-    - **TotalSteps**: Total number of steps recorded.
+    - **TotalSteps**: Total number of steps.
     - **StepsDayAvg**: Average number of steps per day.
     - **StepsDayMed**: Median number of steps per day.
-    - **StepsDayMin**: Minimum number of steps in any single day.
-    - **StepsDayMax**: Maximum number of steps in any single day.
+    - **StepsDayMin**: Minimum number of steps per day.
+    - **StepsDayMax**: Maximum number of steps per day.
     - **Steps_Hour{XX}**: Average number of steps taken during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Steps_Hour12` is the average number of steps taken during 12:00 - 13:00, averaged across all days.
     <!-- weekends -->
-    - **TotalSteps_Weekend**: Total number of steps recorded. Weekends only.
+    - **TotalSteps_Weekend**: Total number of steps. Weekends only.
     - **StepsDayAvg_Weekend**: Average number of steps per day. Weekends only.
     - **StepsDayMed_Weekend**: Median number of steps per day. Weekends only.
-    - **StepsDayMin_Weekend**: Minimum number of steps in any single day. Weekends only.
-    - **StepsDayMax_Weekend**: Maximum number of steps in any single day. Weekends only.
+    - **StepsDayMin_Weekend**: Minimum number of steps per day. Weekends only.
+    - **StepsDayMax_Weekend**: Maximum number of steps per day. Weekends only.
     - **Steps_Hour{XX}_Weekend**: Average number of steps taken during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Steps_Hour12_Weekend` is the average number of steps taken during 12:00 - 13:00, averaged across all days. Weekends only.
     <!-- weekdays -->
-    - **TotalSteps_Weekday**: Total number of steps recorded. Weekdays only.
+    - **TotalSteps_Weekday**: Total number of steps. Weekdays only.
     - **StepsDayAvg_Weekday**: Average number of steps per day. Weekdays only.
     - **StepsDayMed_Weekday**: Median number of steps per day. Weekdays only.
-    - **StepsDayMin_Weekday**: Minimum number of steps in any single day. Weekdays only.
-    - **StepsDayMax_Weekday**: Maximum number of steps in any single day. Weekdays only.
+    - **StepsDayMin_Weekday**: Minimum number of steps per day. Weekdays only.
+    - **StepsDayMax_Weekday**: Maximum number of steps per day. Weekdays only.
     - **Steps_Hour{XX}_Weekday**: Average number of steps taken during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Steps_Hour12_Weekday` is the average number of steps taken during 12:00 - 13:00, averaged across all days. Weekdays only.
 1. Walking
-    - **TotalWalking(mins)**: Total minutes spent walking.
-    - **WalkingDayAvg(mins)**: Average walking duration per day in minutes.
-    - **WalkingDayMed(mins)**: Median walking duration per day in minutes.
-    - **WalkingDayMin(mins)**: Minimum walking duration in any single day in minutes.
-    - **WalkingDayMax(mins)**: Maximum walking duration in any single day in minutes.
+    - **TotalWalking(mins)**: Total minutes spent walking, in minutes.
+    - **WalkingDayAvg(mins)**: Average time spent walking per day, in minutes.
+    - **WalkingDayMed(mins)**: Median time spent walking per day, in minutes.
+    - **WalkingDayMin(mins)**: Minimum time spent walking per day, in minutes.
+    - **WalkingDayMax(mins)**: Maximum time spent walking per day, in minutes.
     - **Walking(mins)_Hour{XX}**: Average time spent walking during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Walking(mins)_Hour12` is the average time spent walking during 12:00 - 13:00, averaged across all days.
     <!-- weekends -->
-    - **TotalWalking(mins)_Weekend**: Total minutes spent walking. Weekends only.
-    - **WalkingDayAvg(mins)_Weekend**: Average walking duration per day in minutes. Weekends only.
-    - **WalkingDayMed(mins)_Weekend**: Median walking duration per day in minutes. Weekends only.
-    - **WalkingDayMin(mins)_Weekend**: Minimum walking duration in any single day in minutes. Weekends only.
-    - **WalkingDayMax(mins)_Weekend**: Maximum walking duration in any single day in minutes. Weekends only.
+    - **TotalWalking(mins)_Weekend**: Total time spent walking, in minutes. Weekends only.
+    - **WalkingDayAvg(mins)_Weekend**: Average time spent walking per day, in minutes. Weekends only.
+    - **WalkingDayMed(mins)_Weekend**: Median time spent walking per day, in minutes. Weekends only.
+    - **WalkingDayMin(mins)_Weekend**: Minimum time spent walking per day, in minutes. Weekends only.
+    - **WalkingDayMax(mins)_Weekend**: Maximum time spent walking per day, in minutes. Weekends only.
     - **Walking(mins)_Hour{XX}_Weekend**: Average time spent walking during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Walking(mins)_Hour12_Weekend` is the average time spent walking during 12:00 - 13:00, averaged across all days. Weekends only.
     <!-- weekdays -->
-    - **TotalWalking(mins)_Weekday**: Total minutes spent walking. Weekdays only.
-    - **WalkingDayAvg(mins)_Weekday**: Average walking duration per day in minutes. Weekdays only.
-    - **WalkingDayMed(mins)_Weekday**: Median walking duration per day in minutes. Weekdays only.
-    - **WalkingDayMin(mins)_Weekday**: Minimum walking duration in any single day in minutes. Weekdays only.
-    - **WalkingDayMax(mins)_Weekday**: Maximum walking duration in any single day in minutes. Weekdays only.
+    - **TotalWalking(mins)_Weekday**: Total time spent walking, in minutes. Weekdays only.
+    - **WalkingDayAvg(mins)_Weekday**: Average time spent walking per day, in minutes. Weekdays only.
+    - **WalkingDayMed(mins)_Weekday**: Median time spent walking per day, in minutes. Weekdays only.
+    - **WalkingDayMin(mins)_Weekday**: Minimum time spent walking per day, in minutes. Weekdays only.
+    - **WalkingDayMax(mins)_Weekday**: Maximum time spent walking per day, in minutes. Weekdays only.
     - **Walking(mins)_Hour{XX}_Weekday**: Average time spent walking during each hour bin, where `{XX}` is a placeholder for the hour in 24-hour format. For example, `Walking(mins)_Hour12_Weekday` is the average time spent walking during 12:00 - 13:00, averaged across all days. Weekdays only.
 1. Cadence
-    - **CadencePeak1(steps/min)**: The highest cadence recorded in one minute of the day, averaged across all days.
-    - **CadencePeak30(steps/min)**: The mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days.
-    - **Cadence95th(steps/min)**: The 95th percentile of cadence of the day, averaged across all days.
+    - **CadencePeak1(steps/min)**: Highest cadence recorded in one minute of the day, averaged across all days.
+    - **CadencePeak30(steps/min)**: Mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days.
+    - **Cadence95th(steps/min)**: 95th percentile of cadence of the day, averaged across all days.
     <!-- weekends -->
-    - **CadencePeak1(steps/min)_Weekend**: The highest cadence recorded in one minute of the day, averaged across all days. Weekends only.
-    - **CadencePeak30(steps/min)_Weekend**: The mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days. Weekends only.
-    - **Cadence95th(steps/min)_Weekend**: The 95th percentile of cadence of the day, averaged across all days. Weekends only.
+    - **CadencePeak1(steps/min)_Weekend**: Highest cadence recorded in one minute of the day, averaged across all days. Weekends only.
+    - **CadencePeak30(steps/min)_Weekend**: Mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days. Weekends only.
+    - **Cadence95th(steps/min)_Weekend**: 95th percentile of cadence of the day, averaged across all days. Weekends only.
     <!-- weekdays -->
-    - **CadencePeak1(steps/min)_Weekday**: The highest cadence recorded in one minute of the day, averaged across all days. Weekdays only.
-    - **CadencePeak30(steps/min)_Weekday**: The mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days. Weekdays only.
-    - **Cadence95th(steps/min)_Weekday**: The 95th percentile of cadence of the day, averaged across all days. Weekdays only.
+    - **CadencePeak1(steps/min)_Weekday**: Highest cadence recorded in one minute of the day, averaged across all days. Weekdays only.
+    - **CadencePeak30(steps/min)_Weekday**: Mean of the 30 highest minutes of the day (not necessarily continuous), averaged across all days. Weekdays only.
+    - **Cadence95th(steps/min)_Weekday**: 95th percentile of cadence of the day, averaged across all days. Weekdays only.
 1. Steps Distribution
     - **Steps5thAt**: Average time of day when 5% of steps was accumulated.
     - **Steps25thAt**: Average time of day when 25% of steps was accumulated.
