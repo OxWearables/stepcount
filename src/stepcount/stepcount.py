@@ -863,7 +863,7 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
         freq = to_offset(freq)
         data = data.reindex(
             pd.date_range(
-                # TODO: This fails if data.index[0] happens to be midnight
+                # Note that at exactly 00:00:00, the floor('D') and ceil('D') will be the same
                 data.index[0].floor('D'),
                 data.index[-1].ceil('D'),
                 freq=freq,
