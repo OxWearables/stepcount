@@ -852,6 +852,9 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
             .transform(fillna)
         )
 
+    if skip_full_missing_days:
+        na_dates = data.isna().groupby(data.index.date).all()
+
     if extrapolate:  # extrapolate beyond start/end times to have full 24h
         freq = infer_freq(data.index)
         if pd.isna(freq):
@@ -871,14 +874,10 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
             tolerance=pd.Timedelta('1m'),
             limit=1)
 
+    data = impute(data)
+
     if skip_full_missing_days:
-        # find ok days
-        ok = data.notna().groupby(data.index.date).any()
-        ok = np.isin(data.index.date, ok[ok].index)
-        # impute only on ok days
-        data.loc[ok] = impute(data.loc[ok])
-    else:
-        data = impute(data)
+        data.mask(np.isin(data.index.date, na_dates[na_dates].index), inplace=True)
 
     return data
 
