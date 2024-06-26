@@ -1,6 +1,8 @@
 ## Data Dictionary
 
 1. General Information
+    - **StepCountVersion**: Version number of the `stepcount` program used to run the analysis. This information is useful to ensure reproducibility.
+    - **StepCountArgs**: Arguments passed to the `stepcount` program to run the analysis. This information is useful to ensure reproducibility.
     - **Filename**: The name of the data file.
     - **Filesize(MB)**: The size of the file in megabytes.
     - **Device**: The brand or model of the device that recorded the data, or the file extension.
