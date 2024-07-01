@@ -826,7 +826,18 @@ def exclude_first_last_days(x: pd.Series, first_or_last='both'):
 
 
 def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=True):
+    """
+    Imputes missing values in the given DataFrame using a multi-step approach.
 
+    Args:
+        data (pd.DataFrame): The DataFrame containing the data to be imputed.
+        extrapolate (bool, optional): Whether to extrapolate beyond start/end times to have full 24 hours. Defaults to True.
+        skip_full_missing_days (bool, optional): Whether to skip days that have all missing values. Defaults to True.
+
+    Returns:
+        pd.DataFrame: The DataFrame with missing values imputed.
+
+    """
     def fillna(subframe):
         if isinstance(subframe, pd.Series):
             x = subframe.to_numpy()
