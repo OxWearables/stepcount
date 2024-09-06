@@ -6,15 +6,12 @@ import shutil
 import time
 import argparse
 import json
-import hashlib
 import re
 import numpy as np
 import pandas as pd
 import joblib
-from pandas.tseries.frequencies import to_offset
 
-import actipy
-
+from stepcount import utils
 from stepcount import __version__
 from stepcount import __model_version__
 from stepcount import __model_md5__
@@ -64,7 +61,7 @@ def main():
     info['StepCountArgs'] = vars(args)
 
     # Load file
-    data, info_read = read(
+    data, info_read = utils.read(
         args.filepath, 
         usecols=args.txyz, 
         resample_hz=30 if args.model_type == 'ssl' else None,
@@ -74,7 +71,7 @@ def main():
     info.update(info_read)
 
     # Output paths
-    basename = resolve_path(args.filepath)[1]
+    basename = utils.resolve_path(args.filepath)[1]
     outdir = os.path.join(args.outdir, basename)
     os.makedirs(outdir, exist_ok=True)
 
@@ -263,7 +260,7 @@ def main():
 
     # Save Info.json
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
-        json.dump(info, f, indent=4, cls=NpEncoder)
+        json.dump(info, f, indent=4, cls=utils.NpEncoder)
 
     # Save hourly data
     hourly = pd.concat([
@@ -337,7 +334,7 @@ def main():
     print("\nSummary\n-------")
     print(json.dumps(
         {k: v for k, v in info.items() if not re.search(r'_Weekend|_Weekday|_Hour\d{2}', k)},
-        indent=4, cls=NpEncoder
+        indent=4, cls=utils.NpEncoder
     ))
     print("\nEstimated Daily Stats\n---------------------")
     print(daily.set_index('Date').drop(columns='Filename'))
@@ -356,7 +353,7 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
         if min_wear is None:
             return True  # no minimum wear time, then default to True
         if dt is None:
-            dt = infer_freq(x.index).total_seconds()
+            dt = utils.infer_freq(x.index).total_seconds()
         return x.notna().sum() * dt / 60 > min_wear
 
     def _mean(x, min_wear=None, dt=None):
@@ -371,25 +368,25 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
     # promptly downsample to minutely to reduce future computation and memory at minimal loss to accuracy
     v = v.resample('T').mean()
 
-    dt = infer_freq(v.index).total_seconds()
+    dt = utils.infer_freq(v.index).total_seconds()
 
     if exclude_first_last is not None:
-        v = exclude_first_last_days(v, exclude_first_last)
+        v = utils.exclude_first_last_days(v, exclude_first_last)
 
     if exclude_wear_below is not None:
-        v = exclude_wear_below_days(v, exclude_wear_below)
+        v = utils.exclude_wear_below_days(v, exclude_wear_below)
 
     if adjust_estimates:
-        v = impute_missing(v)
+        v = utils.impute_missing(v)
 
     if adjust_estimates:
         # adjusted estimates account for NAs
         minutely = v.resample('T').agg(_mean, min_wear=0.5, dt=dt).rename('ENMO(mg)')  # up to 30s/min missingness
         hourly = v.resample('H').agg(_mean, min_wear=50, dt=dt).rename('ENMO(mg)')  # up to 10min/h missingness
-        daily = v.resample('D').agg(_mean, min_wear=21*60, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
+        daily = v.resample('D').agg(_mean, min_wear=21 * 60, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week = impute_days(daily).groupby(daily.index.weekday).mean()
+        day_of_week = utils.impute_days(daily).groupby(daily.index.weekday).mean()
         avg = day_of_week.mean()
         weekend_avg = day_of_week[day_of_week.index >= 5].mean()
         weekday_avg = day_of_week[day_of_week.index < 5].mean()
@@ -430,7 +427,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         if min_wear is None:
             return True  # no minimum wear time, then default to True
         if dt is None:
-            dt = infer_freq(x.index).total_seconds()
+            dt = utils.infer_freq(x.index).total_seconds()
         return x.notna().sum() * dt / 60 > min_wear
 
     def _sum(x, min_wear=None, dt=None):
@@ -482,27 +479,27 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         return f"{hours:02}:{minutes:02}:{seconds:02}"
 
     if exclude_first_last is not None:
-        Y = exclude_first_last_days(Y, exclude_first_last)
+        Y = utils.exclude_first_last_days(Y, exclude_first_last)
 
     if exclude_wear_below is not None:
-        Y = exclude_wear_below_days(Y, exclude_wear_below)
+        Y = utils.exclude_wear_below_days(Y, exclude_wear_below)
 
-    dt = infer_freq(Y.index).total_seconds()
+    dt = utils.infer_freq(Y.index).total_seconds()
     W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
 
     if adjust_estimates:
-        Y = impute_missing(Y)
-        W = impute_missing(W)
+        Y = utils.impute_missing(Y)
+        W = utils.impute_missing(W)
 
     # steps
     if adjust_estimates:
         # adjusted estimates account for NAs
         minutely_steps = Y.resample('T').agg(_sum, min_wear=0.5, dt=dt).rename('Steps')  # up to 30s/min missingness
         hourly_steps = Y.resample('H').agg(_sum, min_wear=50, dt=dt).rename('Steps')  # up to 10min/h missingness
-        daily_steps = Y.resample('D').agg(_sum, min_wear=21*60, dt=dt).rename('Steps')  # up to 3h/d missingness
+        daily_steps = Y.resample('D').agg(_sum, min_wear=21 * 60, dt=dt).rename('Steps')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week = impute_days(daily_steps).groupby(daily_steps.index.weekday).mean()
+        day_of_week = utils.impute_days(daily_steps).groupby(daily_steps.index.weekday).mean()
         avg_steps = day_of_week.mean()
         med_steps = day_of_week.median()
         min_steps = day_of_week.min()
@@ -547,10 +544,10 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
         # adjusted estimates account for NAs
         # minutely_walk = (W.resample('T').agg(_sum, min_wear=0.5, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 30s/min missingness
         hourly_walk = (W.resample('H').agg(_sum, min_wear=50, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
-        daily_walk = (W.resample('D').agg(_sum, min_wear=21*60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
+        daily_walk = (W.resample('D').agg(_sum, min_wear=21 * 60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
-        day_of_week_walk = impute_days(daily_walk).groupby(daily_walk.index.weekday).mean()
+        day_of_week_walk = utils.impute_days(daily_walk).groupby(daily_walk.index.weekday).mean()
         avg_walk = day_of_week_walk.mean()
         med_walk = day_of_week_walk.median()
         min_walk = day_of_week_walk.min()
@@ -593,7 +590,7 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     # time of accumulated steps
     if adjust_estimates:
         # adjusted estimates account for NAs
-        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at, min_wear=21*60, dt=dt).unstack(1)  # up to 3h/d missingness
+        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at, min_wear=21 * 60, dt=dt).unstack(1)  # up to 3h/d missingness
     else:
         # crude (unadjusted) estimates ignore NAs
         daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
@@ -624,21 +621,21 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     # round steps
     minutely_steps = minutely_steps.round().astype(pd.Int64Dtype())
     hourly_steps = hourly_steps.round().astype(pd.Int64Dtype())
-    total_steps = nanint(np.round(total_steps))
-    avg_steps = nanint(np.round(avg_steps))
-    med_steps = nanint(np.round(med_steps))
-    min_steps = nanint(np.round(min_steps))
-    max_steps = nanint(np.round(max_steps))
-    weekend_total_steps = nanint(np.round(weekend_total_steps))
-    weekend_avg_steps = nanint(np.round(weekend_avg_steps))
-    weekend_med_steps = nanint(np.round(weekend_med_steps))
-    weekend_min_steps = nanint(np.round(weekend_min_steps))
-    weekend_max_steps = nanint(np.round(weekend_max_steps))
-    weekday_total_steps = nanint(np.round(weekday_total_steps))
-    weekday_avg_steps = nanint(np.round(weekday_avg_steps))
-    weekday_med_steps = nanint(np.round(weekday_med_steps))
-    weekday_min_steps = nanint(np.round(weekday_min_steps))
-    weekday_max_steps = nanint(np.round(weekday_max_steps))
+    total_steps = utils.nanint(np.round(total_steps))
+    avg_steps = utils.nanint(np.round(avg_steps))
+    med_steps = utils.nanint(np.round(med_steps))
+    min_steps = utils.nanint(np.round(min_steps))
+    max_steps = utils.nanint(np.round(max_steps))
+    weekend_total_steps = utils.nanint(np.round(weekend_total_steps))
+    weekend_avg_steps = utils.nanint(np.round(weekend_avg_steps))
+    weekend_med_steps = utils.nanint(np.round(weekend_med_steps))
+    weekend_min_steps = utils.nanint(np.round(weekend_min_steps))
+    weekend_max_steps = utils.nanint(np.round(weekend_max_steps))
+    weekday_total_steps = utils.nanint(np.round(weekday_total_steps))
+    weekday_avg_steps = utils.nanint(np.round(weekday_avg_steps))
+    weekday_med_steps = utils.nanint(np.round(weekday_med_steps))
+    weekday_min_steps = utils.nanint(np.round(weekday_min_steps))
+    weekday_max_steps = utils.nanint(np.round(weekday_max_steps))
     hour_steps = hour_steps.round().astype(pd.Int64Dtype())
     weekend_hour_steps = weekend_hour_steps.round().astype(pd.Int64Dtype())
     weekday_hour_steps = weekday_hour_steps.round().astype(pd.Int64Dtype())
@@ -703,10 +700,10 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
     # TODO: split walking and running cadence?
 
     if exclude_first_last is not None:
-        Y = exclude_first_last_days(Y, exclude_first_last)
+        Y = utils.exclude_first_last_days(Y, exclude_first_last)
 
     if exclude_wear_below is not None:
-        Y = exclude_wear_below_days(Y, exclude_wear_below)
+        Y = utils.exclude_wear_below_days(Y, exclude_wear_below)
 
     def _cadence_max(x, steptol, walktol=30, n=1):
         y = x[x >= steptol]
@@ -724,7 +721,7 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
             return np.nan
         return y.quantile(.95)
 
-    dt = infer_freq(Y.index).total_seconds()
+    dt = utils.infer_freq(Y.index).total_seconds()
     steptol_in_minutes = steptol * 60 / dt  # rescale steptol to steps/min
     minutely = Y.resample('T').sum().rename('Steps')  # steps/min
 
@@ -741,9 +738,9 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
             # adjusted estimates first form a 7-day representative week before final aggregation
             # TODO: 7-day padding for shorter recordings
             # TODO: maybe impute output daily_cadence? but skip user-excluded days
-            day_of_week_cadence_peak1 = impute_days(daily_cadence_peak1, method='median').groupby(daily_cadence_peak1.index.weekday).median()
-            day_of_week_cadence_peak30 = impute_days(daily_cadence_peak30, method='median').groupby(daily_cadence_peak30.index.weekday).median()
-            day_of_week_cadence_p95 = impute_days(daily_cadence_p95, method='median').groupby(daily_cadence_p95.index.weekday).median()
+            day_of_week_cadence_peak1 = utils.impute_days(daily_cadence_peak1, method='median').groupby(daily_cadence_peak1.index.weekday).median()
+            day_of_week_cadence_peak30 = utils.impute_days(daily_cadence_peak30, method='median').groupby(daily_cadence_peak30.index.weekday).median()
+            day_of_week_cadence_p95 = utils.impute_days(daily_cadence_p95, method='median').groupby(daily_cadence_p95.index.weekday).median()
 
             cadence_peak1 = day_of_week_cadence_peak1.median()
             cadence_peak30 = day_of_week_cadence_peak30.median()
@@ -778,247 +775,18 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
 
     return {
         'daily': daily,
-        'cadence_peak1': nanint(np.round(cadence_peak1)),
-        'cadence_peak30': nanint(np.round(cadence_peak30)),
-        'cadence_p95': nanint(np.round(cadence_p95)),
+        'cadence_peak1': utils.nanint(np.round(cadence_peak1)),
+        'cadence_peak30': utils.nanint(np.round(cadence_peak30)),
+        'cadence_p95': utils.nanint(np.round(cadence_p95)),
         # weekend stats
-        'weekend_cadence_peak1': nanint(np.round(weekend_cadence_peak1)),
-        'weekend_cadence_peak30': nanint(np.round(weekend_cadence_peak30)),
-        'weekend_cadence_p95': nanint(np.round(weekend_cadence_p95)),
+        'weekend_cadence_peak1': utils.nanint(np.round(weekend_cadence_peak1)),
+        'weekend_cadence_peak30': utils.nanint(np.round(weekend_cadence_peak30)),
+        'weekend_cadence_p95': utils.nanint(np.round(weekend_cadence_p95)),
         # weekday stats
-        'weekday_cadence_peak1': nanint(np.round(weekday_cadence_peak1)),
-        'weekday_cadence_peak30': nanint(np.round(weekday_cadence_peak30)),
-        'weekday_cadence_p95': nanint(np.round(weekday_cadence_p95)),
+        'weekday_cadence_peak1': utils.nanint(np.round(weekday_cadence_peak1)),
+        'weekday_cadence_peak30': utils.nanint(np.round(weekday_cadence_peak30)),
+        'weekday_cadence_p95': utils.nanint(np.round(weekday_cadence_p95)),
     }
-
-
-def exclude_wear_below_days(x: pd.Series, min_wear: str):
-    """ Exclude days with less than `min_wear` of valid data """
-
-    min_wear = pd.Timedelta(min_wear)
-    dt = infer_freq(x.index)
-    ok = x.notna()
-    if isinstance(ok, pd.DataFrame):
-        ok = ok.all(axis=1)
-    ok = (
-        ok
-        .groupby(x.index.date)
-        .sum() * dt
-        >= min_wear
-    )
-    # keep ok days, rest is set to NaN
-    x = x.copy()  # make a copy to avoid modifying the original data
-    x[np.isin(x.index.date, ok[~ok].index)] = np.nan
-    return x
-
-
-def exclude_first_last_days(x: pd.Series, first_or_last='both'):
-    """ Exclude first day, last day, or both """
-
-    x = x.copy()  # make a copy to avoid modifying the original data
-    if first_or_last == 'first':
-        x[x.index.date == x.index.date[0]] = np.nan
-    elif first_or_last == 'last':
-        x[x.index.date == x.index.date[-1]] = np.nan
-    elif first_or_last == 'both':
-        x[(x.index.date == x.index.date[0]) | (x.index.date == x.index.date[-1])] = np.nan
-    return x
-
-
-def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=True):
-    """
-    Imputes missing values in the given DataFrame using a multi-step approach.
-
-    Args:
-        data (pd.DataFrame): The DataFrame containing the data to be imputed.
-        extrapolate (bool, optional): Whether to extrapolate beyond start/end times to have full 24 hours. Defaults to True.
-        skip_full_missing_days (bool, optional): Whether to skip days that have all missing values. Defaults to True.
-
-    Returns:
-        pd.DataFrame: The DataFrame with missing values imputed.
-
-    """
-    def fillna(subframe):
-        if isinstance(subframe, pd.Series):
-            x = subframe.to_numpy()
-            nan = np.isnan(x)
-            nanlen = len(x[nan])
-            if 0 < nanlen < len(x):  # check x contains a NaN and is not all NaN
-                x[nan] = np.nanmean(x)
-                return x  # will be cast back to a Series automatically
-            else:
-                return subframe
-
-    def impute(data):
-        return (
-            data
-            # first attempt imputation using same day of week
-            .groupby([data.index.weekday, data.index.hour, data.index.minute // 5])
-            .transform(fillna)
-            # then try within weekday/weekend
-            .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute // 5])
-            .transform(fillna)
-            # finally, use all other days
-            .groupby([data.index.hour, data.index.minute // 5])
-            .transform(fillna)
-        )
-
-    if skip_full_missing_days:
-        na_dates = data.isna().groupby(data.index.date).all()
-
-    if extrapolate:  # extrapolate beyond start/end times to have full 24h
-        freq = infer_freq(data.index)
-        if pd.isna(freq):
-            warnings.warn("Cannot infer frequency, using 1s")
-            freq = pd.Timedelta('1s')
-        freq = to_offset(freq)
-        data = data.reindex(
-            pd.date_range(
-                # Note that at exactly 00:00:00, the floor('D') and ceil('D') will be the same
-                data.index[0].floor('D'),
-                data.index[-1].ceil('D'),
-                freq=freq,
-                inclusive='left',
-                name='time',
-            ),
-            method='nearest',
-            tolerance=pd.Timedelta('1m'),
-            limit=1)
-
-    data = impute(data)
-
-    if skip_full_missing_days:
-        data.mask(np.isin(data.index.date, na_dates[na_dates].index), inplace=True)
-
-    return data
-
-
-def impute_days(x, method='mean'):
-
-    if x.isna().all():
-        return x
-
-    def fillna(x):
-        if method == 'mean':
-            return x.fillna(x.mean())
-        elif method == 'median':
-            return x.fillna(x.median())
-        else:
-            raise ValueError(f"Unknown method: {method}")
-
-    with warnings.catch_warnings():
-        warnings.filterwarnings('ignore', message='Mean of empty slice')
-        return (
-            x
-            .groupby(x.index.weekday).transform(fillna)
-            .groupby(x.index.weekday >= 5).transform(fillna)
-            .transform(fillna)
-        )
-
-
-def nanint(x):
-    if np.isnan(x):
-        return x
-    return int(x)
-
-
-def read(
-    filepath: str,
-    usecols: str = 'time,x,y,z',
-    resample_hz: str = 'uniform',
-    sample_rate: float = None,
-    verbose: bool = True
-):
-
-    p = pathlib.Path(filepath)
-    fsize = round(p.stat().st_size / (1024 * 1024), 1)
-    ftype = p.suffix.lower()
-    if ftype in (".gz", ".xz", ".lzma", ".bz2", ".zip"):  # if file is compressed, check the next extension
-        ftype = pathlib.Path(p.stem).suffix.lower()
-
-    if ftype in (".csv", ".pkl"):
-
-        if ftype == ".csv":
-            tcol, xcol, ycol, zcol = usecols.split(',')
-            data = pd.read_csv(
-                filepath,
-                usecols=[tcol, xcol, ycol, zcol],
-                parse_dates=[tcol],
-                index_col=tcol,
-                dtype={xcol: 'f4', ycol: 'f4', zcol: 'f4'},
-            )
-            # rename to standard names
-            data = data.rename(columns={xcol: 'x', ycol: 'y', zcol: 'z'})
-            data.index.name = 'time'
-
-        elif ftype == ".pkl":
-            data = pd.read_pickle(filepath)
-
-        else:
-            raise ValueError(f"Unknown file format: {ftype}")
-
-        if sample_rate in (None, False):
-            freq = infer_freq(data.index)
-            sample_rate = int(np.round(pd.Timedelta('1s') / freq))
-
-        # Quick fix: Drop duplicate indices. TODO: Maybe should be handled by actipy.
-        data = data[~data.index.duplicated(keep='first')]
-
-        data, info = actipy.process(
-            data, sample_rate,
-            lowpass_hz=None,
-            calibrate_gravity=True,
-            detect_nonwear=True,
-            resample_hz=resample_hz,
-            verbose=verbose,
-        )
-
-        info.update({
-            "Filename": filepath,
-            "Device": ftype,
-            "Filesize(MB)": fsize,
-            "SampleRate": sample_rate,
-            "StartTime": data.index[0].strftime('%Y-%m-%d %H:%M:%S'),
-            "EndTime": data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
-        })
-
-    elif ftype in (".cwa", ".gt3x", ".bin"):
-
-        data, info = actipy.read_device(
-            filepath,
-            lowpass_hz=None,
-            calibrate_gravity=True,
-            detect_nonwear=True,
-            resample_hz=resample_hz,
-            verbose=verbose,
-        )
-
-    else:
-        raise ValueError(f"Unknown file format: {ftype}")
-
-    if 'ResampleRate' not in info:
-        info['ResampleRate'] = info['SampleRate']
-
-    return data, info
-
-
-def infer_freq(t):
-    """ Like pd.infer_freq but more forgiving """
-    tdiff = t.to_series().diff()
-    q1, q3 = tdiff.quantile([0.25, 0.75])
-    tdiff = tdiff[(q1 <= tdiff) & (tdiff <= q3)]
-    freq = tdiff.mean()
-    freq = pd.Timedelta(freq)
-    return freq
-
-
-def resolve_path(path):
-    """ Return parent folder, file name and file extension """
-    p = pathlib.Path(path)
-    extension = p.suffixes[0]
-    filename = p.name.rsplit(extension)[0]
-    dirname = p.parent
-    return dirname, filename, extension
 
 
 def load_model(model_path, model_type, check_md5=True, force_download=False):
@@ -1036,33 +804,12 @@ def load_model(model_path, model_type, check_md5=True, force_download=False):
             shutil.copyfileobj(f_src, f_dst)
 
     if check_md5:
-        assert md5(pth) == __model_md5__[model_type], (
+        assert utils.md5(pth) == __model_md5__[model_type], (
             "Model file is corrupted. Please run with --force-download "
             "to download the model file again."
         )
 
     return joblib.load(pth)
-
-
-def md5(fname):
-    hash_md5 = hashlib.md5()
-    with open(fname, "rb") as f:
-        for chunk in iter(lambda: f.read(4096), b""):
-            hash_md5.update(chunk)
-    return hash_md5.hexdigest()
-
-
-class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
-        if isinstance(obj, np.integer):
-            return int(obj)
-        if isinstance(obj, np.floating):
-            return float(obj)
-        if isinstance(obj, np.ndarray):
-            return obj.tolist()
-        if pd.isnull(obj):  # handles pandas NAType
-            return np.nan
-        return json.JSONEncoder.default(self, obj)
 
 
 
