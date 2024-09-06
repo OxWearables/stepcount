@@ -137,3 +137,4 @@ torch_hub_cache/
 *.joblib
 *.joblib.lzma
 outputs/
+collated-outputs/
