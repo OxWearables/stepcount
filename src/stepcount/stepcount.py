@@ -346,8 +346,27 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
-def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
-    """ Summarize ENMO data """
+def summarize_enmo(
+    data: pd.DataFrame,
+    exclude_wear_below: str = None,
+    exclude_first_last: str = None,
+    adjust_estimates: bool = False
+):
+    """
+    Summarize ENMO information from raw accelerometer data, e.g. daily and hourly averages, percentiles, etc.
+
+    Parameters:
+    - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z'.
+    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
+    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
+    - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
+
+    Returns:
+    - dict: A dictionary containing various summary ENMO statistics.
+
+    Example:
+        summary = summarize_enmo(data, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+    """
 
     def _is_enough(x, min_wear=None, dt=None):
         if min_wear is None:
@@ -417,8 +436,29 @@ def summarize_enmo(data: pd.DataFrame, exclude_wear_below=None, exclude_first_la
     }
 
 
-def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
-    """ Summarize step count data """
+def summarize_steps(
+    Y: pd.Series, 
+    steptol: int = 3, 
+    exclude_wear_below: str = None, 
+    exclude_first_last: str = None, 
+    adjust_estimates: bool = False
+):
+    """
+    Summarize a series of step counts, e.g. daily and hourly averages, percentiles, etc.
+
+    Parameters:
+    - Y (pd.Series): A pandas Series of step counts.
+    - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
+    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
+    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
+    - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
+
+    Returns:
+    - dict: A dictionary containing various summary step count statistics.
+
+    Example:
+        summary = summarize_steps(Y, steptol=3, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+    """
 
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
@@ -694,8 +734,29 @@ def summarize_steps(Y, steptol=3, exclude_wear_below=None, exclude_first_last=No
     }
 
 
-def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=None, adjust_estimates=False):
-    """ Summarize cadence data """
+def summarize_cadence(
+    Y: pd.Series,
+    steptol: int = 3,
+    exclude_wear_below: str = None,
+    exclude_first_last: str = None,
+    adjust_estimates: bool = False
+):
+    """
+    Summarize cadence information from a series of step counts.
+
+    Parameters:
+    - Y (pd.Series): A pandas Series of step counts.
+    - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
+    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
+    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
+    - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
+
+    Returns:
+    - dict: A dictionary containing various summary cadence statistics.
+
+    Example:
+        summary = summarize_cadence(Y, steptol=3, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+    """
 
     # TODO: split walking and running cadence?
 
@@ -789,8 +850,34 @@ def summarize_cadence(Y, steptol=3, exclude_wear_below=None, exclude_first_last=
     }
 
 
-def load_model(model_path, model_type, check_md5=True, force_download=False):
-    """ Load trained model. Download if not exists. """
+def load_model(
+    model_path: str,
+    model_type: str,
+    check_md5: bool = True,
+    force_download: bool = False
+):
+    """
+    Load a trained model from the specified path. Download the model if it does not exist.
+
+    This function attempts to load a trained model from the given path. If the model file does not 
+    exist or if `force_download` is set to True, it downloads the model from a predefined URL. 
+    Optionally, it can check the MD5 checksum of the downloaded file to ensure its integrity.
+
+    Parameters:
+    - model_path (str or pathlib.Path): The path to the model file.
+    - model_type (str): The type of model: "rf" for random forest model, or "ssl" for self-supervised learning model.
+    - check_md5 (bool, optional): Whether to check the MD5 checksum of the model file. Defaults to True.
+    - force_download (bool, optional): Whether to force download the model file even if it exists. Defaults to False.
+
+    Returns:
+    - The loaded model object.
+
+    Raises:
+    - AssertionError: If the MD5 checksum of the model file does not match the expected value.
+
+    Example:
+        model = load_model("path/to/model.joblib", "ssl")
+    """
 
     pth = pathlib.Path(model_path)
 
