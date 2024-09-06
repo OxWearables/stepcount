@@ -7,9 +7,11 @@ import time
 import argparse
 import json
 import re
+from collections import defaultdict
 import numpy as np
 import pandas as pd
 import joblib
+from numba import njit
 
 from stepcount import utils
 from stepcount import __version__
@@ -296,6 +298,9 @@ def main():
     info['CadencePeak30Adjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_peak30']
     info['Cadence95thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p95']
 
+    # Bouts summary
+    bouts_summary = summarize_bouts(Y, W, data)
+
     # Save Info.json
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
         json.dump(info, f, indent=4, cls=utils.NpEncoder)
@@ -367,6 +372,9 @@ def main():
     daily_adj.insert(0, 'Filename', info['Filename'])  # add filename for reference
     daily_adj.to_csv(f"{outdir}/{basename}-DailyAdjusted.csv.gz", index=False)
     # del daily_adj  # still needed for printing
+
+    # Save bouts data
+    bouts_summary['bouts'].to_csv(f"{outdir}/{basename}-Bouts.csv.gz", index=False)
 
     # Print
     print("\nSummary\n-------")
@@ -905,6 +913,176 @@ def summarize_cadence(
         'weekday_cadence_peak30': utils.nanint(np.round(weekday_cadence_peak30)),
         'weekday_cadence_p95': utils.nanint(np.round(weekday_cadence_p95)),
     }
+
+
+def summarize_bouts(
+    Y: pd.Series,
+    W: pd.Series,
+    data: pd.DataFrame
+):
+    """
+    Summarize bouts of walking activity. For each detected bout, it calculates
+    start and end times, duration, total steps, ENMO and cadence metrics.
+
+    Parameters:
+    - Y (pd.Series): A pandas Series of step counts.
+    - W (pd.Series): A pandas Series indicating walking (1) and non-walking (0) windows, aligned with Y.
+    - data (pd.DataFrame): A pandas DataFrame containing raw acceleration data.
+
+    Returns:
+    - dict: A dictionary containing summary information for each detected bout, with the following keys:
+        - 'StartTime': List of start times for each bout.
+        - 'EndTime': List of end times for each bout.
+        - 'Duration(mins)': List of durations (in minutes) for each bout.
+        - 'TimeSinceLast(mins)': List of time since the last bout (in minutes) for each bout.
+        - 'Steps': List of total steps for each bout.
+        - 'Cadence(steps/min)': List of average cadence (steps per minute) for each bout.
+        - 'CadenceSD(steps/min)': List of standard deviations of cadence (steps per minute) for each bout.
+        - 'Cadence25th(steps/min)': List of 25th percentile cadence (steps per minute) for each bout.
+        - 'Cadence50th(steps/min)': List of median cadence (steps per minute) for each bout.
+        - 'Cadence75th(steps/min)': List of 75th percentile cadence (steps per minute) for each bout.
+        - 'ENMO(mg)': Mean ENMO for each bout.
+        - 'ENMOMed(mg)': Median ENMO for each bout.
+    """
+
+    bouts = numba_detect_bouts(W.to_numpy())
+
+    if len(bouts) == 0:
+        return {
+            'bouts': pd.DataFrame({
+                'StartTime': [],
+                'EndTime': [],
+                'Duration(mins)': [],
+                'TimeSinceLast(mins)': [],
+                'Steps': [],
+                'Cadence(steps/min)': [],
+                'CadenceSD(steps/min)': [],
+                'Cadence25th(steps/min)': [],
+                'Cadence50th(steps/min)': [],
+                'Cadence75th(steps/min)': [],
+                'ENMO(mg)': [],
+                'ENMOMed(mg)': [],
+            })
+        }
+
+    bout_stats = defaultdict(list)
+
+    dt = utils.infer_freq(Y.index)
+    one_min = pd.Timedelta('1min')
+
+    # Truncated ENMO: Euclidean norm minus one and clipped at zero
+    v = np.sqrt(data['x'] ** 2 + data['y'] ** 2 + data['z'] ** 2)
+    v = np.clip(v - 1, a_min=0, a_max=None)
+    v *= 1000  # convert to mg
+    # resample to match Y
+    v = v.resample(dt).mean().reindex(Y.index, method='nearest', tolerance=dt)
+
+    tlast = None
+    for i, n in bouts:
+        y = Y.iloc[i:i + n]
+        bout_steps = y.sum()
+        bout_duration = n * dt / one_min  # in minutes
+        bout_cadence = bout_steps / bout_duration  # steps per minute
+        # rescale to steps per minute
+        y *= one_min / dt
+        bout_cadence_sd = y.std()
+        bout_cadence_25th = y.quantile(0.25)
+        bout_cadence_50th = y.quantile(0.50)
+        bout_cadence_75th = y.quantile(0.75)
+        tstart, tend = y.index[0], y.index[-1]
+        if tlast is not None:
+            tsince = (tstart - tlast) / one_min
+        else:
+            tsince = np.nan
+        tlast = y.index[-1]
+        bout_enmo = v.loc[tstart:tend].mean()
+        bout_enmo_med = v.loc[tstart:tend].median()
+        bout_stats['StartTime'].append(tstart.strftime('%Y-%m-%d %H:%M:%S'))
+        bout_stats['EndTime'].append(tend.strftime('%Y-%m-%d %H:%M:%S'))
+        bout_stats['Duration(mins)'].append(bout_duration)
+        bout_stats['TimeSinceLast(mins)'].append(tsince)
+        bout_stats['Steps'].append(bout_steps)
+        bout_stats['Cadence(steps/min)'].append(bout_cadence)
+        bout_stats['CadenceSD(steps/min)'].append(bout_cadence_sd)
+        bout_stats['Cadence25th(steps/min)'].append(bout_cadence_25th)
+        bout_stats['Cadence50th(steps/min)'].append(bout_cadence_50th)
+        bout_stats['Cadence75th(steps/min)'].append(bout_cadence_75th)
+        bout_stats['ENMO(mg)'].append(bout_enmo)
+        bout_stats['ENMOMed(mg)'].append(bout_enmo_med)
+
+    bout_stats = pd.DataFrame(bout_stats)
+
+    return {
+        'bouts': bout_stats,
+    }
+
+
+@njit
+def numba_detect_bouts(
+    arr: np.ndarray,
+    min_percent_ones: float = 0.8,
+    max_trailing_zeros: int = 3
+):
+    """
+    For a series of 0s and 1s, find the start and duration of each bout.
+    A bout is a series of 0s and 1s where any expanding average is at least
+    `min_percent_ones`. If a bout has more than `max_trailing_zeros` trailing
+    0s, the bout ends. Trailing 0s are not counted in the bout length.
+
+    Parameters:
+    - arr (np.ndarray): An array of 0s and 1s representing activity data.
+    - min_percent_ones (float, optional): The minimum proportion of 1s required for a sequence 
+      to be considered a bout. Default is 0.8.
+    - max_trailing_zeros (int, optional): The maximum number of trailing 0s allowed in a bout 
+      before it is considered to have ended. Default is 3.
+
+    Returns:
+    - list of tuple: A list of tuples where each tuple represents a detected bout. Each tuple 
+      contains the start index and the length of the bout.
+
+    Example:
+        arr: [0, 1, 0, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 0]
+
+        min_percent_ones: 0.5
+        max_trailing_zeros: 3
+        Output: [(1, 1), (4, 2), (9, 10)]
+
+        min_percent_ones: 0.5
+        max_trailing_zeros: 2
+        Output: [(1, 1), (4, 2), (9, 3), (15, 4)]
+    """
+
+    bouts = []
+    bout_start = None
+    bout_length = 0
+    bout_sum = 0
+    trailing_zeros = 0
+
+    for i, a in enumerate(arr):
+        if a == 1:
+            if bout_start is None:  # start new bout
+                bout_start = i
+            bout_sum += 1
+            bout_length += 1
+            trailing_zeros = 0
+        else:
+            if bout_start is None:
+                continue  # skip if no bout is ongoing
+            bout_length += 1
+            trailing_zeros += 1
+            # if too many trailing zeros or not enough ones, end the bout
+            if trailing_zeros > max_trailing_zeros or bout_sum / bout_length < min_percent_ones:
+                bouts.append((bout_start, bout_length - trailing_zeros))
+                bout_start = None
+                bout_length = 0
+                bout_sum = 0
+                trailing_zeros = 0
+
+    # if the last bout is ongoing, add it to the list
+    if bout_start is not None:
+        bouts.append((bout_start, bout_length - trailing_zeros))
+
+    return bouts
 
 
 
