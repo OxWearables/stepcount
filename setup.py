@@ -85,8 +85,8 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "stepcount=stepcount.stepcount:main",
-            "stepcount-collate-outputs=stepcount.utils.collate_outputs:main",
-            "stepcount-generate-commands=stepcount.utils.generate_commands:main"
+            "stepcount-collate-outputs=stepcount.cli_utils.collate_outputs:main",
+            "stepcount-generate-commands=stepcount.cli_utils.generate_commands:main"
         ]
     }
 )

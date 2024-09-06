@@ -18,7 +18,7 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
     """
 
     os.makedirs(outdir, exist_ok=True)
-    
+
     # Find all relevant files under <outputs>/
     # - *-Info.json files contain the summary information
     # - *-Daily.json files contain daily summaries
@@ -113,7 +113,7 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
             df.to_csv(minutes_file, mode='a', index=False, header=not header_written)
             header_written = True
         print('Collated minutes CSV written to', minutes_file)
-        
+
         print(f"Found {len(minutesadj_files)} adjusted minutes files...")
         minutesadj_file = outdir / "MinutelyAdjusted.csv.gz"
         header_written = False
