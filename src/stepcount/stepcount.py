@@ -346,6 +346,55 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
+def load_model(
+    model_path: str,
+    model_type: str,
+    check_md5: bool = True,
+    force_download: bool = False
+):
+    """
+    Load a trained model from the specified path. Download the model if it does not exist.
+
+    This function attempts to load a trained model from the given path. If the model file does not 
+    exist or if `force_download` is set to True, it downloads the model from a predefined URL. 
+    Optionally, it can check the MD5 checksum of the downloaded file to ensure its integrity.
+
+    Parameters:
+    - model_path (str or pathlib.Path): The path to the model file.
+    - model_type (str): The type of model: "rf" for random forest model, or "ssl" for self-supervised learning model.
+    - check_md5 (bool, optional): Whether to check the MD5 checksum of the model file. Defaults to True.
+    - force_download (bool, optional): Whether to force download the model file even if it exists. Defaults to False.
+
+    Returns:
+    - The loaded model object.
+
+    Raises:
+    - AssertionError: If the MD5 checksum of the model file does not match the expected value.
+
+    Example:
+        model = load_model("path/to/model.joblib", "ssl")
+    """
+
+    pth = pathlib.Path(model_path)
+
+    if force_download or not pth.exists():
+
+        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__[model_type]}.joblib.lzma"
+
+        print(f"Downloading {url}...")
+
+        with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
+            shutil.copyfileobj(f_src, f_dst)
+
+    if check_md5:
+        assert utils.md5(pth) == __model_md5__[model_type], (
+            "Model file is corrupted. Please run with --force-download "
+            "to download the model file again."
+        )
+
+    return joblib.load(pth)
+
+
 def summarize_enmo(
     data: pd.DataFrame,
     exclude_wear_below: str = None,
@@ -848,55 +897,6 @@ def summarize_cadence(
         'weekday_cadence_peak30': utils.nanint(np.round(weekday_cadence_peak30)),
         'weekday_cadence_p95': utils.nanint(np.round(weekday_cadence_p95)),
     }
-
-
-def load_model(
-    model_path: str,
-    model_type: str,
-    check_md5: bool = True,
-    force_download: bool = False
-):
-    """
-    Load a trained model from the specified path. Download the model if it does not exist.
-
-    This function attempts to load a trained model from the given path. If the model file does not 
-    exist or if `force_download` is set to True, it downloads the model from a predefined URL. 
-    Optionally, it can check the MD5 checksum of the downloaded file to ensure its integrity.
-
-    Parameters:
-    - model_path (str or pathlib.Path): The path to the model file.
-    - model_type (str): The type of model: "rf" for random forest model, or "ssl" for self-supervised learning model.
-    - check_md5 (bool, optional): Whether to check the MD5 checksum of the model file. Defaults to True.
-    - force_download (bool, optional): Whether to force download the model file even if it exists. Defaults to False.
-
-    Returns:
-    - The loaded model object.
-
-    Raises:
-    - AssertionError: If the MD5 checksum of the model file does not match the expected value.
-
-    Example:
-        model = load_model("path/to/model.joblib", "ssl")
-    """
-
-    pth = pathlib.Path(model_path)
-
-    if force_download or not pth.exists():
-
-        url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__[model_type]}.joblib.lzma"
-
-        print(f"Downloading {url}...")
-
-        with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
-            shutil.copyfileobj(f_src, f_dst)
-
-    if check_md5:
-        assert utils.md5(pth) == __model_md5__[model_type], (
-            "Model file is corrupted. Please run with --force-download "
-            "to download the model file again."
-        )
-
-    return joblib.load(pth)
 
 
 
