@@ -2,6 +2,7 @@ import pathlib
 import json
 import hashlib
 import warnings
+from typing import Union
 import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
@@ -15,6 +16,32 @@ def read(
     sample_rate: float = None,
     verbose: bool = True
 ):
+    """
+    Read and preprocess activity data from a file.
+
+    This function reads activity data from various file formats, processes it using the `actipy` library, 
+    and returns the processed data along with metadata information.
+
+    Parameters:
+    - filepath (str): The path to the file containing activity data.
+    - usecols (str, optional): A comma-separated string of column names to use when reading CSV files. 
+      Default is 'time,x,y,z'.
+    - resample_hz (str, optional): The resampling frequency for the data. If 'uniform', it will use `sample_rate`
+      and resample to ensure it is evenly spaced. Default is 'uniform'.
+    - sample_rate (float, optional): The sample rate of the data. If None, it will be inferred. Default is None.
+    - verbose (bool, optional): If True, enables verbose output during processing. Default is True.
+
+    Returns:
+    - tuple: A tuple containing:
+        - data (pd.DataFrame): The processed activity data.
+        - info (dict): A dictionary containing metadata information about the data.
+
+    Raises:
+    - ValueError: If the file format is unknown or unsupported.
+
+    Example:
+        data, info = read('activity_data.csv')
+    """
 
     p = pathlib.Path(filepath)
     fsize = round(p.stat().st_size / (1024 * 1024), 1)
@@ -88,8 +115,27 @@ def read(
     return data, info
 
 
-def exclude_wear_below_days(x: pd.Series, min_wear: str):
-    """ Exclude days with less than `min_wear` of valid data """
+def exclude_wear_below_days(
+    x: Union[pd.Series, pd.DataFrame],
+    min_wear: str = '12H'
+):
+    """
+    Exclude days with less than `min_wear` of valid data.
+
+    This function filters out days from a time series that have less than the specified minimum 
+    wear time of valid data. Days with insufficient valid data are set to NaN.
+
+    Parameters:
+    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame with representing the time series data.
+    - min_wear (str): A string representing the minimum wear time required per day (e.g., '8H' for 8 hours).
+
+    Returns:
+    - pd.Series: A pandas Series with days having less than `min_wear` of valid data set to NaN.
+
+    Example:
+        # Exclude days with less than 12 hours of valid data
+        series = exclude_wear_below_days(series, min_wear='12H')
+    """
 
     min_wear = pd.Timedelta(min_wear)
     dt = infer_freq(x.index)
@@ -108,8 +154,28 @@ def exclude_wear_below_days(x: pd.Series, min_wear: str):
     return x
 
 
-def exclude_first_last_days(x: pd.Series, first_or_last='both'):
-    """ Exclude first day, last day, or both """
+def exclude_first_last_days(
+    x: pd.Series, 
+    first_or_last='both'
+):
+    """
+    Exclude the first day, last day, or both from a time series.
+
+    This function sets the values of the first day, last day, or both to NaN in a pandas Series 
+    with a datetime index. This is useful for excluding incomplete days from time series data.
+
+    Parameters:
+    - x (pd.Series): A pandas Series with a datetime index representing the time series data.
+    - first_or_last (str, optional): A string indicating which days to exclude. 
+      Options are 'first', 'last', or 'both'. Default is 'both'.
+
+    Returns:
+    - pd.Series: A pandas Series with the specified days set to NaN.
+
+    Example:
+        # Exclude the first day from the series
+        series = exclude_first_last_days(series, first_or_last='first')
+    """
 
     x = x.copy()  # make a copy to avoid modifying the original data
     if first_or_last == 'first':
@@ -121,18 +187,38 @@ def exclude_first_last_days(x: pd.Series, first_or_last='both'):
     return x
 
 
-def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=True):
+def impute_missing(
+    data: pd.DataFrame,
+    extrapolate=True,
+    skip_full_missing_days=True
+):
     """
-    Imputes missing values in the given DataFrame using a multi-step approach.
+    Impute missing values in the given DataFrame using a multi-step approach.
 
-    Args:
-        data (pd.DataFrame): The DataFrame containing the data to be imputed.
-        extrapolate (bool, optional): Whether to extrapolate beyond start/end times to have full 24 hours. Defaults to True.
-        skip_full_missing_days (bool, optional): Whether to skip days that have all missing values. Defaults to True.
+    This function fills in missing values in a time series DataFrame by applying a series of 
+    imputation strategies. It can also extrapolate data to ensure full 24-hour coverage and 
+    optionally skip days that are entirely missing.
+
+    Parameters:
+    - data (pd.DataFrame): The DataFrame containing the time series data to be imputed. 
+      The index should be a datetime index.
+    - extrapolate (bool, optional): Whether to extrapolate data beyond the start and end times 
+      to ensure full 24-hour coverage. Defaults to True.
+    - skip_full_missing_days (bool, optional): Whether to skip days that have all missing values. 
+      Defaults to True.
 
     Returns:
-        pd.DataFrame: The DataFrame with missing values imputed.
+    - pd.DataFrame: The DataFrame with missing values imputed.
 
+    Notes:
+    - The imputation process involves three steps in the following order:
+        1. Imputation using the same day of the week.
+        2. Imputation within weekdays or weekends.
+        3. Imputation using all other days.
+    - The granularity of the imputation is 5 minutes. 
+    - If `extrapolate` is True, the function will attempt to fill in data beyond the start and end times, so that 
+      the first and last day have full 24-hour coverage.
+    - If `skip_full_missing_days` is True, days with all missing values will be excluded from the imputation process.
     """
     def fillna(subframe):
         if isinstance(subframe, pd.Series):
@@ -189,8 +275,34 @@ def impute_missing(data: pd.DataFrame, extrapolate=True, skip_full_missing_days=
     return data
 
 
-def impute_days(x, method='mean'):
+def impute_days(
+    x: pd.Series,
+    method='mean'
+):
+    """
+    Impute missing values for data with a daily resolution.
 
+    The imputation is performed in three steps: first by the same day of the
+    week, then by weekdays or weekends, and finally by the entire series.
+
+    Parameters:
+    - x (pd.Series): A pandas Series at a daily resolution level.
+    - method (str, optional): The imputation method to use. Options are 'mean' or 'median'. 
+      Defaults to 'mean'.
+
+    Returns:
+    - pd.Series: A pandas Series with missing days imputed.
+
+    Raises:
+    - ValueError: If an unknown imputation method is specified.
+
+    Notes:
+    - The imputation process involves three steps in the following order:
+        1. Imputation using the same day of the week.
+        2. Imputation within weekdays or weekends.
+        3. Imputation using the entire series.
+    - If the entire Series is missing, it will be returned as is.
+    """
     if x.isna().all():
         return x
 
