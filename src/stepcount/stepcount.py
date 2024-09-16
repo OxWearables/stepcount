@@ -85,7 +85,7 @@ def main():
         data = utils.exclude_wear_below_days(data, args.exclude_wear_below)
 
     # If no data left, save info and exit early
-    if len(data) == 0:
+    if len(data) == 0 or data.isna().all().all():
         print("No data left after exclusion. Exiting early...")
         # Reset start, end, wear time, etc.
         info['StartTime'] = None
