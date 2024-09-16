@@ -56,6 +56,12 @@ def main():
 
     verbose = not args.quiet
 
+    # Output paths
+    basename = utils.resolve_path(args.filepath)[1]
+    outdir = os.path.join(args.outdir, basename)
+    os.makedirs(outdir, exist_ok=True)
+
+    # Info.json contains high-level summary of the data and results
     info = {}
     info['StepCountVersion'] = __version__
     info['StepCountArgs'] = vars(args)
@@ -70,10 +76,42 @@ def main():
     )
     info.update(info_read)
 
-    # Output paths
-    basename = utils.resolve_path(args.filepath)[1]
-    outdir = os.path.join(args.outdir, basename)
-    os.makedirs(outdir, exist_ok=True)
+    # Exclusion: first/last days
+    if args.exclude_first_last is not None:
+        data = utils.exclude_first_last_days(data, args.exclude_first_last)
+
+    # Exclusion: days with wear time below threshold
+    if args.exclude_wear_below is not None:
+        data = utils.exclude_wear_below_days(data, args.exclude_wear_below)
+
+    # If no data left, save info and exit early
+    if len(data) == 0:
+        print("No data left after exclusion. Exiting early...")
+        # Reset start, end, wear time, etc.
+        info['StartTime'] = None
+        info['EndTime'] = None
+        info['WearTime(days)'] = None
+        info['NonwearTime(days)'] = None
+        with open(f"{outdir}/{basename}-Info.json", 'w') as f:
+            json.dump(info, f, indent=4, cls=utils.NpEncoder)
+        print("\nSummary\n-------")
+        print(json.dumps(
+            {k: v for k, v in info.items() if not re.search(r'_Weekend|_Weekday|_Hour\d{2}', k)},
+            indent=4, cls=utils.NpEncoder
+        ))
+        print("\nOutput files saved in:", outdir)
+        print(f"Done! ({round(time.time() - before,2)}s)")
+        return  # exit early
+
+    # Update start, end, wear time, etc. if exclusions applied
+    if args.exclude_first_last is not None or args.exclude_wear_below is not None:
+        dt = utils.infer_freq(data.index).total_seconds()
+        nonwear_time = data.isna().any(axis=1).sum() * dt
+        wear_time = len(data) * dt - nonwear_time
+        info['StartTime'] = data.index[0].strftime("%Y-%m-%d %H:%M:%S")
+        info['EndTime'] = data.index[-1].strftime("%Y-%m-%d %H:%M:%S")
+        info['WearTime(days)'] = wear_time / (60 * 60 * 24)
+        info['NonwearTime(days)'] = nonwear_time / (60 * 60 * 24)
 
     # Run model
     if verbose:
@@ -108,7 +146,7 @@ def main():
     T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv.gz", index=False)
 
     # ENMO summary
-    enmo_summary = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
+    enmo_summary = summarize_enmo(data)
     info['ENMO(mg)'] = enmo_summary['avg']
     info['ENMO(mg)_Weekend'] = enmo_summary['weekend_avg']
     info['ENMO(mg)_Weekday'] = enmo_summary['weekday_avg']
@@ -117,7 +155,7 @@ def main():
     info.update({f'ENMO(mg)_Hour{h:02}_Weekday': enmo_summary['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # ENMO summary, adjusted
-    enmo_summary_adj = summarize_enmo(data, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
+    enmo_summary_adj = summarize_enmo(data, adjust_estimates=True)
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
     info['ENMOAdjusted(mg)_Weekend'] = enmo_summary_adj['weekend_avg']
     info['ENMOAdjusted(mg)_Weekday'] = enmo_summary_adj['weekday_avg']
@@ -126,7 +164,7 @@ def main():
     info.update({f'ENMOAdjusted(mg)_Hour{h:02}_Weekday': enmo_summary_adj['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # Steps summary
-    steps_summary = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
+    steps_summary = summarize_steps(Y, model.steptol)
     # steps, overall stats
     info['TotalSteps'] = steps_summary['total_steps']
     info['StepsDayAvg'] = steps_summary['avg_steps']
@@ -178,7 +216,7 @@ def main():
     info.update({f'Walking(mins)_Hour{h:02}_Weekday': steps_summary['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Steps summary, adjusted
-    steps_summary_adj = summarize_steps(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
+    steps_summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
     # steps, overall stats
     info['TotalStepsAdjusted'] = steps_summary_adj['total_steps']
     info['StepsDayAvgAdjusted'] = steps_summary_adj['avg_steps']
@@ -230,7 +268,7 @@ def main():
     info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekday': steps_summary_adj['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Cadence summary
-    cadence_summary = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last)
+    cadence_summary = summarize_cadence(Y, model.steptol)
     # overall stats
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
     info['CadencePeak30(steps/min)'] = cadence_summary['cadence_peak30']
@@ -245,7 +283,7 @@ def main():
     info['Cadence95th(steps/min)_Weekday'] = cadence_summary['weekday_cadence_p95']
 
     # Cadence summary, adjusted
-    cadence_summary_adj = summarize_cadence(Y, model.steptol, exclude_wear_below=args.exclude_wear_below, exclude_first_last=args.exclude_first_last, adjust_estimates=True)
+    cadence_summary_adj = summarize_cadence(Y, model.steptol, adjust_estimates=True)
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
     info['CadencePeak30Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
@@ -397,8 +435,6 @@ def load_model(
 
 def summarize_enmo(
     data: pd.DataFrame,
-    exclude_wear_below: str = None,
-    exclude_first_last: str = None,
     adjust_estimates: bool = False
 ):
     """
@@ -406,15 +442,13 @@ def summarize_enmo(
 
     Parameters:
     - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z'.
-    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
-    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
 
     Returns:
     - dict: A dictionary containing various summary ENMO statistics.
 
     Example:
-        summary = summarize_enmo(data, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+        summary = summarize_enmo(data, adjust_estimates=True)
     """
 
     def _is_enough(x, min_wear=None, dt=None):
@@ -437,12 +471,6 @@ def summarize_enmo(
     v = v.resample('T').mean()
 
     dt = utils.infer_freq(v.index).total_seconds()
-
-    if exclude_first_last is not None:
-        v = utils.exclude_first_last_days(v, exclude_first_last)
-
-    if exclude_wear_below is not None:
-        v = utils.exclude_wear_below_days(v, exclude_wear_below)
 
     if adjust_estimates:
         v = utils.impute_missing(v)
@@ -488,8 +516,6 @@ def summarize_enmo(
 def summarize_steps(
     Y: pd.Series, 
     steptol: int = 3, 
-    exclude_wear_below: str = None, 
-    exclude_first_last: str = None, 
     adjust_estimates: bool = False
 ):
     """
@@ -498,15 +524,13 @@ def summarize_steps(
     Parameters:
     - Y (pd.Series): A pandas Series of step counts.
     - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
-    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
-    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
 
     Returns:
     - dict: A dictionary containing various summary step count statistics.
 
     Example:
-        summary = summarize_steps(Y, steptol=3, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+        summary = summarize_steps(Y, steptol=3, adjust_estimates=True)
     """
 
     # there's a bug with .resample().sum(skipna)
@@ -566,12 +590,6 @@ def summarize_steps(
         hours, rem = divmod(tdelta.seconds, 3600)
         minutes, seconds = divmod(rem, 60)
         return f"{hours:02}:{minutes:02}:{seconds:02}"
-
-    if exclude_first_last is not None:
-        Y = utils.exclude_first_last_days(Y, exclude_first_last)
-
-    if exclude_wear_below is not None:
-        Y = utils.exclude_wear_below_days(Y, exclude_wear_below)
 
     dt = utils.infer_freq(Y.index).total_seconds()
     W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
@@ -786,8 +804,6 @@ def summarize_steps(
 def summarize_cadence(
     Y: pd.Series,
     steptol: int = 3,
-    exclude_wear_below: str = None,
-    exclude_first_last: str = None,
     adjust_estimates: bool = False
 ):
     """
@@ -796,24 +812,16 @@ def summarize_cadence(
     Parameters:
     - Y (pd.Series): A pandas Series of step counts.
     - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
-    - exclude_wear_below (str, optional): Exclude days where wear time is below this threshold, e.g. '12H'. If None, no exclusion is applied. Defaults to None.
-    - exclude_first_last (str, optional): Exclude the first and/or last day of the series. Options are: 'first', 'last', 'both'. If None, no exclusion is applied. Defaults to None.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
 
     Returns:
     - dict: A dictionary containing various summary cadence statistics.
 
     Example:
-        summary = summarize_cadence(Y, steptol=3, exclude_wear_below='12H', exclude_first_last='first', adjust_estimates=True)
+        summary = summarize_cadence(Y, steptol=3, adjust_estimates=True)
     """
 
     # TODO: split walking and running cadence?
-
-    if exclude_first_last is not None:
-        Y = utils.exclude_first_last_days(Y, exclude_first_last)
-
-    if exclude_wear_below is not None:
-        Y = utils.exclude_wear_below_days(Y, exclude_wear_below)
 
     def _cadence_max(x, steptol, walktol=30, n=1):
         y = x[x >= steptol]
