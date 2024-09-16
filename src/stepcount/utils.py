@@ -133,6 +133,9 @@ def exclude_wear_below_days(
         # Exclude days with less than 12 hours of valid data
         series = exclude_wear_below_days(series, min_wear='12H')
     """
+    if len(x) == 0:
+        print("No data to exclude")
+        return x
 
     min_wear = pd.Timedelta(min_wear)
     dt = infer_freq(x.index)
@@ -169,8 +172,10 @@ def exclude_first_last_days(
         # Exclude the first day from the series
         series = exclude_first_last_days(series, first_or_last='first')
     """
+    if len(x) == 0:
+        print("No data to exclude")
+        return x
 
-    x = x.copy()  # make a copy to avoid modifying the original data
     if first_or_last == 'first':
         x[x.index.date == x.index.date[0]] = np.nan
     elif first_or_last == 'last':
