@@ -120,17 +120,14 @@ def exclude_wear_below_days(
     min_wear: str = '12H'
 ):
     """
-    Exclude days with less than `min_wear` of valid data.
-
-    This function filters out days from a time series that have less than the specified minimum 
-    wear time of valid data. Days with insufficient valid data are set to NaN.
+    Set days containing less than the specified minimum wear time (`min_wear`) to NaN.
 
     Parameters:
-    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame with representing the time series data.
+    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame with a DatetimeIndex representing time series data.
     - min_wear (str): A string representing the minimum wear time required per day (e.g., '8H' for 8 hours).
 
     Returns:
-    - pd.Series: A pandas Series with days having less than `min_wear` of valid data set to NaN.
+    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with days having less than `min_wear` of valid data set to NaN.
 
     Example:
         # Exclude days with less than 12 hours of valid data
@@ -155,22 +152,18 @@ def exclude_wear_below_days(
 
 
 def exclude_first_last_days(
-    x: pd.Series, 
+    x: Union[pd.Series, pd.DataFrame],
     first_or_last='both'
 ):
     """
-    Exclude the first day, last day, or both from a time series.
-
-    This function sets the values of the first day, last day, or both to NaN in a pandas Series 
-    with a datetime index. This is useful for excluding incomplete days from time series data.
+    Set the values of the first day, last day, or both to NaN in a time series.
 
     Parameters:
-    - x (pd.Series): A pandas Series with a datetime index representing the time series data.
-    - first_or_last (str, optional): A string indicating which days to exclude. 
-      Options are 'first', 'last', or 'both'. Default is 'both'.
+    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame a DatetimeIndex representing time series data.
+    - first_or_last (str, optional): A string indicating which days to exclude. Options are 'first', 'last', or 'both'. Default is 'both'.
 
     Returns:
-    - pd.Series: A pandas Series with the specified days set to NaN.
+    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with the values of the specified days set to NaN.
 
     Example:
         # Exclude the first day from the series
