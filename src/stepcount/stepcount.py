@@ -984,7 +984,7 @@ def summarize_bouts(
         bout_duration = n * dt / one_min  # in minutes
         bout_cadence = bout_steps / bout_duration  # steps per minute
         # rescale to steps per minute
-        y *= one_min / dt
+        y = y * one_min / dt
         bout_cadence_sd = y.std()
         bout_cadence_25th = y.quantile(0.25)
         bout_cadence_50th = y.quantile(0.50)
