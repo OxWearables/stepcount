@@ -62,7 +62,8 @@ setuptools.setup(
         "torch==1.13.*",
         "torchvision==0.14.*",
         "transforms3d==0.4.*",
-        "numba==0.58.*"
+        "numba==0.58.*",
+        "matplotlib==3.7.*",
     ],
     extras_require={
         "dev": [
