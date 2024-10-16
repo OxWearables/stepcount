@@ -1132,7 +1132,7 @@ def plot(Y, title=None):
         ax.plot(y.index, y, label='steps/min')
 
         # Grey shading where NA
-        ax.fill_between(y.index, 0, MAX_STEPS_PER_MINUTE, where=y.isna(), color='grey', alpha=0.3, interpolate=True, label='missing')
+        ax.fill_between(y.index, -10, MAX_STEPS_PER_MINUTE, where=y.isna(), color='grey', alpha=0.3, interpolate=True, label='missing')
 
         # Formatting the x-axis to show hours and minutes
         ax.xaxis.set_major_locator(mdates.HourLocator(interval=1))
