@@ -159,14 +159,14 @@ def exclude_first_last_days(
     first_or_last='both'
 ):
     """
-    Drop the first, last, or both days from the time series.
+    Set the values of the first day, last day, or both to NaN in a time series.
 
     Parameters:
-    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame a DatetimeIndex representing time series data.
+    - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame with a DatetimeIndex representing time series data.
     - first_or_last (str, optional): A string indicating which days to exclude. Options are 'first', 'last', or 'both'. Default is 'both'.
 
     Returns:
-    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with the specified days dropped.
+    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with the values of the specified days set to NaN.
 
     Example:
         # Exclude the first day from the series
@@ -177,13 +177,11 @@ def exclude_first_last_days(
         return x
 
     if first_or_last == 'first':
-        x = x.loc[x.index.date != x.index.date[0]]
+        x[x.index.date == x.index.date[0]] = np.nan
     elif first_or_last == 'last':
-        x = x.loc[x.index.date != x.index.date[-1]]
+        x[x.index.date == x.index.date[-1]] = np.nan
     elif first_or_last == 'both':
-        x = x.loc[(x.index.date != x.index.date[0]) & (x.index.date != x.index.date[-1])]
-    else:
-        raise ValueError(f"Unknown option: {first_or_last}")
+        x[(x.index.date == x.index.date[0]) | (x.index.date == x.index.date[-1])] = np.nan
     return x
 
 
