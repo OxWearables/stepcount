@@ -64,7 +64,7 @@ def collate_outputs(
 
     outdir = Path(outdir) 
 
-    print(f"Found {len(info_files)} summary files...")
+    print(f"Collating {len(info_files)} summary files...")
     info = []
     for file in tqdm(info_files):
         with open(file, 'r') as f:
@@ -75,95 +75,61 @@ def collate_outputs(
     info.to_csv(info_file, index=False)
     print('Collated info CSV written to', info_file)
 
-    print(f"Found {len(daily_files)} daily files...")
-    daily_file = outdir / "Daily.csv.gz"
-    if daily_file.exists():
-        daily_file.unlink()  # remove existing file
+    print(f"Collating {len(daily_files)} daily files...")
+    daily_csv = outdir / "Daily.csv.gz"
+    collate_to_csv(daily_files, daily_csv)
+    print('Collated daily CSV written to', daily_csv)
 
-    header_written = False
-    for file in tqdm(daily_files):
-        df = pd.read_csv(file)
-        df.to_csv(daily_file, mode='a', index=False, header=not header_written)
-        header_written = True
-    print('Collated daily CSV written to', daily_file)
-
-    print(f"Found {len(dailyadj_files)} adjusted daily files...")
-    dailyadj_file = outdir / "DailyAdjusted.csv.gz"
-    if dailyadj_file.exists():
-        dailyadj_file.unlink()  # remove existing file
-
-    header_written = False
-    for file in tqdm(dailyadj_files):
-        df = pd.read_csv(file)
-        df.to_csv(dailyadj_file, mode='a', index=False, header=not header_written)
-        header_written = True
-    print('Collated adjusted daily CSV written to', dailyadj_file)
+    print(f"Collating {len(dailyadj_files)} adjusted daily files...")
+    dailyadj_csv = outdir / "DailyAdjusted.csv.gz"
+    collate_to_csv(dailyadj_files, dailyadj_csv)
+    print('Collated adjusted daily CSV written to', dailyadj_csv)
 
     if include_hourly:
 
-        print(f"Found {len(hourly_files)} hourly files...")
-        hourly_file = outdir / "Hourly.csv.gz"
-        if hourly_file.exists():
-            hourly_file.unlink()  # remove existing file
+        print(f"Collating {len(hourly_files)} hourly files...")
+        hourly_csv = outdir / "Hourly.csv.gz"
+        collate_to_csv(hourly_files, hourly_csv)
+        print('Collated hourly CSV written to', hourly_csv)
 
-        header_written = False
-        for file in tqdm(hourly_files):
-            df = pd.read_csv(file)
-            df.to_csv(hourly_file, mode='a', index=False, header=not header_written)
-            header_written = True
-        print('Collated hourly CSV written to', hourly_file)
-
-        print(f"Found {len(hourlyadj_files)} adjusted hourly files...")
-        hourlyadj_file = outdir / "HourlyAdjusted.csv.gz"
-        if hourlyadj_file.exists():
-            hourlyadj_file.unlink()  # remove existing file
-
-        header_written = False
-        for file in tqdm(hourlyadj_files):
-            df = pd.read_csv(file)
-            df.to_csv(hourlyadj_file, mode='a', index=False, header=not header_written)
-            header_written = True
-        print('Collated adjusted hourly CSV written to', hourlyadj_file)
+        print(f"Collating {len(hourlyadj_files)} adjusted hourly files...")
+        hourlyadj_csv = outdir / "HourlyAdjusted.csv.gz"
+        collate_to_csv(hourlyadj_files, hourlyadj_csv)
+        print('Collated adjusted hourly CSV written to', hourlyadj_csv)
 
     if include_minutely:
 
-        print(f"Found {len(minutes_files)} minutes files...")
-        minutes_file = outdir / "Minutely.csv.gz"
-        if minutes_file.exists():
-            minutes_file.unlink()  # remove existing file
+        print(f"Collating {len(minutes_files)} minutes files...")
+        minutes_csv = outdir / "Minutely.csv.gz"
+        collate_to_csv(minutes_files, minutes_csv)
+        print('Collated minutes CSV written to', minutes_csv)
 
-        header_written = False
-        for file in tqdm(minutes_files):
-            df = pd.read_csv(file)
-            df.to_csv(minutes_file, mode='a', index=False, header=not header_written)
-            header_written = True
-        print('Collated minutes CSV written to', minutes_file)
-
-        print(f"Found {len(minutesadj_files)} adjusted minutes files...")
-        minutesadj_file = outdir / "MinutelyAdjusted.csv.gz"
-        if minutesadj_file.exists():
-            minutesadj_file.unlink()  # remove existing file
-
-        header_written = False
-        for file in tqdm(minutesadj_files):
-            df = pd.read_csv(file)
-            df.to_csv(minutesadj_file, mode='a', index=False, header=not header_written)
-            header_written = True
-        print('Collated adjusted minutes CSV written to', minutesadj_file)
+        print(f"Collating {len(minutesadj_files)} adjusted minutes files...")
+        minutesadj_csv = outdir / "MinutelyAdjusted.csv.gz"
+        collate_to_csv(minutesadj_files, minutesadj_csv)
+        print('Collated adjusted minutes CSV written to', minutesadj_csv)
 
     if include_bouts:
 
-        print(f"Found {len(bouts_files)} bouts files...")
-        bouts_file = outdir / "Bouts.csv.gz"
-        if bouts_file.exists():
-            bouts_file.unlink()  # remove existing file
+        print(f"Collating {len(bouts_files)} bouts files...")
+        bouts_csv = outdir / "Bouts.csv.gz"
+        collate_to_csv(bouts_files, bouts_csv)
+        print('Collated bouts CSV written to', bouts_csv)
 
-        header_written = False
-        for file in tqdm(bouts_files):
-            df = pd.read_csv(file)
-            df.to_csv(bouts_file, mode='a', index=False, header=not header_written)
-            header_written = True
-        print('Collated bouts CSV written to', bouts_file)
+    return
+
+
+def collate_to_csv(file_list, outfile, overwrite=True):
+    """ Collate a list of files into a single CSV file."""
+
+    if overwrite and outfile.exists():
+        outfile.unlink()  # remove existing file
+
+    header_written = False
+    for file in tqdm(file_list):
+        df = pd.read_csv(file)
+        df.to_csv(outfile, mode='a', index=False, header=not header_written)
+        header_written = True
 
     return
 
