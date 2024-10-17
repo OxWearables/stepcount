@@ -116,7 +116,7 @@ $ stepcount sample.cwa -t rf
 
 When using the random forest model, a set of signal features is extracted from the accelerometer data. 
 These features are subsequently used as inputs for the model's classification process. 
-For a comprehensive list of the extracted features, see [this list](https://github.com/OxWearables/stepcount/blob/main/rf-feature-list.md).
+For a comprehensive list of the extracted features, see [the glossary](https://github.com/OxWearables/stepcount/blob/main/GLOSSARY.md#random-forest-feature-list).
 
 
 ### Crude vs. Adjusted Estimates
