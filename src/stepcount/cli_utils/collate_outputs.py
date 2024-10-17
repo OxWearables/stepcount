@@ -8,10 +8,15 @@ from pathlib import Path
 from tqdm.auto import tqdm
 
 
-
-def collate_outputs(results, include_hourly=False, include_minutely=False, outdir="collated_outputs/"):
-    """Read all *-Info.json files under <outputs> and merge into one CSV file.
-    :param str outputs: Directory containing JSON files.
+def collate_outputs(
+    results,
+    include_hourly=False,
+    include_minutely=False,
+    include_bouts=False,
+    outdir="collated_outputs/"
+):
+    """Collate all output files under <outdir> into one CSV file.
+    :param str outdir: Root directory from which to search for output files.
     :param str outfile: Output CSV filename.
     :return: New file written to <outfile>
     :rtype: void
@@ -23,7 +28,8 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
     # - *-Info.json files contain the summary information
     # - *-Daily.json files contain daily summaries
     # - *-Hourly.json files contain hourly summaries
-    # - *-Minutely.json files contain minute-by-minute summaries
+    # - *-Minutely.json files contain minute-level summaries
+    # - *-Bouts.json files contain bout information
     info_files = []
     daily_files = []
     hourly_files = []
@@ -31,6 +37,7 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
     dailyadj_files = []
     hourlyadj_files = []
     minutesadj_files = []
+    bouts_files = []
 
     results = Path(results)
 
@@ -52,6 +59,8 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
                 hourlyadj_files.append(file)
             if file.name.endswith("-MinutelyAdjusted.csv.gz"):
                 minutesadj_files.append(file)
+            if file.name.endswith("-Bouts.csv.gz"):
+                bouts_files.append(file)
 
     outdir = Path(outdir) 
 
@@ -68,6 +77,9 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
 
     print(f"Found {len(daily_files)} daily files...")
     daily_file = outdir / "Daily.csv.gz"
+    if daily_file.exists():
+        daily_file.unlink()  # remove existing file
+
     header_written = False
     for file in tqdm(daily_files):
         df = pd.read_csv(file)
@@ -77,6 +89,9 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
 
     print(f"Found {len(dailyadj_files)} adjusted daily files...")
     dailyadj_file = outdir / "DailyAdjusted.csv.gz"
+    if dailyadj_file.exists():
+        dailyadj_file.unlink()  # remove existing file
+
     header_written = False
     for file in tqdm(dailyadj_files):
         df = pd.read_csv(file)
@@ -85,8 +100,12 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
     print('Collated adjusted daily CSV written to', dailyadj_file)
 
     if include_hourly:
+
         print(f"Found {len(hourly_files)} hourly files...")
         hourly_file = outdir / "Hourly.csv.gz"
+        if hourly_file.exists():
+            hourly_file.unlink()  # remove existing file
+
         header_written = False
         for file in tqdm(hourly_files):
             df = pd.read_csv(file)
@@ -96,6 +115,9 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
 
         print(f"Found {len(hourlyadj_files)} adjusted hourly files...")
         hourlyadj_file = outdir / "HourlyAdjusted.csv.gz"
+        if hourlyadj_file.exists():
+            hourlyadj_file.unlink()  # remove existing file
+
         header_written = False
         for file in tqdm(hourlyadj_files):
             df = pd.read_csv(file)
@@ -107,6 +129,9 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
 
         print(f"Found {len(minutes_files)} minutes files...")
         minutes_file = outdir / "Minutely.csv.gz"
+        if minutes_file.exists():
+            minutes_file.unlink()  # remove existing file
+
         header_written = False
         for file in tqdm(minutes_files):
             df = pd.read_csv(file)
@@ -116,12 +141,29 @@ def collate_outputs(results, include_hourly=False, include_minutely=False, outdi
 
         print(f"Found {len(minutesadj_files)} adjusted minutes files...")
         minutesadj_file = outdir / "MinutelyAdjusted.csv.gz"
+        if minutesadj_file.exists():
+            minutesadj_file.unlink()  # remove existing file
+
         header_written = False
         for file in tqdm(minutesadj_files):
             df = pd.read_csv(file)
             df.to_csv(minutesadj_file, mode='a', index=False, header=not header_written)
             header_written = True
         print('Collated adjusted minutes CSV written to', minutesadj_file)
+
+    if include_bouts:
+
+        print(f"Found {len(bouts_files)} bouts files...")
+        bouts_file = outdir / "Bouts.csv.gz"
+        if bouts_file.exists():
+            bouts_file.unlink()  # remove existing file
+
+        header_written = False
+        for file in tqdm(bouts_files):
+            df = pd.read_csv(file)
+            df.to_csv(bouts_file, mode='a', index=False, header=not header_written)
+            header_written = True
+        print('Collated bouts CSV written to', bouts_file)
 
     return
 
@@ -138,6 +180,7 @@ def main():
     parser.add_argument('results', help="Directory containing the result files")
     parser.add_argument('--include-hourly', action='store_true', help="Collate hourly files")
     parser.add_argument('--include-minutely', action='store_true', help="Collate minutely files")
+    parser.add_argument('--include-bouts', action='store_true', help="Collate bouts files")
     parser.add_argument('--outdir', '-o', default="collated-outputs/", help="Output directory")
     args = parser.parse_args()
 
@@ -145,6 +188,7 @@ def main():
         results=args.results,
         include_hourly=args.include_hourly,
         include_minutely=args.include_minutely,
+        include_bouts=args.include_bouts,
         outdir=args.outdir
     )
 
