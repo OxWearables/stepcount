@@ -342,6 +342,7 @@ def main():
     # del daily_adj  # still needed for printing
 
     # Save bouts data
+    bouts_summary['bouts'].insert(0, 'Filename', info['Filename'])  # add filename for reference
     bouts_summary['bouts'].to_csv(f"{outdir}/{basename}-Bouts.csv.gz", index=False)
 
     # Print
