@@ -11,8 +11,10 @@
     - **SampleRate**: The frequency at which data points are sampled per second, measured in Hz.
     - **ReadOK**: A binary indicator (1 for success, 0 for failure) showing whether the data was read successfully.
     - **NumTicks**: Total number of data points recorded.
-    - **StartTime**: Timestamp marking the beginning of the data recording.
-    - **EndTime**: Timestamp marking the end of the data recording.
+    - **StartTime**: Timestamp marking the beginning of the device recording.
+    - **EndTime**: Timestamp marking the end of the device recording.
+    - **WearStartTime**: Timestamp marking the beginning of valid wear data.
+    - **WearEndTime**: Timestamp marking the end of valid wear data.
     - **WearTime(days)**: Total time the device was worn, expressed in days.
     - **NumInterrupts**: Number of interruptions in the data recording.
     - **CalibErrorBefore(mg)**: Calibration error before any correction was applied, measured in milli-g.
