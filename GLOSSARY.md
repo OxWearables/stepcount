@@ -1,4 +1,6 @@
-## Data Dictionary
+# Glossary
+
+## Info.json
 
 1. General Information
     - **StepCountVersion**: Version number of the `stepcount` program used to run the analysis. This information is useful to ensure reproducibility.

@@ -83,7 +83,7 @@ time
 
 Output: outputs/sample/
 ```
-Refer to the [Data Dictionary](https://github.com/OxWearables/stepcount/blob/main/data-dictionary.md) for a comprehensive list of outputs.
+Refer to the [GLOSSARY.md](https://github.com/OxWearables/stepcount/blob/main/GLOSSARY.md) for a comprehensive list of outputs.
 
 ### Troubleshooting 
 Some systems may face issues with Java when running the script. If this is your case, try fixing OpenJDK to version 8:
