@@ -88,34 +88,8 @@ def main():
     if args.exclude_wear_below is not None:
         data = utils.exclude_wear_below_days(data, args.exclude_wear_below)
 
-    # If no data left, save info and exit early
-    if len(data) == 0 or data.isna().all().all():
-        print("No data left after exclusion. Exiting early...")
-        # Reset start, end, wear time, etc.
-        info['StartTime'] = None
-        info['EndTime'] = None
-        info['WearTime(days)'] = None
-        info['NonwearTime(days)'] = None
-        with open(f"{outdir}/{basename}-Info.json", 'w') as f:
-            json.dump(info, f, indent=4, cls=utils.NpEncoder)
-        print("\nSummary\n-------")
-        print(json.dumps(
-            {k: v for k, v in info.items() if not re.search(r'_Weekend|_Weekday|_Hour\d{2}', k)},
-            indent=4, cls=utils.NpEncoder
-        ))
-        print("\nOutput files saved in:", outdir)
-        print(f"Done! ({round(time.time() - before,2)}s)")
-        return  # exit early
-
-    # Update start, end, wear time, etc. if exclusions applied
-    if args.exclude_first_last is not None or args.exclude_wear_below is not None:
-        dt = utils.infer_freq(data.index).total_seconds()
-        nonwear_time = data.isna().any(axis=1).sum() * dt
-        wear_time = len(data) * dt - nonwear_time
-        info['StartTime'] = data.index[0].strftime("%Y-%m-%d %H:%M:%S")
-        info['EndTime'] = data.index[-1].strftime("%Y-%m-%d %H:%M:%S")
-        info['WearTime(days)'] = wear_time / (60 * 60 * 24)
-        info['NonwearTime(days)'] = nonwear_time / (60 * 60 * 24)
+    # Summarize wear time
+    info.update(summarize_wear_time(data))
 
     # Run model
     if verbose:
@@ -135,14 +109,6 @@ def main():
     if verbose:
         print("Running step counter...")
     Y, W, T_steps = model.predict_from_frame(data)
-
-    # Quality control: Wear time coverage
-    coverage = Y.groupby(Y.index.hour).agg(lambda x: x.notna().mean())
-    if len(coverage) < 24 or coverage.min() < 0.01:
-        info['Covers24hOK'] = 0
-    else:
-        info['Covers24hOK'] = 1
-    del coverage  # free memory
 
     # Save step counts
     Y.to_csv(f"{outdir}/{basename}-Steps.csv.gz")
@@ -445,6 +411,48 @@ def load_model(
         )
 
     return joblib.load(pth)
+
+
+def summarize_wear_time(
+    data: pd.DataFrame,
+):
+    """
+    Summarize wear time information from raw accelerometer data.
+
+    Parameters:
+    - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z'.
+
+    Returns:
+    - dict: A dictionary containing various wear time statistics.
+
+    Example:
+        summary = summarize_wear_time(data)
+    """
+
+    dt = utils.infer_freq(data.index).total_seconds()
+    na = data.isna().any(axis=1)
+
+    if len(data) == 0 or na.all():
+        wear_start = None
+        wear_end = None
+        nonwear_time = len(data) * dt
+        wear_time = 0.0
+        covers24hok = 0
+    else:
+        wear_start = data.first_valid_index().strftime("%Y-%m-%d %H:%M:%S")
+        wear_end = data.last_valid_index().strftime("%Y-%m-%d %H:%M:%S")
+        nonwear_time = na.sum() * dt / (60 * 60 * 24)
+        wear_time = len(data) * dt - nonwear_time / (60 * 60 * 24)
+        coverage = (~na).groupby(na.index.hour).mean()
+        covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
+
+    return {
+        'WearStartTime': wear_start,
+        'WearEndTime': wear_end,
+        'WearTime(days)': wear_time,
+        'NonwearTime(days)': nonwear_time,
+        'Covers24hOK': covers24hok
+    }
 
 
 def summarize_enmo(
