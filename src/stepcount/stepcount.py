@@ -53,6 +53,14 @@ def main():
     parser.add_argument("--exclude-first-last", "-e",
                         help="Exclude first, last or both days of data. Default: None (no exclusion)",
                         type=str, choices=['first', 'last', 'both'], default=None)
+    parser.add_argument("--start",
+                        help=("Specicfy a start time for the data to be processed (otherwise, process all). "
+                              "Pass values as strings, e.g.: '2024-01-01 10:00:00'. Default: None",),
+                        type=str, default=None)
+    parser.add_argument("--end",
+                        help=("Specicfy an end time for the data to be processed (otherwise, process all). "
+                              "Pass values as strings, e.g.: '2024-01-02 09:59:59'. Default: None",),
+                        type=str, default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -79,6 +87,12 @@ def main():
         verbose=verbose
     )
     info.update(info_read)
+
+    # Set start/end times, if given
+    if args.start is not None:
+        data = data.loc[args.start:]
+    if args.end is not None:
+        data = data.loc[:args.end]
 
     # Exclusion: first/last days
     if args.exclude_first_last is not None:
