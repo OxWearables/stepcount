@@ -457,7 +457,7 @@ def summarize_wear_time(
         wear_start = data.first_valid_index().strftime("%Y-%m-%d %H:%M:%S")
         wear_end = data.last_valid_index().strftime("%Y-%m-%d %H:%M:%S")
         nonwear_time = na.sum() * dt / (60 * 60 * 24)
-        wear_time = len(data) * dt - nonwear_time / (60 * 60 * 24)
+        wear_time = (len(data) * dt - nonwear_time) / (60 * 60 * 24)
         coverage = (~na).groupby(na.index.hour).mean()
         covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
 
