@@ -12,8 +12,10 @@ import actipy
 def read(
     filepath: str,
     usecols: str = 'time,x,y,z',
-    resample_hz: str = 'uniform',
+    start_time: str = None,
+    end_time: str = None,
     sample_rate: float = None,
+    resample_hz: str = 'uniform',
     verbose: bool = True
 ):
     """
@@ -91,8 +93,6 @@ def read(
             "Device": ftype,
             "Filesize(MB)": fsize,
             "SampleRate": sample_rate,
-            "StartTime": data.index[0].strftime('%Y-%m-%d %H:%M:%S'),
-            "EndTime": data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
         })
 
     elif ftype in (".cwa", ".gt3x", ".bin"):
@@ -111,6 +111,18 @@ def read(
 
     if 'ResampleRate' not in info:
         info['ResampleRate'] = info['SampleRate']
+
+    # Trim the data if start/end times are specified
+    if start_time is not None:
+        data = data.loc[start_time:]
+    if end_time is not None:
+        data = data.loc[:end_time]
+
+    # Update start/end times in metadata
+    info.update({
+        "StartTime": data.index[0].strftime('%Y-%m-%d %H:%M:%S'),
+        "EndTime": data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
+    })
 
     return data, info
 

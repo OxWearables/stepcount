@@ -82,17 +82,13 @@ def main():
     data, info_read = utils.read(
         args.filepath, 
         usecols=args.txyz, 
-        resample_hz=30 if args.model_type == 'ssl' else None,
+        start_time=args.start,
+        end_time=args.end,
         sample_rate=args.sample_rate, 
+        resample_hz=30 if args.model_type == 'ssl' else None,
         verbose=verbose
     )
     info.update(info_read)
-
-    # Set start/end times, if given
-    if args.start is not None:
-        data = data.loc[args.start:]
-    if args.end is not None:
-        data = data.loc[:args.end]
 
     # Exclusion: first/last days
     if args.exclude_first_last is not None:
