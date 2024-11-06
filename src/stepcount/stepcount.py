@@ -1,5 +1,6 @@
 import warnings
 import os
+import sys
 import pathlib
 import urllib
 import shutil
@@ -100,6 +101,20 @@ def main():
 
     # Update wear time stats after exclusions
     info.update(utils.calculate_wear_stats(data))
+
+    # If no data, save Info.json and exit
+    if len(data) == 0 or data.isna().any(axis=1).all():  # TODO: check na only on x,y,z cols?
+        # Save Info.json
+        with open(f"{outdir}/{basename}-Info.json", 'w') as f:
+            json.dump(info, f, indent=4, cls=utils.NpEncoder)
+        # Print
+        print("\nSummary\n-------")
+        print(json.dumps(
+            {k: v for k, v in info.items() if not re.search(r'_Weekend|_Weekday|_Hour\d{2}', k)},
+            indent=4, cls=utils.NpEncoder
+        ))
+        print("No data to process. Exiting early...")
+        sys.exit(0)
 
     # Run model
     if verbose:
