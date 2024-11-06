@@ -178,7 +178,7 @@ def calculate_wear_stats(data: pd.DataFrame):
     }
 
 
-def exclude_wear_below_days(
+def flag_wear_below_days(
     x: Union[pd.Series, pd.DataFrame],
     min_wear: str = '12H'
 ):
@@ -217,34 +217,34 @@ def exclude_wear_below_days(
     return x
 
 
-def exclude_first_last_days(
+def drop_first_last_days(
     x: Union[pd.Series, pd.DataFrame],
     first_or_last='both'
 ):
     """
-    Set the values of the first day, last day, or both to NaN in a time series.
+    Drop the first day, last day, or both from a time series.
 
     Parameters:
     - x (pd.Series or pd.DataFrame): A pandas Series or DataFrame with a DatetimeIndex representing time series data.
-    - first_or_last (str, optional): A string indicating which days to exclude. Options are 'first', 'last', or 'both'. Default is 'both'.
+    - first_or_last (str, optional): A string indicating which days to drop. Options are 'first', 'last', or 'both'. Default is 'both'.
 
     Returns:
-    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with the values of the specified days set to NaN.
+    - pd.Series or pd.DataFrame: A pandas Series or DataFrame with the values of the specified days dropped.
 
     Example:
-        # Exclude the first day from the series
-        series = exclude_first_last_days(series, first_or_last='first')
+        # Drop the first day from the series
+        series = drop_first_last_days(series, first_or_last='first')
     """
     if len(x) == 0:
-        print("No data to exclude")
+        print("No data to drop")
         return x
 
     if first_or_last == 'first':
-        x[x.index.date == x.index.date[0]] = np.nan
+        x = x[x.index.date != x.index.date[0]]
     elif first_or_last == 'last':
-        x[x.index.date == x.index.date[-1]] = np.nan
+        x = x[x.index.date != x.index.date[-1]]
     elif first_or_last == 'both':
-        x[(x.index.date == x.index.date[0]) | (x.index.date == x.index.date[-1])] = np.nan
+        x = x[(x.index.date != x.index.date[0]) & (x.index.date != x.index.date[-1])]
     return x
 
 

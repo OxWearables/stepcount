@@ -92,11 +92,11 @@ def main():
 
     # Exclusion: first/last days
     if args.exclude_first_last is not None:
-        data = utils.exclude_first_last_days(data, args.exclude_first_last)
+        data = utils.drop_first_last_days(data, args.exclude_first_last)
 
     # Exclusion: days with wear time below threshold
     if args.exclude_wear_below is not None:
-        data = utils.exclude_wear_below_days(data, args.exclude_wear_below)
+        data = utils.flag_wear_below_days(data, args.exclude_wear_below)
 
     # Update wear time stats after exclusions
     info.update(utils.calculate_wear_stats(data))
