@@ -127,6 +127,60 @@ def read(
     return data, info
 
 
+def calculate_wear_stats(data: pd.DataFrame):
+    """
+    Calculate wear time and related information from raw accelerometer data.
+
+    Parameters:
+    - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z' and a DatetimeIndex.
+
+    Returns:
+    - dict: A dictionary containing various wear time stats.
+
+    Example:
+        info = calculate_wear_stats(data)
+    """
+
+    TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+    n_data = len(data)
+
+    if n_data == 0:
+        start_time = None
+        end_time = None
+        wear_start_time = None
+        wear_end_time = None
+        nonwear_duration = 0.0
+        wear_duration = 0.0
+        covers24hok = 0
+
+    else:
+        na = data.isna().any(axis=1)  # TODO: check na only on x,y,z cols?
+        dt = infer_freq(data.index).total_seconds()
+        start_time = data.index[0].strftime(TIME_FORMAT)
+        end_time = data.index[-1].strftime(TIME_FORMAT)
+        wear_start_time = data.first_valid_index()
+        if wear_start_time is not None:
+            wear_start_time = wear_start_time.strftime(TIME_FORMAT)
+        wear_end_time = data.last_valid_index()
+        if wear_end_time is not None:
+            wear_end_time = wear_end_time.strftime(TIME_FORMAT)
+        nonwear_duration = na.sum() * dt / (60 * 60 * 24)
+        wear_duration = n_data * dt / (60 * 60 * 24) - nonwear_duration 
+        coverage = (~na).groupby(na.index.hour).mean()
+        covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
+
+    return {
+        'StartTime': start_time,
+        'EndTime': end_time,
+        'WearStartTime': wear_start_time,
+        'WearEndTime': wear_end_time,
+        'WearTime(days)': wear_duration,
+        'NonwearTime(days)': nonwear_duration,
+        'Covers24hOK': covers24hok
+    }
+
+
 def exclude_wear_below_days(
     x: Union[pd.Series, pd.DataFrame],
     min_wear: str = '12H'
