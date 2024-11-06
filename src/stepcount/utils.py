@@ -118,11 +118,8 @@ def read(
     if end_time is not None:
         data = data.loc[:end_time]
 
-    # Update start/end times in metadata
-    info.update({
-        "StartTime": data.index[0].strftime('%Y-%m-%d %H:%M:%S'),
-        "EndTime": data.index[-1].strftime('%Y-%m-%d %H:%M:%S')
-    })
+    # Update wear stats
+    info.update(calculate_wear_stats(data))
 
     return data, info
 
