@@ -98,8 +98,8 @@ def main():
     if args.exclude_wear_below is not None:
         data = utils.exclude_wear_below_days(data, args.exclude_wear_below)
 
-    # Summarize wear time
-    info.update(summarize_wear_time(data))
+    # Update wear time stats after exclusions
+    info.update(utils.calculate_wear_stats(data))
 
     # Run model
     if verbose:
@@ -422,48 +422,6 @@ def load_model(
         )
 
     return joblib.load(pth)
-
-
-def summarize_wear_time(
-    data: pd.DataFrame,
-):
-    """
-    Summarize wear time information from raw accelerometer data.
-
-    Parameters:
-    - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z'.
-
-    Returns:
-    - dict: A dictionary containing various wear time statistics.
-
-    Example:
-        summary = summarize_wear_time(data)
-    """
-
-    dt = utils.infer_freq(data.index).total_seconds()
-    na = data.isna().any(axis=1)
-
-    if len(data) == 0 or na.all():
-        wear_start = None
-        wear_end = None
-        nonwear_time = len(data) * dt
-        wear_time = 0.0
-        covers24hok = 0
-    else:
-        wear_start = data.first_valid_index().strftime("%Y-%m-%d %H:%M:%S")
-        wear_end = data.last_valid_index().strftime("%Y-%m-%d %H:%M:%S")
-        nonwear_time = na.sum() * dt / (60 * 60 * 24)
-        wear_time = len(data) * dt / (60 * 60 * 24) - nonwear_time 
-        coverage = (~na).groupby(na.index.hour).mean()
-        covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
-
-    return {
-        'WearStartTime': wear_start,
-        'WearEndTime': wear_end,
-        'WearTime(days)': wear_time,
-        'NonwearTime(days)': nonwear_time,
-        'Covers24hOK': covers24hok
-    }
 
 
 def summarize_enmo(
