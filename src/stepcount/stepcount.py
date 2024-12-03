@@ -56,11 +56,11 @@ def main():
                         type=str, choices=['first', 'last', 'both'], default=None)
     parser.add_argument("--start",
                         help=("Specicfy a start time for the data to be processed (otherwise, process all). "
-                              "Pass values as strings, e.g.: '2024-01-01 10:00:00'. Default: None",),
+                              "Pass values as strings, e.g.: '2024-01-01 10:00:00'. Default: None"),
                         type=str, default=None)
     parser.add_argument("--end",
                         help=("Specicfy an end time for the data to be processed (otherwise, process all). "
-                              "Pass values as strings, e.g.: '2024-01-02 09:59:59'. Default: None",),
+                              "Pass values as strings, e.g.: '2024-01-02 09:59:59'. Default: None"),
                         type=str, default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
