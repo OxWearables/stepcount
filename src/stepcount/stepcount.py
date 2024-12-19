@@ -69,6 +69,10 @@ def main():
     parser.add_argument("--p95-min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for p95 calculation.",
                         type=int, default=10)
+    parser.add_argument("--bouts-min-walk", help="Minimum percentage of walking for a bout to be considered valid.",
+                        type=float, default=0.8)
+    parser.add_argument("--bouts-max-idle", help="Maximum idle (in windows) before a bout is considered to have ended.",
+                        type=int, default=3)
     parser.add_argument("--start",
                         help=("Specicfy a start time for the data to be processed (otherwise, process all). "
                               "Pass values as strings, e.g.: '2024-01-01 10:00:00'. Default: None"),
@@ -318,7 +322,7 @@ def main():
     info['Cadence95thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p95']
 
     # Bouts summary
-    bouts_summary = summarize_bouts(Y, W, data)
+    bouts_summary = summarize_bouts(Y, W, data, bouts_min_walk=args.bouts_min_walk, bouts_max_idle=args.bouts_max_idle)
 
     # Save Info.json
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -960,7 +964,9 @@ def summarize_cadence(
 def summarize_bouts(
     Y: pd.Series,
     W: pd.Series,
-    data: pd.DataFrame
+    data: pd.DataFrame,
+    bouts_min_walk: float = 0.8,
+    bouts_max_idle: int = 3,
 ):
     """
     Summarize bouts of walking activity. For each detected bout, it calculates
@@ -970,6 +976,8 @@ def summarize_bouts(
     - Y (pd.Series): A pandas Series of step counts.
     - W (pd.Series): A pandas Series indicating walking (1) and non-walking (0) windows, aligned with Y.
     - data (pd.DataFrame): A pandas DataFrame containing raw acceleration data.
+    - bouts_min_walk (float, optional): Minimum percentage of walking for a bout to be considered valid. Defaults to 0.8.
+    - bouts_max_idle (int, optional): Maximum idle (in windows) before a bout is considered to have ended. Defaults to 3.
 
     Returns:
     - dict: A dictionary containing summary information for each detected bout, with the following keys:
@@ -987,7 +995,11 @@ def summarize_bouts(
         - 'ENMOMed(mg)': Median ENMO for each bout.
     """
 
-    bouts = numba_detect_bouts(W.to_numpy())
+    bouts = numba_detect_bouts(
+        W.to_numpy(),
+        min_percent_ones=bouts_min_walk,
+        max_trailing_zeros=bouts_max_idle
+    )
 
     if len(bouts) == 0:
         return {
