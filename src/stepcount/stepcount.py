@@ -48,20 +48,20 @@ def main():
                               "Default: 'time,x,y,z'"),
                         type=str, default="time,x,y,z")
     parser.add_argument("--exclude-wear-below", "-w",
-                        help=("Minimum wear time for a day to be considered valid, otherwise exclude it. "
-                              "Pass values as strings, e.g.: '12H', '30min'. Default: None (no exclusion)"),
+                        help="Exclude days with wear time below threshold. Pass values as strings, e.g.: '12H', '30min'. "
+                        "Default: None (no exclusion)",
                         type=str, default=None)
     parser.add_argument("--exclude-first-last", "-e",
                         help="Exclude first, last or both days of data. Default: None (no exclusion)",
                         type=str, choices=['first', 'last', 'both'], default=None)
     parser.add_argument("--peak1-min-walk-per-day",
-                        help="The minimum amount of walking time per day required for peak1 calculation.",
+                        help="The minimum required walking time (in minutes) in a day for peak1 calculation.",
                         type=int, default=10)
     parser.add_argument("--peak30-min-walk-per-day",
-                        help="The minimum amount of walking time per day for peak30 calculation.",
+                        help="The minimum required walking time (in minutes) in a day for peak30 calculation.",
                         type=int, default=30)
     parser.add_argument("--p95-min-walk-per-day",
-                        help="The minimum amount of walking time per day for p95 calculation.",
+                        help="The minimum required walking time (in minutes) in a day for p95 calculation.",
                         type=int, default=10)
     parser.add_argument("--start",
                         help=("Specicfy a start time for the data to be processed (otherwise, process all). "
