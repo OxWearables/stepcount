@@ -62,13 +62,13 @@ def main():
                         type=float, default=0.5)
     parser.add_argument("--peak1-min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for peak1 calculation.",
-                        type=int, default=10)
+                        type=float, default=10)
     parser.add_argument("--peak30-min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for peak30 calculation.",
-                        type=int, default=30)
+                        type=float, default=30)
     parser.add_argument("--p95-min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for p95 calculation.",
-                        type=int, default=10)
+                        type=float, default=10)
     parser.add_argument("--bouts-min-walk", help="Minimum percentage of walking for a bout to be considered valid.",
                         type=float, default=0.8)
     parser.add_argument("--bouts-max-idle", help="Maximum idle (in windows) before a bout is considered to have ended.",
