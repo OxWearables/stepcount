@@ -54,6 +54,12 @@ def main():
     parser.add_argument("--exclude-first-last", "-e",
                         help="Exclude first, last or both days of data. Default: None (no exclusion)",
                         type=str, choices=['first', 'last', 'both'], default=None)
+    parser.add_argument("--min-wear-per-day", help="The minimum required wear time (in minutes) for a day to be considered valid.",
+                        type=float, default=21 * 60)
+    parser.add_argument("--min-wear-per-hour", help="The minimum required wear time (in minutes) for an hour bin to be considered valid.",
+                        type=float, default=50)
+    parser.add_argument("--min-wear-per-minute", help="The minimum required wear time (in minutes) for a minute bin to be considered valid.",
+                        type=float, default=0.5)
     parser.add_argument("--peak1-min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for peak1 calculation.",
                         type=int, default=10)
@@ -461,7 +467,10 @@ def load_model(
 
 def summarize_enmo(
     data: pd.DataFrame,
-    adjust_estimates: bool = False
+    adjust_estimates: bool = False,
+    min_wear_per_day: float = 21 * 60,
+    min_wear_per_hour: float = 50,
+    min_wear_per_minute: float = 0.5,
 ):
     """
     Summarize ENMO information from raw accelerometer data, e.g. daily and hourly averages, percentiles, etc.
@@ -469,6 +478,9 @@ def summarize_enmo(
     Parameters:
     - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z'.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
+    - min_wear_per_day (float, optional): The minimum required wear time (in minutes) for a day to be considered valid. Defaults to 21 hours.
+    - min_wear_per_hour (float, optional): The minimum required wear time (in minutes) for an hour bin to be considered valid. Defaults to 50 minutes.
+    - min_wear_per_minute (float, optional): The minimum required wear time (in minutes) for a minute bin to be considered valid. Defaults to 0.5 minutes (30 seconds).
 
     Returns:
     - dict: A dictionary containing various summary ENMO statistics.
@@ -503,9 +515,9 @@ def summarize_enmo(
 
     if adjust_estimates:
         # adjusted estimates account for NAs
-        minutely = v.resample('T').agg(_mean, min_wear=0.5, dt=dt).rename('ENMO(mg)')  # up to 30s/min missingness
-        hourly = v.resample('H').agg(_mean, min_wear=50, dt=dt).rename('ENMO(mg)')  # up to 10min/h missingness
-        daily = v.resample('D').agg(_mean, min_wear=21 * 60, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
+        minutely = v.resample('T').agg(_mean, min_wear=min_wear_per_minute, dt=dt).rename('ENMO(mg)')  # up to 30s/min missingness
+        hourly = v.resample('H').agg(_mean, min_wear=min_wear_per_hour, dt=dt).rename('ENMO(mg)')  # up to 10min/h missingness
+        daily = v.resample('D').agg(_mean, min_wear=min_wear_per_day, dt=dt).rename('ENMO(mg)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week = utils.impute_days(daily).groupby(daily.index.weekday).mean()
@@ -542,7 +554,10 @@ def summarize_enmo(
 def summarize_steps(
     Y: pd.Series, 
     steptol: int = 3, 
-    adjust_estimates: bool = False
+    adjust_estimates: bool = False,
+    min_wear_per_day: int = 21 * 60,
+    min_wear_per_hour: int = 50,
+    min_wear_per_minute: int = 0.5,
 ):
     """
     Summarize a series of step counts, e.g. daily and hourly averages, percentiles, etc.
@@ -551,6 +566,9 @@ def summarize_steps(
     - Y (pd.Series): A pandas Series of step counts.
     - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
+    - min_wear_per_day (float, optional): The minimum required wear time (in minutes) for a day to be considered valid. Defaults to 21 hours.
+    - min_wear_per_hour (float, optional): The minimum required wear time (in minutes) for an hour bin to be considered valid. Defaults to 50 minutes.
+    - min_wear_per_minute (float, optional): The minimum required wear time (in minutes) for a minute bin to be considered valid. Defaults to 0.5 minutes (30 seconds).
 
     Returns:
     - dict: A dictionary containing various summary step count statistics.
@@ -627,9 +645,9 @@ def summarize_steps(
     # steps
     if adjust_estimates:
         # adjusted estimates account for NAs
-        minutely_steps = Y.resample('T').agg(_sum, min_wear=0.5, dt=dt).rename('Steps')  # up to 30s/min missingness
-        hourly_steps = Y.resample('H').agg(_sum, min_wear=50, dt=dt).rename('Steps')  # up to 10min/h missingness
-        daily_steps = Y.resample('D').agg(_sum, min_wear=21 * 60, dt=dt).rename('Steps')  # up to 3h/d missingness
+        minutely_steps = Y.resample('T').agg(_sum, min_wear=min_wear_per_minute, dt=dt).rename('Steps')  # up to 30s/min missingness
+        hourly_steps = Y.resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt).rename('Steps')  # up to 10min/h missingness
+        daily_steps = Y.resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt).rename('Steps')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week = utils.impute_days(daily_steps).groupby(daily_steps.index.weekday).mean()
@@ -675,9 +693,9 @@ def summarize_steps(
     # walking
     if adjust_estimates:
         # adjusted estimates account for NAs
-        # minutely_walk = (W.resample('T').agg(_sum, min_wear=0.5, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 30s/min missingness
-        hourly_walk = (W.resample('H').agg(_sum, min_wear=50, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
-        daily_walk = (W.resample('D').agg(_sum, min_wear=21 * 60, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
+        # minutely_walk = (W.resample('T').agg(_sum, min_wear=min_wear_per_minute, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 30s/min missingness
+        hourly_walk = (W.resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
+        daily_walk = (W.resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week_walk = utils.impute_days(daily_walk).groupby(daily_walk.index.weekday).mean()
@@ -723,7 +741,7 @@ def summarize_steps(
     # time of accumulated steps
     if adjust_estimates:
         # adjusted estimates account for NAs
-        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at, min_wear=21 * 60, dt=dt).unstack(1)  # up to 3h/d missingness
+        daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at, min_wear=min_wear_per_day, dt=dt).unstack(1)  # up to 3h/d missingness
     else:
         # crude (unadjusted) estimates ignore NAs
         daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
