@@ -1,5 +1,8 @@
 # stepcount
 
+[![Github all releases](https://img.shields.io/github/release/OxWearables/stepcount.svg)](https://github.com/OxWearables/stepcount/releases/)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.14535974.svg)](https://doi.org/10.5281/zenodo.14535974)
+
 Improved step counting based on a foundation model for wrist-worn accelerometers.
 
 The foundation model was trained using self-supervised learning on the large-scale [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649), and fine-tuned on the [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
