@@ -197,6 +197,14 @@ def main():
     info['StepsDayMed_Weekday'] = steps_summary['weekday_med_steps']
     info['StepsDayMin_Weekday'] = steps_summary['weekday_min_steps']
     info['StepsDayMax_Weekday'] = steps_summary['weekday_max_steps']
+    # steps top 1
+    info['StepsTop1(steps/min)'] = steps_summary['med_top1']
+    info['StepsTop1(steps/min)_Weekend'] = steps_summary['weekend_med_top1']
+    info['StepsTop1(steps/min)_Weekday'] = steps_summary['weekday_med_top1']
+    # steps top 30
+    info['StepsTop30(steps/min)'] = steps_summary['med_top30']
+    info['StepsTop30(steps/min)_Weekend'] = steps_summary['weekend_med_top30']
+    info['StepsTop30(steps/min)_Weekday'] = steps_summary['weekday_med_top30']
     # walking, overall stats
     info['TotalWalking(mins)'] = steps_summary['total_walk']
     info['WalkingDayAvg(mins)'] = steps_summary['avg_walk']
@@ -249,6 +257,14 @@ def main():
     info['StepsDayMedAdjusted_Weekday'] = steps_summary_adj['weekday_med_steps']
     info['StepsDayMinAdjusted_Weekday'] = steps_summary_adj['weekday_min_steps']
     info['StepsDayMaxAdjusted_Weekday'] = steps_summary_adj['weekday_max_steps']
+    # steps top 1
+    info['StepsTop1Adjusted(steps/min)'] = steps_summary_adj['med_top1']
+    info['StepsTop1Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top1']
+    info['StepsTop1Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top1']
+    # steps top 30
+    info['StepsTop30Adjusted(steps/min)'] = steps_summary_adj['med_top30']
+    info['StepsTop30Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top30']
+    info['StepsTop30Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top30']
     # walking, overall stats
     info['TotalWalkingAdjusted(mins)'] = steps_summary_adj['total_walk']
     info['WalkingDayAvgAdjusted(mins)'] = steps_summary_adj['avg_walk']
@@ -618,6 +634,11 @@ def summarize_steps(
             return np.nan
         return x.median()
 
+    def _nlargest(x, min_wear=None, n=1):
+        if not _is_enough(x, min_wear, dt):
+            return np.nan
+        return x.nlargest(n).mean()
+
     def _percentile_at(x, ps=(5, 25, 50, 75, 95), min_wear=None, dt=None):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
         if not _is_enough(x, min_wear, dt):
@@ -669,6 +690,19 @@ def summarize_steps(
         weekday_med_steps = day_of_week[day_of_week.index < 5].median()
         weekday_min_steps = day_of_week[day_of_week.index < 5].min()
         weekday_max_steps = day_of_week[day_of_week.index < 5].max()
+
+        daily_top1 = minutely_steps.resample('D').agg(_nlargest, min_wear=1, n=1).rename('StepsTop1(steps/min)')
+        top1_7d = utils.impute_days(daily_top1).groupby(daily_top1.index.weekday).mean()
+        med_top1 = top1_7d.median()
+        weekend_med_top1 = top1_7d[top1_7d.index >= 5].median()
+        weekday_med_top1 = top1_7d[top1_7d.index < 5].median()
+
+        daily_top30 = minutely_steps.resample('D').agg(_nlargest, min_wear=30, n=30).rename('StepsTop30(steps/min)')
+        top30_7d = utils.impute_days(daily_top30).groupby(daily_top30.index.weekday).mean()
+        med_top30 = top30_7d.median()
+        weekend_med_top30 = top30_7d[top30_7d.index >= 5].median()
+        weekday_med_top30 = top30_7d[top30_7d.index < 5].median()
+
     else:
         # crude (unadjusted) estimates ignore NAs
         minutely_steps = Y.resample('T').agg(_sum).rename('Steps')
@@ -688,6 +722,16 @@ def summarize_steps(
         weekday_med_steps = daily_steps[daily_steps.index.weekday < 5].median()
         weekday_min_steps = daily_steps[daily_steps.index.weekday < 5].min()
         weekday_max_steps = daily_steps[daily_steps.index.weekday < 5].max()
+
+        daily_top1 = minutely_steps.resample('D').agg(_nlargest, min_wear=1, n=1).rename('StepsTop1(steps/min)')
+        med_top1 = daily_top1.median()
+        weekend_med_top1 = daily_top1[daily_top1.index.weekday >= 5].median()
+        weekday_med_top1 = daily_top1[daily_top1.index.weekday < 5].median()
+
+        daily_top30 = minutely_steps.resample('D').agg(_nlargest, min_wear=30, n=30).rename('StepsTop30(steps/min)')
+        med_top30 = daily_top30.median()
+        weekend_med_top30 = daily_top30[daily_top30.index.weekday >= 5].median()
+        weekday_med_top30 = daily_top30[daily_top30.index.weekday < 5].median()
 
     total_steps = daily_steps.sum() if not daily_steps.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
     # weekend/weekday totals
@@ -763,6 +807,8 @@ def summarize_steps(
     daily_steps = pd.concat([
         daily_walk,
         daily_steps.round().astype(pd.Int64Dtype()),
+        daily_top1,
+        daily_top30,
         # convert timedelta to human-friendly format
         daily_ptile_at.rename(columns={
             'p05_at': 'Steps5thAt',
@@ -791,6 +837,12 @@ def summarize_steps(
     weekday_med_steps = utils.nanint(np.round(weekday_med_steps))
     weekday_min_steps = utils.nanint(np.round(weekday_min_steps))
     weekday_max_steps = utils.nanint(np.round(weekday_max_steps))
+    med_top1 = utils.nanint(np.round(med_top1))
+    weekend_med_top1 = utils.nanint(np.round(weekend_med_top1))
+    weekday_med_top1 = utils.nanint(np.round(weekday_med_top1))
+    med_top30 = utils.nanint(np.round(med_top30))
+    weekend_med_top30 = utils.nanint(np.round(weekend_med_top30))
+    weekday_med_top30 = utils.nanint(np.round(weekday_med_top30))
     hour_steps = hour_steps.round().astype(pd.Int64Dtype())
     weekend_hour_steps = weekend_hour_steps.round().astype(pd.Int64Dtype())
     weekday_hour_steps = weekday_hour_steps.round().astype(pd.Int64Dtype())
@@ -819,6 +871,14 @@ def summarize_steps(
         'weekday_med_steps': weekday_med_steps,
         'weekday_min_steps': weekday_min_steps,
         'weekday_max_steps': weekday_max_steps,
+        # steps top 1
+        'med_top1': med_top1,
+        'weekend_med_top1': weekend_med_top1,
+        'weekday_med_top1': weekday_med_top1,
+        # steps top 30
+        'med_top30': med_top30,
+        'weekend_med_top30': weekend_med_top30,
+        'weekday_med_top30': weekday_med_top30,
         # walking, overall stats
         'total_walk': total_walk,
         'avg_walk': avg_walk,
