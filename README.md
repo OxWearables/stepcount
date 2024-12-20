@@ -1,8 +1,8 @@
 # stepcount
 
-A step-counting model based on self-supervised learning for wrist-worn accelerometer data.
+Improved step counting based on a foundation model for wrist-worn accelerometers.
 
-The SSL model was pre-trained using the large-scale [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649), and fine-tuned on the [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
+The foundation model was trained using self-supervised learning on the large-scale [UK Biobank Accelerometer Dataset](https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0169649), and fine-tuned on the [OxWalk Dataset](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
 
 The command-line tool can process Axivity AX3 files (UK Biobank, China Kadoorie Biobank) directly. For consumer devices like Fitbit and Apple Watch, convert them to raw CSV first.
 
