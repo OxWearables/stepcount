@@ -1,22 +1,19 @@
 When using this tool, please consider citing the following works:
 
 1. Small SR, Chan S, Walmsley R, et al. (2023)
-[Development and Validation of a Machine Learning Wrist-worn Step Detection Algorithm with Deployment in the UK Biobank](https://www.medrxiv.org/content/10.1101/2023.02.20.23285750v1).
-medRxiv. DOI: 10.1101/2023.02.20.23285750
-    
-```
-@article {Small2023.02.20.23285750,
-	author = {Small, Scott R and Chan, Shing and Walmsley, Rosemary and von Fritsch, Lennart and Acquah, Aidan and Mertes, Gert and Feakins, Benjamin G and Creagh, Andrew and Strange, Adam and Matthews, Charles E and Clifton, David A and Price, Andrew J and Khalid, Sara and Bennett, Derrick and Doherty, Aiden},
-	title = {Development and Validation of a Machine Learning Wrist-worn Step Detection Algorithm with Deployment in the UK Biobank},
-	elocation-id = {2023.02.20.23285750},
-	year = {2023},
-	doi = {10.1101/2023.02.20.23285750},
-	publisher = {Cold Spring Harbor Laboratory Press},
-	URL = {https://www.medrxiv.org/content/early/2023/02/22/2023.02.20.23285750},
-	eprint = {https://www.medrxiv.org/content/early/2023/02/22/2023.02.20.23285750.full.pdf},
-	journal = {medRxiv}
-}
+[Self-Supervised Machine Learning to Characterize Step Counts from Wrist-Worn Accelerometers in the UK Biobank](https://journals.lww.com/acsm-msse/fulltext/2024/10000/self_supervised_machine_learning_to_characterize.9.aspx).
+Medicine & Science in Sports & Exercise. DOI: 10.1249/MSS.0000000000003478
 
+```
+@article{small2024self,
+  title={Self-Supervised Machine Learning to Characterize Step Counts from Wrist-Worn Accelerometers in the UK Biobank},
+  author={Small, Scott R and Chan, Shing and Walmsley, Rosemary and von Fritsch, Lennart and Acquah, Aidan and Mertes, Gert and Feakins, Benjamin G and Creagh, Andrew and Strange, Adam and Matthews, Charles E and others},
+  journal={Medicine and Science in Sports and Exercise},
+  volume={56},
+  number={10},
+  pages={1945},
+  year={2024}
+}
 ```
 
 2. Small SR, von Fritsch L, Doherty A, et al. (2023)
