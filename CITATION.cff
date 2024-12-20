@@ -1,0 +1,22 @@
+cff-version: 1.0.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Chan"
+  given-names: "Shing"
+  orcid: "https://orcid.org/0000-0003-1840-0451"
+- family-names: "Small"
+  given-names: "Scott R"
+  orcid: "https://orcid.org/0000-0003-3603-8062"
+- family-names: "Acquah"
+  given-names: "Aidan"
+  orcid: "https://orcid.org/0000-0002-3241-1280"
+- family-names: "Mertes"
+  given-names: "Gert"
+  # orcid: 
+- family-names: "Doherty"
+  given-names: "Aiden"
+  orcid: "https://orcid.org/0000-0001-9600-5575"
+title: "Improved Step Counting via Foundation Models for Wrist-Worn Accelerometers"
+doi: 10.5281/zenodo.14535974
+date-released: 2023-02-10
+url: "https://github.com/OxWearables/stepcount"
