@@ -60,15 +60,18 @@ def main():
                         type=float, default=50)
     parser.add_argument("--min-wear-per-minute", help="The minimum required wear time (in minutes) for a minute bin to be considered valid.",
                         type=float, default=0.5)
-    parser.add_argument("--peak1-min-walk-per-day",
-                        help="The minimum required walking time (in minutes) in a day for peak1 calculation.",
-                        type=float, default=10)
-    parser.add_argument("--peak30-min-walk-per-day",
-                        help="The minimum required walking time (in minutes) in a day for peak30 calculation.",
-                        type=float, default=30)
-    parser.add_argument("--p95-min-walk-per-day",
-                        help="The minimum required walking time (in minutes) in a day for p95 calculation.",
-                        type=float, default=10)
+    # parser.add_argument("--peak1-min-walk-per-day",
+    #                     help="The minimum required walking time (in minutes) in a day for peak1 calculation.",
+    #                     type=float, default=10)
+    # parser.add_argument("--peak30-min-walk-per-day",
+    #                     help="The minimum required walking time (in minutes) in a day for peak30 calculation.",
+    #                     type=float, default=30)
+    # parser.add_argument("--p95-min-walk-per-day",
+    #                     help="The minimum required walking time (in minutes) in a day for p95 calculation.",
+    #                     type=float, default=10)
+    parser.add_argument("--min-walk-per-day",
+                        help="The minimum required walking time (in minutes) in a day for metrics calculation.",
+                        type=float, default=5)
     parser.add_argument("--bouts-min-walk", help="Minimum percentage of walking for a bout to be considered valid.",
                         type=float, default=0.8)
     parser.add_argument("--bouts-max-idle", help="Maximum idle (in windows) before a bout is considered to have ended.",
@@ -284,9 +287,7 @@ def main():
     # Cadence summary
     cadence_summary = summarize_cadence(
         Y, model.steptol,
-        peak1_min_walk_per_day=args.peak1_min_walk_per_day,
-        peak30_min_walk_per_day=args.peak30_min_walk_per_day,
-        p95_min_walk_per_day=args.p95_min_walk_per_day
+        min_walk_per_day=args.min_walk_per_day
     )
     # overall stats
     info['CadencePeak1(steps/min)'] = cadence_summary['cadence_peak1']
@@ -304,9 +305,7 @@ def main():
     # Cadence summary, adjusted
     cadence_summary_adj = summarize_cadence(
         Y, model.steptol, 
-        peak1_min_walk_per_day=args.peak1_min_walk_per_day,
-        peak30_min_walk_per_day=args.peak30_min_walk_per_day,
-        p95_min_walk_per_day=args.p95_min_walk_per_day,
+        min_walk_per_day=args.min_walk_per_day,
         adjust_estimates=True
     )
     info['CadencePeak1Adjusted(steps/min)'] = cadence_summary_adj['cadence_peak1']
@@ -852,9 +851,7 @@ def summarize_steps(
 def summarize_cadence(
     Y: pd.Series,
     steptol: int = 3,
-    peak1_min_walk_per_day: int = 10,
-    peak30_min_walk_per_day: int = 30,
-    p95_min_walk_per_day: int = 10,
+    min_walk_per_day: int = 5,
     adjust_estimates: bool = False
 ):
     """
@@ -863,9 +860,7 @@ def summarize_cadence(
     Parameters:
     - Y (pd.Series): A pandas Series of step counts.
     - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
-    - peak1_min_walk_per_day (int, optional): The minimum number of walking minutes per day for peak1 cadence calculation. Defaults to 10 minutes.
-    - peak30_min_walk_per_day (int, optional): The minimum number of walking minutes per day for peak30 cadence calculation. Defaults to 30 minutes.
-    - p95_min_walk_per_day (int, optional): The minimum number of walking minutes per day for 95th percentile cadence calculation. Defaults to 10 minutes.
+    - min_walk_per_day (int, optional): The minimum number of walking minutes per day for cadence calculation. Defaults to 5 minutes.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
 
     Returns:
@@ -877,7 +872,7 @@ def summarize_cadence(
 
     # TODO: split walking and running cadence?
 
-    def _cadence_max(x, min_steps_per_min, min_walk_per_day=30, n=1):
+    def _cadence_max(x, min_steps_per_min, min_walk_per_day=5, n=1):
         y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
@@ -885,7 +880,7 @@ def summarize_cadence(
             return np.nan
         return y.nlargest(n, keep='all').mean()
 
-    def _cadence_p95(x, min_steps_per_min, min_walk_per_day=30):
+    def _cadence_p95(x, min_steps_per_min, min_walk_per_day=5):
         y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
@@ -899,9 +894,9 @@ def summarize_cadence(
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
 
-    daily_cadence_peak1 = minutely.resample('D').agg(_cadence_max, min_steps_per_min=min_steps_per_min, min_walk_per_day=peak1_min_walk_per_day, n=1).rename('CadencePeak1(steps/min)')
-    daily_cadence_peak30 = minutely.resample('D').agg(_cadence_max, min_steps_per_min=min_steps_per_min, min_walk_per_day=peak30_min_walk_per_day, n=30).rename('CadencePeak30(steps/min)')
-    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95, min_steps_per_min=min_steps_per_min, min_walk_per_day=p95_min_walk_per_day).rename('Cadence95th(steps/min)')
+    daily_cadence_peak1 = minutely.resample('D').agg(_cadence_max, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day, n=1).rename('CadencePeak1(steps/min)')
+    daily_cadence_peak30 = minutely.resample('D').agg(_cadence_max, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day, n=30).rename('CadencePeak30(steps/min)')
+    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day).rename('Cadence95th(steps/min)')
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Mean of empty slice')
