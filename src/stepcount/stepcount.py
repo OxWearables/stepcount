@@ -191,6 +191,38 @@ def main():
     info['StepsDayMed_Weekday'] = steps_summary['weekday_med_steps']
     info['StepsDayMin_Weekday'] = steps_summary['weekday_min_steps']
     info['StepsDayMax_Weekday'] = steps_summary['weekday_max_steps']
+    # steps top 1
+    info['StepsTop1(steps/min)'] = steps_summary['med_top1']
+    info['StepsTop1(steps/min)_Weekend'] = steps_summary['weekend_med_top1']
+    info['StepsTop1(steps/min)_Weekday'] = steps_summary['weekday_med_top1']
+    # steps top 5
+    info['StepsTop5(steps/min)'] = steps_summary['med_top5']
+    info['StepsTop5(steps/min)_Weekend'] = steps_summary['weekend_med_top5']
+    info['StepsTop5(steps/min)_Weekday'] = steps_summary['weekday_med_top5']
+    # steps top 10
+    info['StepsTop10(steps/min)'] = steps_summary['med_top10']
+    info['StepsTop10(steps/min)_Weekend'] = steps_summary['weekend_med_top10']
+    info['StepsTop10(steps/min)_Weekday'] = steps_summary['weekday_med_top10']
+    # steps top 30
+    info['StepsTop30(steps/min)'] = steps_summary['med_top30']
+    info['StepsTop30(steps/min)_Weekend'] = steps_summary['weekend_med_top30']
+    info['StepsTop30(steps/min)_Weekday'] = steps_summary['weekday_med_top30']
+    # steps 95th
+    info['Steps95th(steps/min)'] = steps_summary['med_p95']
+    info['Steps95th(steps/min)_Weekend'] = steps_summary['weekend_med_p95']
+    info['Steps95th(steps/min)_Weekday'] = steps_summary['weekday_med_p95']
+    # steps 25th
+    info['Steps25th(steps/min)'] = steps_summary['med_p25']
+    info['Steps25th(steps/min)_Weekend'] = steps_summary['weekend_med_p25']
+    info['Steps25th(steps/min)_Weekday'] = steps_summary['weekday_med_p25']
+    # steps 50th
+    info['Steps50th(steps/min)'] = steps_summary['med_p50']
+    info['Steps50th(steps/min)_Weekend'] = steps_summary['weekend_med_p50']
+    info['Steps50th(steps/min)_Weekday'] = steps_summary['weekday_med_p50']
+    # steps 75th
+    info['Steps75th(steps/min)'] = steps_summary['med_p75']
+    info['Steps75th(steps/min)_Weekend'] = steps_summary['weekend_med_p75']
+    info['Steps75th(steps/min)_Weekday'] = steps_summary['weekday_med_p75']
     # walking, overall stats
     info['TotalWalking(mins)'] = steps_summary['total_walk']
     info['WalkingDayAvg(mins)'] = steps_summary['avg_walk']
@@ -243,6 +275,38 @@ def main():
     info['StepsDayMedAdjusted_Weekday'] = steps_summary_adj['weekday_med_steps']
     info['StepsDayMinAdjusted_Weekday'] = steps_summary_adj['weekday_min_steps']
     info['StepsDayMaxAdjusted_Weekday'] = steps_summary_adj['weekday_max_steps']
+    # steps top 1
+    info['StepsTop1Adjusted(steps/min)'] = steps_summary_adj['med_top1']
+    info['StepsTop1Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top1']
+    info['StepsTop1Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top1']
+    # steps top 5
+    info['StepsTop5Adjusted(steps/min)'] = steps_summary_adj['med_top5']
+    info['StepsTop5Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top5']
+    info['StepsTop5Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top5']
+    # steps top 10
+    info['StepsTop10Adjusted(steps/min)'] = steps_summary_adj['med_top10']
+    info['StepsTop10Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top10']
+    info['StepsTop10Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top10']
+    # steps top 30
+    info['StepsTop30Adjusted(steps/min)'] = steps_summary_adj['med_top30']
+    info['StepsTop30Adjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_top30']
+    info['StepsTop30Adjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_top30']
+    # steps 95th
+    info['Steps95thAdjusted(steps/min)'] = steps_summary_adj['med_p95']
+    info['Steps95thAdjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_p95']
+    info['Steps95thAdjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_p95']
+    # steps 25th
+    info['Steps25thAdjusted(steps/min)'] = steps_summary_adj['med_p25']
+    info['Steps25thAdjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_p25']
+    info['Steps25thAdjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_p25']
+    # steps 50th
+    info['Steps50thAdjusted(steps/min)'] = steps_summary_adj['med_p50']
+    info['Steps50thAdjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_p50']
+    info['Steps50thAdjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_p50']
+    # steps 75th
+    info['Steps75thAdjusted(steps/min)'] = steps_summary_adj['med_p75']
+    info['Steps75thAdjusted(steps/min)_Weekend'] = steps_summary_adj['weekend_med_p75']
+    info['Steps75thAdjusted(steps/min)_Weekday'] = steps_summary_adj['weekday_med_p75']
     # walking, overall stats
     info['TotalWalkingAdjusted(mins)'] = steps_summary_adj['total_walk']
     info['WalkingDayAvgAdjusted(mins)'] = steps_summary_adj['avg_walk']
@@ -276,33 +340,63 @@ def main():
     info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekday': steps_summary_adj['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Cadence summary
-    cadence_summary = summarize_cadence(Y, model.steptol, min_walk_per_day=args.min_walk_per_day)
+    cadence_summary = summarize_cadence(Y, steptol=model.steptol, min_walk_per_day=args.min_walk_per_day)
     # overall stats
     info['CadenceTop1(steps/min)'] = cadence_summary['cadence_top1']
+    info['CadenceTop5(steps/min)'] = cadence_summary['cadence_top5']
+    info['CadenceTop10(steps/min)'] = cadence_summary['cadence_top10']
     info['CadenceTop30(steps/min)'] = cadence_summary['cadence_top30']
     info['Cadence95th(steps/min)'] = cadence_summary['cadence_p95']
+    info['Cadence25th(steps/min)'] = cadence_summary['cadence_p25']
+    info['Cadence50th(steps/min)'] = cadence_summary['cadence_p50']
+    info['Cadence75th(steps/min)'] = cadence_summary['cadence_p75']
     # weekend stats
     info['CadenceTop1(steps/min)_Weekend'] = cadence_summary['weekend_cadence_top1']
+    info['CadenceTop5(steps/min)_Weekend'] = cadence_summary['weekend_cadence_top5']
+    info['CadenceTop10(steps/min)_Weekend'] = cadence_summary['weekend_cadence_top10']
     info['CadenceTop30(steps/min)_Weekend'] = cadence_summary['weekend_cadence_top30']
     info['Cadence95th(steps/min)_Weekend'] = cadence_summary['weekend_cadence_p95']
+    info['Cadence25th(steps/min)_Weekend'] = cadence_summary['weekend_cadence_p25']
+    info['Cadence50th(steps/min)_Weekend'] = cadence_summary['weekend_cadence_p50']
+    info['Cadence75th(steps/min)_Weekend'] = cadence_summary['weekend_cadence_p75']
     # weekday stats
     info['CadenceTop1(steps/min)_Weekday'] = cadence_summary['weekday_cadence_top1']
+    info['CadenceTop5(steps/min)_Weekday'] = cadence_summary['weekday_cadence_top5']
+    info['CadenceTop10(steps/min)_Weekday'] = cadence_summary['weekday_cadence_top10']
     info['CadenceTop30(steps/min)_Weekday'] = cadence_summary['weekday_cadence_top30']
     info['Cadence95th(steps/min)_Weekday'] = cadence_summary['weekday_cadence_p95']
+    info['Cadence25th(steps/min)_Weekday'] = cadence_summary['weekday_cadence_p25']
+    info['Cadence50th(steps/min)_Weekday'] = cadence_summary['weekday_cadence_p50']
+    info['Cadence75th(steps/min)_Weekday'] = cadence_summary['weekday_cadence_p75']
 
     # Cadence summary, adjusted
-    cadence_summary_adj = summarize_cadence(Y, model.steptol, min_walk_per_day=args.min_walk_per_day, adjust_estimates=True)
+    cadence_summary_adj = summarize_cadence(Y, steptol=model.steptol, min_walk_per_day=args.min_walk_per_day, adjust_estimates=True)
     info['CadenceTop1Adjusted(steps/min)'] = cadence_summary_adj['cadence_top1']
+    info['CadenceTop5Adjusted(steps/min)'] = cadence_summary_adj['cadence_top5']
+    info['CadenceTop10Adjusted(steps/min)'] = cadence_summary_adj['cadence_top10']
     info['CadenceTop30Adjusted(steps/min)'] = cadence_summary_adj['cadence_top30']
     info['Cadence95thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p95']
+    info['Cadence25thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p25']
+    info['Cadence50thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p50']
+    info['Cadence75thAdjusted(steps/min)'] = cadence_summary_adj['cadence_p75']
     # weekend stats
     info['CadenceTop1Adjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_top1']
+    info['CadenceTop5Adjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_top5']
+    info['CadenceTop10Adjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_top10']
     info['CadenceTop30Adjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_top30']
     info['Cadence95thAdjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_p95']
+    info['Cadence25thAdjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_p25']
+    info['Cadence50thAdjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_p50']
+    info['Cadence75thAdjusted(steps/min)_Weekend'] = cadence_summary_adj['weekend_cadence_p75']
     # weekday stats
     info['CadenceTop1Adjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_top1']
+    info['CadenceTop5Adjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_top5']
+    info['CadenceTop10Adjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_top10']
     info['CadenceTop30Adjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_top30']
     info['Cadence95thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p95']
+    info['Cadence25thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p25']
+    info['Cadence50thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p50']
+    info['Cadence75thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p75']
 
     # Bouts summary
     bouts_summary = summarize_bouts(Y, W, data, bouts_min_walk=args.bouts_min_walk, bouts_max_idle=args.bouts_max_idle)
@@ -601,6 +695,16 @@ def summarize_steps(
             return np.nan
         return x.median()
 
+    def _nlargest(x, min_wear=None, n=1):
+        if not _is_enough(x, min_wear, dt):
+            return np.nan
+        return x.nlargest(n).mean()
+
+    def _percentile(x, min_wear=None, p=25):
+        if not _is_enough(x, min_wear, dt):
+            return np.nan
+        return x.quantile(p / 100)
+
     def _percentile_at(x, ps=(5, 25, 50, 75, 95), min_wear=None, dt=None):
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
         if not _is_enough(x, min_wear, dt):
@@ -652,6 +756,55 @@ def summarize_steps(
         weekday_med_steps = day_of_week[day_of_week.index < 5].median()
         weekday_min_steps = day_of_week[day_of_week.index < 5].min()
         weekday_max_steps = day_of_week[day_of_week.index < 5].max()
+
+        daily_top1 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=1).rename('StepsTop1(steps/min)')
+        top1_7d = utils.impute_days(daily_top1).groupby(daily_top1.index.weekday).mean()
+        med_top1 = top1_7d.median()
+        weekend_med_top1 = top1_7d[top1_7d.index >= 5].median()
+        weekday_med_top1 = top1_7d[top1_7d.index < 5].median()
+
+        daily_top5 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=5).rename('StepsTop5(steps/min)')
+        top5_7d = utils.impute_days(daily_top5).groupby(daily_top5.index.weekday).mean()
+        med_top5 = top5_7d.median()
+        weekend_med_top5 = top5_7d[top5_7d.index >= 5].median()
+        weekday_med_top5 = top5_7d[top5_7d.index < 5].median()
+
+        daily_top10 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=10).rename('StepsTop10(steps/min)')
+        top10_7d = utils.impute_days(daily_top10).groupby(daily_top10.index.weekday).mean()
+        med_top10 = top10_7d.median()
+        weekend_med_top10 = top10_7d[top10_7d.index >= 5].median()
+        weekday_med_top10 = top10_7d[top10_7d.index < 5].median()
+
+        daily_top30 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=30).rename('StepsTop30(steps/min)')
+        top30_7d = utils.impute_days(daily_top30).groupby(daily_top30.index.weekday).mean()
+        med_top30 = top30_7d.median()
+        weekend_med_top30 = top30_7d[top30_7d.index >= 5].median()
+        weekday_med_top30 = top30_7d[top30_7d.index < 5].median()
+
+        daily_p95 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=95).rename('Steps95th(steps/min)')
+        p95_7d = utils.impute_days(daily_p95).groupby(daily_p95.index.weekday).mean()
+        med_p95 = p95_7d.median()
+        weekend_med_p95 = p95_7d[p95_7d.index >= 5].median()
+        weekday_med_p95 = p95_7d[p95_7d.index < 5].median()
+
+        daily_p25 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=25).rename('Steps25th(steps/min)')
+        p25_7d = utils.impute_days(daily_p25).groupby(daily_p25.index.weekday).mean()
+        med_p25 = p25_7d.median()
+        weekend_med_p25 = p25_7d[p25_7d.index >= 5].median()
+        weekday_med_p25 = p25_7d[p25_7d.index < 5].median()
+
+        daily_p50 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=50).rename('Steps50th(steps/min)')
+        p50_7d = utils.impute_days(daily_p50).groupby(daily_p50.index.weekday).mean()
+        med_p50 = p50_7d.median()
+        weekend_med_p50 = p50_7d[p50_7d.index >= 5].median()
+        weekday_med_p50 = p50_7d[p50_7d.index < 5].median()
+
+        daily_p75 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=75).rename('Steps75th(steps/min)')
+        p75_7d = utils.impute_days(daily_p75).groupby(daily_p75.index.weekday).mean()
+        med_p75 = p75_7d.median()
+        weekend_med_p75 = p75_7d[p75_7d.index >= 5].median()
+        weekday_med_p75 = p75_7d[p75_7d.index < 5].median()
+
     else:
         # crude (unadjusted) estimates ignore NAs
         minutely_steps = Y.resample('T').agg(_sum).rename('Steps')
@@ -671,6 +824,46 @@ def summarize_steps(
         weekday_med_steps = daily_steps[daily_steps.index.weekday < 5].median()
         weekday_min_steps = daily_steps[daily_steps.index.weekday < 5].min()
         weekday_max_steps = daily_steps[daily_steps.index.weekday < 5].max()
+
+        daily_top1 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=1).rename('StepsTop1(steps/min)')
+        med_top1 = daily_top1.median()
+        weekend_med_top1 = daily_top1[daily_top1.index.weekday >= 5].median()
+        weekday_med_top1 = daily_top1[daily_top1.index.weekday < 5].median()
+
+        daily_top5 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=1).rename('StepsTop5(steps/min)')
+        med_top5 = daily_top5.median()
+        weekend_med_top5 = daily_top5[daily_top5.index.weekday >= 5].median()
+        weekday_med_top5 = daily_top5[daily_top5.index.weekday < 5].median()
+
+        daily_top10 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=1).rename('StepsTop10(steps/min)')
+        med_top10 = daily_top10.median()
+        weekend_med_top10 = daily_top10[daily_top10.index.weekday >= 5].median()
+        weekday_med_top10 = daily_top10[daily_top10.index.weekday < 5].median()
+
+        daily_top30 = minutely_steps.resample('D').agg(_nlargest, min_wear=min_wear_per_day, n=30).rename('StepsTop30(steps/min)')
+        med_top30 = daily_top30.median()
+        weekend_med_top30 = daily_top30[daily_top30.index.weekday >= 5].median()
+        weekday_med_top30 = daily_top30[daily_top30.index.weekday < 5].median()
+
+        daily_p95 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=95).rename('Steps95th(steps/min)')
+        med_p95 = daily_p95.median()
+        weekend_med_p95 = daily_p95[daily_p95.index.weekday >= 5].median()
+        weekday_med_p95 = daily_p95[daily_p95.index.weekday < 5].median()
+
+        daily_p25 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=25).rename('Steps25th(steps/min)')
+        med_p25 = daily_p25.median()
+        weekend_med_p25 = daily_p25[daily_p25.index.weekday >= 5].median()
+        weekday_med_p25 = daily_p25[daily_p25.index.weekday < 5].median()
+
+        daily_p50 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=50).rename('Steps50th(steps/min)')
+        med_p50 = daily_p50.median()
+        weekend_med_p50 = daily_p50[daily_p50.index.weekday >= 5].median()
+        weekday_med_p50 = daily_p50[daily_p50.index.weekday < 5].median()
+
+        daily_p75 = minutely_steps.resample('D').agg(_percentile, min_wear=min_wear_per_day, p=75).rename('Steps75th(steps/min)')
+        med_p75 = daily_p75.median()
+        weekend_med_p75 = daily_p75[daily_p75.index.weekday >= 5].median()
+        weekday_med_p75 = daily_p75[daily_p75.index.weekday < 5].median()
 
     total_steps = daily_steps.sum() if not daily_steps.isna().all() else np.nan  # note that .sum() returns 0 if all-NaN
     # weekend/weekday totals
@@ -746,6 +939,14 @@ def summarize_steps(
     daily_steps = pd.concat([
         daily_walk,
         daily_steps.round().astype(pd.Int64Dtype()),
+        daily_top1,
+        daily_top5,
+        daily_top10,
+        daily_top30,
+        daily_p95,
+        daily_p25,
+        daily_p50,
+        daily_p75,
         # convert timedelta to human-friendly format
         daily_ptile_at.rename(columns={
             'p05_at': 'Steps5thAt',
@@ -774,6 +975,27 @@ def summarize_steps(
     weekday_med_steps = utils.nanint(np.round(weekday_med_steps))
     weekday_min_steps = utils.nanint(np.round(weekday_min_steps))
     weekday_max_steps = utils.nanint(np.round(weekday_max_steps))
+    med_top1 = utils.nanint(np.round(med_top1))
+    weekend_med_top1 = utils.nanint(np.round(weekend_med_top1))
+    weekday_med_top1 = utils.nanint(np.round(weekday_med_top1))
+    med_top5 = utils.nanint(np.round(med_top5))
+    weekend_med_top5 = utils.nanint(np.round(weekend_med_top5))
+    weekday_med_top5 = utils.nanint(np.round(weekday_med_top5))
+    med_top10 = utils.nanint(np.round(med_top10))
+    weekend_med_top10 = utils.nanint(np.round(weekend_med_top10))
+    weekday_med_top10 = utils.nanint(np.round(weekday_med_top10))
+    med_top30 = utils.nanint(np.round(med_top30))
+    weekend_med_top30 = utils.nanint(np.round(weekend_med_top30))
+    weekday_med_top30 = utils.nanint(np.round(weekday_med_top30))
+    med_p25 = utils.nanint(np.round(med_p25))
+    weekend_med_p25 = utils.nanint(np.round(weekend_med_p25))
+    weekday_med_p25 = utils.nanint(np.round(weekday_med_p25))
+    med_p50 = utils.nanint(np.round(med_p50))
+    weekend_med_p50 = utils.nanint(np.round(weekend_med_p50))
+    weekday_med_p50 = utils.nanint(np.round(weekday_med_p50))
+    med_p75 = utils.nanint(np.round(med_p75))
+    weekend_med_p75 = utils.nanint(np.round(weekend_med_p75))
+    weekday_med_p75 = utils.nanint(np.round(weekday_med_p75))
     hour_steps = hour_steps.round().astype(pd.Int64Dtype())
     weekend_hour_steps = weekend_hour_steps.round().astype(pd.Int64Dtype())
     weekday_hour_steps = weekday_hour_steps.round().astype(pd.Int64Dtype())
@@ -802,6 +1024,38 @@ def summarize_steps(
         'weekday_med_steps': weekday_med_steps,
         'weekday_min_steps': weekday_min_steps,
         'weekday_max_steps': weekday_max_steps,
+        # steps top 1
+        'med_top1': med_top1,
+        'weekend_med_top1': weekend_med_top1,
+        'weekday_med_top1': weekday_med_top1,
+        # steps top 5
+        'med_top5': med_top5,
+        'weekend_med_top5': weekend_med_top5,
+        'weekday_med_top5': weekday_med_top5,
+        # steps top 5
+        'med_top10': med_top10,
+        'weekend_med_top10': weekend_med_top10,
+        'weekday_med_top10': weekday_med_top10,
+        # steps top 30
+        'med_top30': med_top30,
+        'weekend_med_top30': weekend_med_top30,
+        'weekday_med_top30': weekday_med_top30,
+        # steps 95th
+        'med_p95': med_p95,
+        'weekend_med_p95': weekend_med_p95,
+        'weekday_med_p95': weekday_med_p95,
+        # steps 25th
+        'med_p25': med_p25,
+        'weekend_med_p25': weekend_med_p25,
+        'weekday_med_p25': weekday_med_p25,
+        # steps 50th
+        'med_p50': med_p50,
+        'weekend_med_p50': weekend_med_p50,
+        'weekday_med_p50': weekday_med_p50,
+        # steps 75th
+        'med_p75': med_p75,
+        'weekend_med_p75': weekend_med_p75,
+        'weekday_med_p75': weekday_med_p75,
         # walking, overall stats
         'total_walk': total_walk,
         'avg_walk': avg_walk,
@@ -854,6 +1108,9 @@ def summarize_cadence(
         summary = summarize_cadence(Y, steptol=3, adjust_estimates=True)
     """
 
+    dt = utils.infer_freq(Y.index).total_seconds()
+    min_steps_per_min = steptol * 60 / dt  # rescale steptol to steps/min
+
     # TODO: split walking and running cadence?
 
     dt = utils.infer_freq(Y.index).total_seconds()
@@ -867,21 +1124,26 @@ def summarize_cadence(
             return np.nan
         return y.nlargest(n, keep='all').mean()
 
-    def _cadence_p95(x, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day):
+    def _cadence_ptile(x, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day, p=50):
         y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
         if len(y) < min_walk_per_day:
             return np.nan
-        return y.quantile(.95)
+        return y.quantile(p / 100)
 
     minutely = Y.resample('T').sum().rename('Steps')  # steps/min
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
 
     daily_cadence_top1 = minutely.resample('D').agg(_cadence_top, n=1).rename('CadenceTop1(steps/min)')
+    daily_cadence_top5 = minutely.resample('D').agg(_cadence_top, n=5).rename('CadenceTop5(steps/min)')
+    daily_cadence_top10 = minutely.resample('D').agg(_cadence_top, n=10).rename('CadenceTop10(steps/min)')
     daily_cadence_top30 = minutely.resample('D').agg(_cadence_top, n=30).rename('CadenceTop30(steps/min)')
-    daily_cadence_p95 = minutely.resample('D').agg(_cadence_p95).rename('Cadence95th(steps/min)')
+    daily_cadence_p95 = minutely.resample('D').agg(_cadence_ptile, p=95).rename('Cadence95th(steps/min)')
+    daily_cadence_p25 = minutely.resample('D').agg(_cadence_ptile, p=25).rename('Cadence25th(steps/min)')
+    daily_cadence_p50 = minutely.resample('D').agg(_cadence_ptile, p=50).rename('Cadence50th(steps/min)')
+    daily_cadence_p75 = minutely.resample('D').agg(_cadence_ptile, p=75).rename('Cadence75th(steps/min)')
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Mean of empty slice')
@@ -891,53 +1153,108 @@ def summarize_cadence(
             # TODO: 7-day padding for shorter recordings
             # TODO: maybe impute output daily_cadence? but skip user-excluded days
             day_of_week_cadence_top1 = utils.impute_days(daily_cadence_top1, method='median').groupby(daily_cadence_top1.index.weekday).median()
+            day_of_week_cadence_top5 = utils.impute_days(daily_cadence_top5, method='median').groupby(daily_cadence_top5.index.weekday).median()
+            day_of_week_cadence_top10 = utils.impute_days(daily_cadence_top10, method='median').groupby(daily_cadence_top10.index.weekday).median()
             day_of_week_cadence_top30 = utils.impute_days(daily_cadence_top30, method='median').groupby(daily_cadence_top30.index.weekday).median()
             day_of_week_cadence_p95 = utils.impute_days(daily_cadence_p95, method='median').groupby(daily_cadence_p95.index.weekday).median()
+            day_of_week_cadence_p25 = utils.impute_days(daily_cadence_p25, method='median').groupby(daily_cadence_p25.index.weekday).median()
+            day_of_week_cadence_p50 = utils.impute_days(daily_cadence_p50, method='median').groupby(daily_cadence_p50.index.weekday).median()
+            day_of_week_cadence_p75 = utils.impute_days(daily_cadence_p75, method='median').groupby(daily_cadence_p75.index.weekday).median()
 
             cadence_top1 = day_of_week_cadence_top1.median()
+            cadence_top5 = day_of_week_cadence_top5.median()
+            cadence_top10 = day_of_week_cadence_top10.median()
             cadence_top30 = day_of_week_cadence_top30.median()
             cadence_p95 = day_of_week_cadence_p95.median()
+            cadence_p25 = day_of_week_cadence_p25.median()
+            cadence_p50 = day_of_week_cadence_p50.median()
+            cadence_p75 = day_of_week_cadence_p75.median()
             # weekend stats
             weekend_cadence_top1 = day_of_week_cadence_top1[day_of_week_cadence_top1.index >= 5].median()
+            weekend_cadence_top5 = day_of_week_cadence_top5[day_of_week_cadence_top5.index >= 5].median()
+            weekend_cadence_top10 = day_of_week_cadence_top10[day_of_week_cadence_top10.index >= 5].median()
             weekend_cadence_top30 = day_of_week_cadence_top30[day_of_week_cadence_top30.index >= 5].median()
             weekend_cadence_p95 = day_of_week_cadence_p95[day_of_week_cadence_p95.index >= 5].median()
+            weekend_cadence_p25 = day_of_week_cadence_p25[day_of_week_cadence_p25.index >= 5].median()
+            weekend_cadence_p50 = day_of_week_cadence_p50[day_of_week_cadence_p50.index >= 5].median()
+            weekend_cadence_p75 = day_of_week_cadence_p75[day_of_week_cadence_p75.index >= 5].median()
             # weekday stats
             weekday_cadence_top1 = day_of_week_cadence_top1[day_of_week_cadence_top1.index < 5].median()
+            weekday_cadence_top5 = day_of_week_cadence_top5[day_of_week_cadence_top5.index < 5].median()
+            weekday_cadence_top10 = day_of_week_cadence_top10[day_of_week_cadence_top10.index < 5].median()
             weekday_cadence_top30 = day_of_week_cadence_top30[day_of_week_cadence_top30.index < 5].median()
             weekday_cadence_p95 = day_of_week_cadence_p95[day_of_week_cadence_p95.index < 5].median()
+            weekday_cadence_p25 = day_of_week_cadence_p25[day_of_week_cadence_p25.index < 5].median()
+            weekday_cadence_p50 = day_of_week_cadence_p50[day_of_week_cadence_p50.index < 5].median()
+            weekday_cadence_p75 = day_of_week_cadence_p75[day_of_week_cadence_p75.index < 5].median()
 
         else:
             cadence_top1 = daily_cadence_top1.median()
+            cadence_top5 = daily_cadence_top5.median()
+            cadence_top10 = daily_cadence_top10.median()
             cadence_top30 = daily_cadence_top30.median()
             cadence_p95 = daily_cadence_p95.median()
+            cadence_p25 = daily_cadence_p25.median()
+            cadence_p50 = daily_cadence_p50.median()
+            cadence_p75 = daily_cadence_p75.median()
             # weekend stats
             weekend_cadence_top1 = daily_cadence_top1[daily_cadence_top1.index.weekday >= 5].median()
+            weekend_cadence_top5 = daily_cadence_top5[daily_cadence_top5.index.weekday >= 5].median()
+            weekend_cadence_top10 = daily_cadence_top10[daily_cadence_top10.index.weekday >= 5].median()
             weekend_cadence_top30 = daily_cadence_top30[daily_cadence_top30.index.weekday >= 5].median()
             weekend_cadence_p95 = daily_cadence_p95[daily_cadence_p95.index.weekday >= 5].median()
+            weekend_cadence_p25 = daily_cadence_p25[daily_cadence_p25.index.weekday >= 5].median()
+            weekend_cadence_p50 = daily_cadence_p50[daily_cadence_p50.index.weekday >= 5].median()
+            weekend_cadence_p75 = daily_cadence_p75[daily_cadence_p75.index.weekday >= 5].median()
             # weekday stats
             weekday_cadence_top1 = daily_cadence_top1[daily_cadence_top1.index.weekday < 5].median()
+            weekday_cadence_top5 = daily_cadence_top5[daily_cadence_top5.index.weekday < 5].median()
+            weekday_cadence_top10 = daily_cadence_top10[daily_cadence_top10.index.weekday < 5].median()
             weekday_cadence_top30 = daily_cadence_top30[daily_cadence_top30.index.weekday < 5].median()
             weekday_cadence_p95 = daily_cadence_p95[daily_cadence_p95.index.weekday < 5].median()
+            weekday_cadence_p25 = daily_cadence_p25[daily_cadence_p25.index.weekday < 5].median()
+            weekday_cadence_p50 = daily_cadence_p50[daily_cadence_p50.index.weekday < 5].median()
+            weekday_cadence_p75 = daily_cadence_p75[daily_cadence_p75.index.weekday < 5].median()
 
     daily = pd.concat([
         daily_cadence_top1.round().astype(pd.Int64Dtype()),
+        daily_cadence_top5.round().astype(pd.Int64Dtype()),
+        daily_cadence_top10.round().astype(pd.Int64Dtype()),
         daily_cadence_top30.round().astype(pd.Int64Dtype()),
         daily_cadence_p95.round().astype(pd.Int64Dtype()),
+        daily_cadence_p25.round().astype(pd.Int64Dtype()),
+        daily_cadence_p50.round().astype(pd.Int64Dtype()),
+        daily_cadence_p75.round().astype(pd.Int64Dtype()),
     ], axis=1)
 
     return {
         'daily': daily,
         'cadence_top1': utils.nanint(np.round(cadence_top1)),
+        'cadence_top5': utils.nanint(np.round(cadence_top5)),
+        'cadence_top10': utils.nanint(np.round(cadence_top10)),
         'cadence_top30': utils.nanint(np.round(cadence_top30)),
         'cadence_p95': utils.nanint(np.round(cadence_p95)),
+        'cadence_p25': utils.nanint(np.round(cadence_p25)),
+        'cadence_p50': utils.nanint(np.round(cadence_p50)),
+        'cadence_p75': utils.nanint(np.round(cadence_p75)),
         # weekend stats
         'weekend_cadence_top1': utils.nanint(np.round(weekend_cadence_top1)),
+        'weekend_cadence_top5': utils.nanint(np.round(weekend_cadence_top5)),
+        'weekend_cadence_top10': utils.nanint(np.round(weekend_cadence_top10)),
         'weekend_cadence_top30': utils.nanint(np.round(weekend_cadence_top30)),
         'weekend_cadence_p95': utils.nanint(np.round(weekend_cadence_p95)),
+        'weekend_cadence_p25': utils.nanint(np.round(weekend_cadence_p25)),
+        'weekend_cadence_p50': utils.nanint(np.round(weekend_cadence_p50)),
+        'weekend_cadence_p75': utils.nanint(np.round(weekend_cadence_p75)),
         # weekday stats
         'weekday_cadence_top1': utils.nanint(np.round(weekday_cadence_top1)),
+        'weekday_cadence_top5': utils.nanint(np.round(weekday_cadence_top5)),
+        'weekday_cadence_top10': utils.nanint(np.round(weekday_cadence_top10)),
         'weekday_cadence_top30': utils.nanint(np.round(weekday_cadence_top30)),
         'weekday_cadence_p95': utils.nanint(np.round(weekday_cadence_p95)),
+        'weekday_cadence_p25': utils.nanint(np.round(weekday_cadence_p25)),
+        'weekday_cadence_p50': utils.nanint(np.round(weekday_cadence_p50)),
+        'weekday_cadence_p75': utils.nanint(np.round(weekday_cadence_p75)),
     }
 
 
