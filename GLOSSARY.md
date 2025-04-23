@@ -74,8 +74,8 @@
 
 ## Cadence
 
-- **CadencePeak1(steps/min)**: Highest cadence per day.
-- **CadencePeak30(steps/min)**: Mean cadence of the thirty most active one-minute epochs per day.
+- **CadenceTop1(steps/min)**: Highest cadence per day.
+- **CadenceTop30(steps/min)**: Mean cadence of the thirty most active one-minute epochs per day.
 - **Cadence95th(steps/min)**: 95th percentile of cadence per day.
 
 *(Weekend and Weekday subsections analogous to Steps above.)*
