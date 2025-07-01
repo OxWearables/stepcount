@@ -102,6 +102,17 @@ def main():
         resample_hz=30 if args.model_type == 'ssl' else None,
         verbose=verbose
     )
+    # Trim data to start of first complete minute to ensure that detection window is 
+    # always alligned with the start of a minute and not with the start of the recording.
+    TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+    cnt = 0
+    while cnt < 10000:
+        start_time = data.index[cnt].strftime(TIME_FORMAT)
+        if start_time.endswith(":00"):
+            data = data.loc[start_time:]
+            break
+        cnt += 1
+    
     info.update(info_read)
 
     # Exclusion: first/last days
