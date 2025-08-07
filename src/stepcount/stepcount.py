@@ -116,7 +116,7 @@ def main():
     info.update(utils.calculate_wear_stats(data))
 
     # If no data, save Info.json and exit
-    if len(data) == 0 or data.isna().any(axis=1).all():  # TODO: check na only on x,y,z cols?
+    if len(data) == 0 or data[['x', 'y', 'z']].isna().any(axis=1).all():
         # Save Info.json
         with open(f"{outdir}/{basename}-Info.json", 'w') as f:
             json.dump(info, f, indent=4, cls=utils.NpEncoder)
