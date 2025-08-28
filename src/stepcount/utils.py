@@ -14,6 +14,7 @@ def read(
     usecols: str = 'time,x,y,z',
     start_time: str = None,
     end_time: str = None,
+    calibration_stdtol_min: float = None,
     sample_rate: float = None,
     resample_hz: str = 'uniform',
     verbose: bool = True
@@ -28,6 +29,8 @@ def read(
     - filepath (str): The path to the file containing activity data.
     - usecols (str, optional): A comma-separated string of column names to use when reading CSV files. 
       Default is 'time,x,y,z'.
+    - calibration_stdtol_min (float, optional): The minimum standard deviation tolerance for detecting stationary periods for calibration. If None,
+      no minimum is applied. Default is None.
     - resample_hz (str, optional): The resampling frequency for the data. If 'uniform', it will use `sample_rate`
       and resample to ensure it is evenly spaced. Default is 'uniform'.
     - sample_rate (float, optional): The sample rate of the data. If None, it will be inferred. Default is None.
@@ -83,6 +86,7 @@ def read(
             data, sample_rate,
             lowpass_hz=None,
             calibrate_gravity=True,
+            calibrate_gravity_kwargs={'stdtol_min': calibration_stdtol_min},
             detect_nonwear=True,
             resample_hz=resample_hz,
             verbose=verbose,
@@ -101,6 +105,7 @@ def read(
             filepath,
             lowpass_hz=None,
             calibrate_gravity=True,
+            calibrate_gravity_kwargs={'stdtol_min': calibration_stdtol_min},
             detect_nonwear=True,
             resample_hz=resample_hz,
             verbose=verbose,
