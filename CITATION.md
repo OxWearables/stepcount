@@ -1,6 +1,6 @@
 When using this tool, please consider citing the following works:
 
-1. Small SR, Chan S, Walmsley R, et al. (2023)
+1. Small SR, Chan S, Walmsley R, et al. (2024)
 [Self-Supervised Machine Learning to Characterize Step Counts from Wrist-Worn Accelerometers in the UK Biobank](https://journals.lww.com/acsm-msse/fulltext/2024/10000/self_supervised_machine_learning_to_characterize.9.aspx).
 Medicine & Science in Sports & Exercise. DOI: 10.1249/MSS.0000000000003478
 
@@ -16,7 +16,7 @@ Medicine & Science in Sports & Exercise. DOI: 10.1249/MSS.0000000000003478
 }
 ```
 
-2. Small SR, von Fritsch L, Doherty A, et al. (2023)
+2. Small SR, von Fritsch L, Doherty A, et al. (2022)
 [OxWalk: Wrist and hip-based activity tracker dataset for free-living step detection and gait recognition](https://ora.ox.ac.uk/objects/uuid:19d3cb34-e2b3-4177-91b6-1bad0e0163e7).
 Oxford University Research Arvive. DOI: 10.5287/bodleian:ORQ2abnbR
 
