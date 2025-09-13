@@ -17,18 +17,21 @@ def read(
     calibration_stdtol_min: float = None,
     sample_rate: float = None,
     resample_hz: str = 'uniform',
+    start_first_complete_minute: bool = False,
     verbose: bool = True
 ):
     """
     Read and preprocess activity data from a file.
 
-    This function reads activity data from various file formats, processes it using the `actipy` library, 
+    This function reads activity data from various file formats, processes it using the `actipy` library,
     and returns the processed data along with metadata information.
 
     Parameters:
     - filepath (str): The path to the file containing activity data.
-    - usecols (str, optional): A comma-separated string of column names to use when reading CSV files. 
+    - usecols (str, optional): A comma-separated string of column names to use when reading CSV files.
       Default is 'time,x,y,z'.
+    - start_first_complete_minute (bool, optional): Whether to start data from the first complete minute.
+      Uses 1 second tolerance. Default is False.
     - calibration_stdtol_min (float, optional): The minimum standard deviation tolerance for detecting stationary periods for calibration. If None,
       no minimum is applied. Default is None.
     - resample_hz (str, optional): The resampling frequency for the data. If 'uniform', it will use `sample_rate`
@@ -89,6 +92,7 @@ def read(
             calibrate_gravity_kwargs={'stdtol_min': calibration_stdtol_min},
             detect_nonwear=True,
             resample_hz=resample_hz,
+            start_first_complete_minute=start_first_complete_minute,
             verbose=verbose,
         )
 
@@ -108,6 +112,7 @@ def read(
             calibrate_gravity_kwargs={'stdtol_min': calibration_stdtol_min},
             detect_nonwear=True,
             resample_hz=resample_hz,
+            start_first_complete_minute=start_first_complete_minute,
             verbose=verbose,
         )
 

@@ -77,6 +77,8 @@ def main():
                         type=str, default=None)
     parser.add_argument("--calibration-stdtol-min", help="Minimum standard deviation tolerance for detection of stationary periods for calibration.",
                         type=float, default=None)
+    parser.add_argument("--start-first-complete-minute", action='store_true',
+                        help="Start data from the first complete minute (uses 1 second tolerance)")
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -96,13 +98,14 @@ def main():
 
     # Load file
     data, info_read = utils.read(
-        args.filepath, 
-        usecols=args.txyz, 
+        args.filepath,
+        usecols=args.txyz,
         start_time=args.start,
         end_time=args.end,
         calibration_stdtol_min=args.calibration_stdtol_min,
-        sample_rate=args.sample_rate, 
+        sample_rate=args.sample_rate,
         resample_hz=30 if args.model_type == 'ssl' else None,
+        start_first_complete_minute=args.start_first_complete_minute,
         verbose=verbose
     )
     info.update(info_read)
