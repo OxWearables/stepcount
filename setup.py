@@ -50,7 +50,7 @@ setuptools.setup(
     package_dir={"": "src"},
     include_package_data=False,
     install_requires=[
-        "actipy>=3.7.0",
+        "actipy>=3.8.0",
         "numpy==1.24.*",
         "scipy==1.10.*",
         "pandas==2.0.*",
