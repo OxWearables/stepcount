@@ -15,7 +15,7 @@ Available models:
 
 ## Install
 
-*Minimum requirements*: Python>=3.8, Java 8 (1.8)
+*Minimum requirements*: Python >=3.8 and <3.11, Java 8 (1.8)
 
 The following instructions make use of Anaconda to meet the minimum requirements:
 
@@ -101,13 +101,22 @@ By default, output files will be stored in a folder named after the input file, 
 $ stepcount sample.cwa -o /path/to/some/folder/
 ```
 
-The following output files will be generated:
+The following output files will be generated (CSV files are gzipped):
 
-- *Info.json* Summary info, as shown above.
-- *Steps.csv* Raw time-series of step counts
-- *Minutely.csv* Minutely summaries
-- *Hourly.csv* Hourly summaries
-- *Daily.csv* Daily summaries
+- `Info.json` Summary info and high-level metrics.
+- `Steps.csv.gz` Per-window step counts (10 s windows for SSL).
+- `StepTimes.csv.gz` Timestamps of each detected step (one per row).
+- `Minutely.csv.gz` Minute-level steps and ENMO; `MinutelyAdjusted.csv.gz` with time-of-day imputation.
+- `Hourly.csv.gz` Hourly steps and ENMO; `HourlyAdjusted.csv.gz` with time-of-day imputation.
+- `Daily.csv.gz` Daily metrics (steps, walking mins, step percentile times, cadence peaks, ENMO);
+  `DailyAdjusted.csv.gz` after time-of-day imputation.
+- `Bouts.csv.gz` Detected walking bouts with duration, steps, cadence stats, ENMO.
+- `Steps.png` Per-day plot of steps/min with missing periods shaded.
+
+Notes
+- All CSVs are gzipped (`.csv.gz`).
+- `Steps.csv.gz` is window-level. SSL uses 10 s windows).
+- “Adjusted” CSVs apply time-of-day imputation, accounting for wear-time thresholds. Short recordings may show many NaNs.
 
 ### Machine learning model type
 By default, the `stepcount` tool employs a self-supervised Resnet18 model to detect walking periods.
@@ -188,7 +197,9 @@ A utility script is provided to collate outputs from multiple runs:
 ```console
 $ stepcount-collate-outputs outputs/
 ```
-This will collate all *-Info.json files found in outputs/ and generate a CSV file.
+This collates summaries into `collated-outputs/` by default:
+- `Info.csv.gz` from all `*-Info.json`
+- `Daily.csv.gz`, `Hourly.csv.gz`, `Minutely.csv.gz`, and `Bouts.csv.gz` from matching CSVs
 
 
 ## Contributing

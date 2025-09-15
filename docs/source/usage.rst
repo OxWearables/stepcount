@@ -4,7 +4,7 @@ Getting started
 Prerequisite 
 ------------
 
-- Python 3.8 or greater
+- Python 3.8–3.10
     .. code-block:: console
 
         $ python --version  # or python3 --version
@@ -86,14 +86,25 @@ change the output path with the :code:`-o` flag:
 
     $ stepcount sample.cwa -o /path/to/some/folder/
 
-Six output files are created:
+The following files are written (CSV files are gzipped):
 
-- *Info.json* Summary info, as shown above.
-- *Steps.csv* Raw time-series of step counts
-- *HourlySteps.csv* Hourly step counts
-- *DailySteps.csv* Daily step counts
-- *HourlyStepsAdjusted.csv* Like HourlySteps but accounting for missing data (see section below).
-- *DailyStepsAdjusted.csv* Like DailySteps but accounting for missing data (see section below).
+- *Info.json* High-level summary and metrics.
+- *Steps.csv.gz* Per-window step counts (10 s windows for SSL).
+- *StepTimes.csv.gz* Timestamps of each detected step.
+- *Minutely.csv.gz* Minute-level steps and ENMO (mg).
+- *MinutelyAdjusted.csv.gz* Minute-level after time-of-day imputation.
+- *Hourly.csv.gz* Hourly steps and ENMO (mg).
+- *HourlyAdjusted.csv.gz* Hourly after time-of-day imputation.
+- *Daily.csv.gz* Daily metrics (steps, walking mins, step-percentile times, cadence peaks, ENMO).
+- *DailyAdjusted.csv.gz* Daily metrics after time-of-day imputation.
+- *Bouts.csv.gz* Walking bouts with duration, steps, cadence stats, ENMO.
+- *Steps.png* Per-day plot of steps/min; missing shaded.
+
+Notes
+-----
+- All CSV files are compressed as ``.csv.gz``.
+- Window length for SSL is 10 s.
+- Adjusted outputs apply time-of-day imputation and wear-time thresholds (defaults: day 21 h, hour 50 min, minute 30 s). Short recordings may contain many NaNs.
 
 Crude vs. Adjusted Estimates
 ..................
@@ -101,6 +112,19 @@ Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
 For adjusted totals and daily statistics, 24h multiples are needed and will be imputed if necessary.
 Estimates will be NaN where data is still missing after imputation.
+
+Collating outputs
+..................
+You can collate outputs from multiple runs into a single directory of summary CSVs:
+
+.. code-block:: console
+
+    $ stepcount-collate-outputs outputs/
+
+This writes ``collated-outputs/`` containing:
+
+- ``Info.csv.gz`` from all ``*-Info.json`` files
+- ``Daily.csv.gz``, ``Hourly.csv.gz``, ``Minutely.csv.gz``, and ``Bouts.csv.gz`` collated from matching files
 
 Processing CSV files
 ..................

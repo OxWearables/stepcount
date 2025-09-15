@@ -77,6 +77,7 @@
 - **CadencePeak1(steps/min)**: Highest cadence per day.
 - **CadencePeak30(steps/min)**: Mean cadence of the thirty most active one-minute epochs per day.
 - **Cadence95th(steps/min)**: 95th percentile of cadence per day.
+  - Note: Cadence metrics are computed from minutes classified as walking; if fewer than a minimum threshold (default 5) are present in a day, values will be NaN.
 
 *(Weekend and Weekday subsections analogous to Steps above.)*
 
@@ -96,6 +97,33 @@ recorded days. To derive adjusted totals and daily summaries, any gaps in the
 required 24‑hour span are similarly imputed; if data remain missing after this
 process, the estimate is reported as NaN. Adjusted metrics are labeled with an
 "Adjusted" suffix&mdash;for example, `StepsDayAvgAdjusted_Weekend`.
+
+Default wear thresholds used for adjusted aggregations
+- Day: 21 hours minimum (`--min-wear-per-day 1260`).
+- Hour: 50 minutes minimum (`--min-wear-per-hour 50`).
+- Minute: 30 seconds minimum (`--min-wear-per-minute 0.5`).
+
+These thresholds can be changed via CLI flags. Adjusted daily/cadence summaries form a 7‑day representative week before final aggregation; very short recordings may yield NaNs.
+
+## CSV Output Schemas
+All CSV files are gzipped (`.csv.gz`). Column schemas:
+
+- `Steps.csv.gz`
+  - `time`, `Steps` (per-window step counts; SSL uses 10 s windows).
+- `StepTimes.csv.gz`
+  - `time` (one row per detected step).
+- `Minutely.csv.gz` / `MinutelyAdjusted.csv.gz`
+  - `Filename`, `Time`, `Steps`, `ENMO(mg)` (Adjusted spans full 24 h grid with imputation where applicable).
+- `Hourly.csv.gz` / `HourlyAdjusted.csv.gz`
+  - `Filename`, `Time`, `Steps`, `ENMO(mg)`.
+- `Daily.csv.gz` / `DailyAdjusted.csv.gz`
+  - `Filename`, `Date`, `Walk(mins)`, `Steps`,
+    `Steps5thAt`, `Steps25thAt`, `Steps50thAt`, `Steps75thAt`, `Steps95thAt`,
+    `CadencePeak1(steps/min)`, `CadencePeak30(steps/min)`, `Cadence95th(steps/min)`, `ENMO(mg)`.
+- `Bouts.csv.gz`
+  - `Filename`, `StartTime`, `EndTime`, `Duration(mins)`, `TimeSinceLast(mins)`, `Steps`,
+    `Cadence(steps/min)`, `CadenceSD(steps/min)`, `Cadence25th(steps/min)`, `Cadence50th(steps/min)`,
+    `Cadence75th(steps/min)`, `ENMO(mg)`, `ENMOMed(mg)`.
 
 ## Random Forest Feature List
 The table below describes the handcrafted features used as inputs to the Random Forest model. 
