@@ -188,6 +188,64 @@ def calculate_wear_stats(data: pd.DataFrame):
     }
 
 
+def calculate_daily_wear_stats(data: pd.DataFrame):
+    """
+    Calculate daily wear time statistics from raw accelerometer data.
+
+    Parameters:
+    - data (pd.DataFrame): A pandas DataFrame of raw accelerometer data with columns 'x', 'y', 'z' and a DatetimeIndex.
+
+    Returns:
+    - pd.DataFrame: A DataFrame with dates as index and daily wear statistics as columns:
+        - 'WearTime(hours)': Total wear time in hours
+
+    Example:
+        daily_wear_stats = calculate_daily_wear_stats(data)
+    """
+
+    if len(data) == 0:
+        return pd.DataFrame()
+
+    # Identify non-wear periods (NaN in any of x,y,z columns)
+    na = data.isna().any(axis=1)
+    dt = infer_freq(data.index).total_seconds()
+
+    # Group by date
+    date_groups = data.groupby(data.index.date)
+
+    results = []
+
+    for date, day_data in date_groups:
+        day_na = na.loc[day_data.index]
+        n_samples = len(day_data)
+
+        if n_samples == 0:
+            # Skip empty days
+            continue
+
+        # Calculate wear time
+        nonwear_samples = day_na.sum()
+        wear_samples = n_samples - nonwear_samples
+
+        # Convert to hours
+        wear_hours = wear_samples * dt / 3600
+
+        results.append({
+            'Date': pd.to_datetime(date),
+            'WearTime(hours)': round(wear_hours, 2)
+        })
+
+    if not results:
+        return pd.DataFrame()
+
+    # Create DataFrame and set date as index
+    daily_stats = pd.DataFrame(results)
+    daily_stats.set_index('Date', inplace=True)
+    daily_stats.index.name = 'Date'
+
+    return daily_stats
+
+
 def flag_wear_below_days(
     x: Union[pd.Series, pd.DataFrame],
     min_wear: str = '12H'
