@@ -153,8 +153,6 @@ def main():
 
     model.wd.device = args.pytorch_device
 
-    if verbose:
-        print("Running step counter...")
     Y, W, T_steps = model.predict_from_frame(data)
 
     # Save step counts

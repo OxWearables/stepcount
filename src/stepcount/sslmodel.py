@@ -237,8 +237,6 @@ def predict(model, dataloader, device, output_logits=False):
     :rtype: (np.ndarray, np.ndarray, np.ndarray)
     """
 
-    if verbose:
-        print('Classifying windows...')
 
     predictions_list = []
     true_list = []
@@ -249,7 +247,7 @@ def predict(model, dataloader, device, output_logits=False):
         return np.array([]), np.array([]), np.array([])
 
     with torch.inference_mode():
-        for x, y, pid in tqdm(dataloader, mininterval=5, disable=not verbose):
+        for x, y, pid in tqdm(dataloader, total=len(dataloader), mininterval=5, disable=not verbose, bar_format='Classifying segments: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]'):
             x = x.to(device, dtype=torch.float)
             logits = model(x)
             true_list.append(y)
@@ -314,7 +312,7 @@ def train(model, train_loader, val_loader, device, class_weights=None, weights_p
         model.train()
         train_losses = []
         train_acces = []
-        for x, y, _ in tqdm(train_loader, disable=not verbose):
+        for x, y, _ in tqdm(train_loader, total=len(train_loader), disable=not verbose, bar_format='Training: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]'):
             x.requires_grad_(True)
             x = x.to(device, dtype=torch.float)
             true_y = y.to(device, dtype=torch.long)
