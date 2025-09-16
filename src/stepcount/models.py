@@ -493,14 +493,14 @@ def make_windows(data, window_sec, fn=None, return_index=False, verbose=True):
     """ Split data into windows """
 
     if verbose:
-        print("Defining windows...")
+        print("Defining segments...")
 
     if fn is None:
         def fn(x):
             return x
 
     X, T = [], []
-    for t, x in tqdm(data.resample(f"{window_sec}s", origin="start"), mininterval=5, disable=not verbose):
+    for t, x in data.resample(f"{window_sec}s", origin="start"):
         x = fn(x)
         X.append(x)
         T.append(t)
@@ -626,12 +626,10 @@ def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif
 def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=False):
     """ Extract features for a list or array of windows """
 
-    if verbose:
-        print("Extracting features...")
 
     X_feats = Parallel(n_jobs=n_jobs)(
         delayed(features.extract_features)(x, sample_rate)
-        for x in tqdm(X, mininterval=5, disable=not verbose)
+        for x in tqdm(X, total=len(X), mininterval=5, disable=not verbose, bar_format='Extracting features: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]')
     )
     X_feats = pd.DataFrame(X_feats)
 
