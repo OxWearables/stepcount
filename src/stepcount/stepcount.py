@@ -121,6 +121,9 @@ def main():
     # Update wear time stats after exclusions
     info.update(utils.calculate_wear_stats(data))
 
+    # Calculate daily wear stats
+    daily_wear_stats = utils.calculate_daily_wear_stats(data)
+
     # If no data, save Info.json and exit
     if len(data) == 0 or data[['x', 'y', 'z']].isna().any(axis=1).all():
         # Save Info.json
@@ -366,6 +369,7 @@ def main():
         steps_summary['daily_steps'],
         cadence_summary['daily'],
         enmo_summary['daily'],
+        daily_wear_stats
     ], axis=1)
     daily.index.name = 'Date'
     daily.reset_index(inplace=True)
