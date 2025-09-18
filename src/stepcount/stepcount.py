@@ -161,7 +161,13 @@ def main():
     T_steps.to_csv(f"{outdir}/{basename}-StepTimes.csv.gz", index=False)
 
     # ENMO summary
-    enmo_summary = summarize_enmo(data)
+    enmo_summary = summarize_enmo(
+        data, 
+        adjust_estimates=False,
+        min_wear_per_day=args.min_wear_per_day,
+        min_wear_per_hour=args.min_wear_per_hour,
+        min_wear_per_minute=args.min_wear_per_minute
+    )
     info['ENMO(mg)'] = enmo_summary['avg']
     info['ENMO(mg)_Weekend'] = enmo_summary['weekend_avg']
     info['ENMO(mg)_Weekday'] = enmo_summary['weekday_avg']
@@ -170,7 +176,13 @@ def main():
     info.update({f'ENMO(mg)_Hour{h:02}_Weekday': enmo_summary['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # ENMO summary, adjusted
-    enmo_summary_adj = summarize_enmo(data, adjust_estimates=True)
+    enmo_summary_adj = summarize_enmo(
+        data, 
+        adjust_estimates=True,
+        min_wear_per_day=args.min_wear_per_day,
+        min_wear_per_hour=args.min_wear_per_hour,
+        min_wear_per_minute=args.min_wear_per_minute
+    )
     info['ENMOAdjusted(mg)'] = enmo_summary_adj['avg']
     info['ENMOAdjusted(mg)_Weekend'] = enmo_summary_adj['weekend_avg']
     info['ENMOAdjusted(mg)_Weekday'] = enmo_summary_adj['weekday_avg']
@@ -179,7 +191,14 @@ def main():
     info.update({f'ENMOAdjusted(mg)_Hour{h:02}_Weekday': enmo_summary_adj['weekday_hour_avgs'].loc[h] for h in range(24)})
 
     # Steps summary
-    steps_summary = summarize_steps(Y, model.steptol)
+    steps_summary = summarize_steps(
+        Y, 
+        model.steptol,
+        adjust_estimates=False,
+        min_wear_per_day=args.min_wear_per_day,
+        min_wear_per_hour=args.min_wear_per_hour,
+        min_wear_per_minute=args.min_wear_per_minute
+    )
     # steps, overall stats
     info['TotalSteps'] = steps_summary['total_steps']
     info['StepsDayAvg'] = steps_summary['avg_steps']
@@ -231,7 +250,14 @@ def main():
     info.update({f'Walking(mins)_Hour{h:02}_Weekday': steps_summary['weekday_hour_walks'].loc[h] for h in range(24)})
 
     # Steps summary, adjusted
-    steps_summary_adj = summarize_steps(Y, model.steptol, adjust_estimates=True)
+    steps_summary_adj = summarize_steps(
+        Y, 
+        model.steptol, 
+        adjust_estimates=True,
+        min_wear_per_day=args.min_wear_per_day,
+        min_wear_per_hour=args.min_wear_per_hour,
+        min_wear_per_minute=args.min_wear_per_minute
+    )
     # steps, overall stats
     info['TotalStepsAdjusted'] = steps_summary_adj['total_steps']
     info['StepsDayAvgAdjusted'] = steps_summary_adj['avg_steps']
@@ -550,9 +576,9 @@ def summarize_steps(
     Y: pd.Series, 
     steptol: int = 3, 
     adjust_estimates: bool = False,
-    min_wear_per_day: int = 21 * 60,
-    min_wear_per_hour: int = 50,
-    min_wear_per_minute: int = 0.5,
+    min_wear_per_day: float = 21 * 60,
+    min_wear_per_hour: float = 50,
+    min_wear_per_minute: float = 0.5,
 ):
     """
     Summarize a series of step counts, e.g. daily and hourly averages, percentiles, etc.
