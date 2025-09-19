@@ -338,7 +338,13 @@ def main():
     info['Cadence95thAdjusted(steps/min)_Weekday'] = cadence_summary_adj['weekday_cadence_p95']
 
     # Bouts summary
-    bouts_summary = summarize_bouts(Y, W, data, bouts_min_walk=args.bouts_min_walk, bouts_max_idle=args.bouts_max_idle)
+    bouts_summary = summarize_bouts(
+        Y,
+        data,
+        steptol=model.steptol,
+        bouts_min_walk=args.bouts_min_walk,
+        bouts_max_idle=args.bouts_max_idle
+    )
 
     # Save Info.json
     with open(f"{outdir}/{basename}-Info.json", 'w') as f:
@@ -977,8 +983,8 @@ def summarize_cadence(
 
 def summarize_bouts(
     Y: pd.Series,
-    W: pd.Series,
     data: pd.DataFrame,
+    steptol: int = 3,
     bouts_min_walk: float = 0.8,
     bouts_max_idle: int = 3,
 ):
@@ -988,8 +994,8 @@ def summarize_bouts(
 
     Parameters:
     - Y (pd.Series): A pandas Series of step counts.
-    - W (pd.Series): A pandas Series indicating walking (1) and non-walking (0) windows, aligned with Y.
     - data (pd.DataFrame): A pandas DataFrame containing raw acceleration data.
+    - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
     - bouts_min_walk (float, optional): Minimum percentage of walking for a bout to be considered valid. Defaults to 0.8.
     - bouts_max_idle (int, optional): Maximum idle (in windows) before a bout is considered to have ended. Defaults to 3.
 
@@ -1008,6 +1014,8 @@ def summarize_bouts(
         - 'ENMO(mg)': Mean ENMO for each bout.
         - 'ENMOMed(mg)': Median ENMO for each bout.
     """
+
+    W = Y.mask(~Y.isna(), Y >= steptol).astype('float')
 
     bouts = numba_detect_bouts(
         W.to_numpy(),
