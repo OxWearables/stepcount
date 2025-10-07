@@ -22,11 +22,13 @@ jobs:
           python-version: "3.8"
       - name: Install dependencies
         run: |
+          set -e
           python -m pip install --upgrade pip
           python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
       - name: Download test files
         run: |
+          set -e
           wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
           wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
 
@@ -76,6 +78,7 @@ jobs:
 
       - name: Install dependencies
         run: |
+          set -e
           python -m pip install --upgrade pip
           python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
