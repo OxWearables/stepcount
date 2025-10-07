@@ -13,9 +13,9 @@ Available models:
 - Self-supervised learning model of Hang et al. (default): https://www.nature.com/articles/s41746-024-01062-3
 - Random forest (enable with the flag `-t rf`)
 
-## Install
+## 📦 Install
 
-*Minimum requirements*: Python >=3.8 and <3.11, Java 8 (1.8)
+**Minimum requirements**: 🐍 Python >=3.8 and <3.11, ☕ Java 8 (1.8)
 
 The following instructions make use of Anaconda to meet the minimum requirements:
 
@@ -40,7 +40,7 @@ You are all set! The next time that you want to use `stepcount`, open the Anacon
 
 Check out the 5-minute video tutorial to get started: [https://www.youtube.com/watch?v=FPb7H-jyRVQ](https://www.youtube.com/watch?v=FPb7H-jyRVQ).
 
-## Usage
+## 💻 Usage
 
 ```bash
 # Process an AX3 file
@@ -88,13 +88,13 @@ Output: outputs/sample/
 ```
 Refer to the [GLOSSARY.md](https://github.com/OxWearables/stepcount/blob/main/GLOSSARY.md) for a comprehensive list of outputs.
 
-### Troubleshooting 
+### 🔧 Troubleshooting 
 Some systems may face issues with Java when running the script. If this is your case, try fixing OpenJDK to version 8:
 ```console
 $ conda install -n stepcount openjdk=8
 ```
 
-### Output files
+### 📁 Output files
 By default, output files will be stored in a folder named after the input file, `outputs/{filename}/`, created in the current working directory. You can change the output path with the `-o` flag:
 
 ```console
@@ -118,7 +118,7 @@ Notes
 - `Steps.csv.gz` is window-level. SSL uses 10 s windows).
 - “Adjusted” CSVs apply time-of-day imputation, accounting for wear-time thresholds. Short recordings may show many NaNs.
 
-### Machine learning model type
+### 🤖 Machine learning model type
 By default, the `stepcount` tool employs a self-supervised Resnet18 model to detect walking periods.
 However, it is possible to switch to a random forest model, by using the `-t` flag:
 
@@ -131,14 +131,14 @@ These features are subsequently used as inputs for the model's classification pr
 For a comprehensive list of the extracted features, see [the glossary](https://github.com/OxWearables/stepcount/blob/main/GLOSSARY.md#random-forest-feature-list).
 
 
-### Crude vs. Adjusted Estimates
+### 📈 Crude vs. Adjusted Estimates
 Adjusted estimates are provided that account for missing data.
 Missing values in the time-series are imputed with the mean of the same timepoint of other available days.
 For adjusted totals and daily statistics, 24h multiples are needed and will be imputed if necessary.
 Estimates will be NaN where data is still missing after imputation.
 
 
-### Processing CSV files
+### 📄 Processing CSV files
 If a CSV file is provided, the following header is expected: `time`, `x`, `y`, `z`. 
 
 Example:
@@ -168,7 +168,7 @@ $ stepcount my-file.csv --txyz HEADER_TIMESTAMP,X,Y,Z
 ```
 
 
-### Processing multiple files
+### ⚙️ Processing multiple files
 #### Windows
 To process multiple files you can create a text file in Notepad which includes one line for each file you wish to process, as shown below for *file1.cwa*, *file2.cwa*, and *file2.cwa*.
 
@@ -190,7 +190,7 @@ stepcount file3.cwa
 ```
 Then, run `bash command.sh` from the terminal.
 
-#### Collating outputs
+#### 📊 Collating outputs
 
 A utility script is provided to collate outputs from multiple runs:
 
@@ -202,19 +202,19 @@ This collates summaries into `collated-outputs/` by default:
 - `Daily.csv.gz`, `Hourly.csv.gz`, `Minutely.csv.gz`, and `Bouts.csv.gz` from matching CSVs
 
 
-## Contributing
+## 🤝 Contributing
 If you would like to contribute to this repository, please check out [CONTRIBUTING.md](https://github.com/OxWearables/stepcount/blob/main/CONTRIBUTING.md).
 We welcome contributions in the form of bug reports, feature requests, and pull requests. 
 
 
-## Citing our work
+## 📚 Citing our work
 
 When using this tool, please consider citing the works listed in [CITATION.md](https://github.com/OxWearables/stepcount/blob/main/CITATION.md).
 
 
-## Licence
+## 📜 Licence
 See [LICENSE.md](https://github.com/OxWearables/stepcount/blob/main/LICENSE.md).
 
 
-## Acknowledgements
+## 🙏 Acknowledgements
 We would like to thank all our code contributors, manuscript co-authors, and research participants for their help in making this work possible.

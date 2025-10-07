@@ -22,7 +22,7 @@ def get_string(string, rel_path="src/stepcount/__init__.py"):
     else:
         raise RuntimeError(f"Unable to find {string}.")
 
-with open("README.md", "r") as fh:
+with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setuptools.setup(
