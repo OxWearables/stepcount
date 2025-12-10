@@ -28,27 +28,13 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
-      - name: Download test files
-        run: |
-          set -e
-          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/mini-sample.csv.gz --quiet
-          wget https://wearables-files.ndph.ox.ac.uk/files/data/samples/ax3/tiny-sample.cwa.gz --quiet
-
       # Perform a run to cache the torch hub repo and download the model files (SSL)
       - name: Smoke test
-        run: stepcount mini-sample.csv.gz
+        run: stepcount tests/data/nano-sample.csv.gz
 
       # Perform a run to download the model files (RF)
       - name: Smoke test (RF)
-        run: stepcount mini-sample.csv.gz -t rf
-
-      - name: Upload test files
-        uses: actions/upload-artifact@v4
-        with:
-          name: test-files
-          path: |
-            mini-sample.csv.gz
-            tiny-sample.cwa.gz
+        run: stepcount tests/data/nano-sample.csv.gz -t rf
 
       - name: Upload model joblib files
         uses: actions/upload-artifact@v4
@@ -86,11 +72,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
-      - name: Download test files
-        uses: actions/download-artifact@v4
-        with:
-          name: test-files
-
       - name: Download model files
         uses: actions/download-artifact@v4
         with:
@@ -103,14 +84,14 @@ jobs:
           name: torch_hub_cache
           path: src/stepcount/torch_hub_cache
 
-      - name: Smoke test, mini-sample.csv.gz
-        run: stepcount mini-sample.csv.gz
+      - name: Smoke test, nano-sample.csv.gz
+        run: stepcount tests/data/nano-sample.csv.gz
 
       - name: Smoke test, tiny-sample.cwa.gz
-        run: stepcount tiny-sample.cwa.gz
+        run: stepcount tests/data/tiny-sample.cwa.gz
 
-      - name: Smoke test, mini-sample.csv.gz (RF)
-        run: stepcount mini-sample.csv.gz -t rf
+      - name: Smoke test, nano-sample.csv.gz (RF)
+        run: stepcount tests/data/nano-sample.csv.gz -t rf
 
       - name: Smoke test, tiny-sample.cwa.gz (RF)
-        run: stepcount tiny-sample.cwa.gz -t rf
+        run: stepcount tests/data/tiny-sample.cwa.gz -t rf

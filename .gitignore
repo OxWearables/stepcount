@@ -128,6 +128,11 @@ data/
 torch_hub_cache/
 *.cwa
 *.cwa.gz
+
+# Exception: CI test fixtures
+!tests/data/
+!tests/data/*.csv.gz
+!tests/data/*.cwa.gz
 *.gt3x
 *.gt3x.gz
 *.bin
