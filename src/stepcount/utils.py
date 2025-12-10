@@ -437,7 +437,16 @@ def impute_missing(
         )
 
     if skip_full_missing_days:
-        na_dates = data.isna().groupby(data.index.date).all()
+        # Compute dates where ALL values are NaN (across all columns if DataFrame)
+        # Handle both Series (1D) and DataFrame (2D) cases
+        if isinstance(data, pd.DataFrame):
+            # For DataFrame: check if all columns are NaN per row, then group by date
+            row_all_na = data.isna().all(axis=1)
+        else:
+            # For Series: just check if each value is NaN
+            row_all_na = data.isna()
+        full_na_dates = row_all_na.groupby(data.index.date).all()
+        full_na_dates = full_na_dates[full_na_dates].index  # Extract dates where entire day is NaN
 
     if extrapolate:  # extrapolate beyond start/end times to have full 24h
         freq = infer_freq(data.index)
@@ -461,7 +470,9 @@ def impute_missing(
     data = impute(data)
 
     if skip_full_missing_days:
-        data.mask(np.isin(data.index.date, na_dates[na_dates].index), inplace=True)
+        # Set rows for fully-missing dates back to NaN
+        mask = np.isin(data.index.date, full_na_dates)
+        data.loc[mask] = np.nan
 
     return data
 
