@@ -18,6 +18,8 @@ def read(
     sample_rate: float = None,
     resample_hz: str = 'uniform',
     start_first_complete_minute: bool = False,
+    csv_start_row: int = None,
+    csv_end_row: int = None,
     verbose: bool = True
 ):
     """
@@ -37,6 +39,10 @@ def read(
     - resample_hz (str, optional): The resampling frequency for the data. If 'uniform', it will use `sample_rate`
       and resample to ensure it is evenly spaced. Default is 'uniform'.
     - sample_rate (float, optional): The sample rate of the data. If None, it will be inferred. Default is None.
+    - csv_start_row (int, optional): The row number to start reading from (0-indexed, excluding header).
+      Only applies to CSV files. Default is None (read from the beginning).
+    - csv_end_row (int, optional): The row number to stop reading at, inclusive (0-indexed, excluding header).
+      Only applies to CSV files. Default is None (read to the end).
     - verbose (bool, optional): If True, enables verbose output during processing. Default is True.
 
     Returns:
@@ -61,12 +67,33 @@ def read(
 
         if ftype == ".csv":
             tcol, xcol, ycol, zcol = usecols.split(',')
+
+            # Validate csv_start_row and csv_end_row
+            if csv_start_row is not None and csv_end_row is not None:
+                if csv_end_row < csv_start_row:
+                    raise ValueError(f"csv_end_row ({csv_end_row}) must be >= csv_start_row ({csv_start_row})")
+
+            # skiprows: skip rows after header if csv_start_row is specified
+            # csv_start_row is 0-indexed (excluding header), so skiprows skips file rows 1 to csv_start_row
+            skiprows = None if csv_start_row is None else range(1, csv_start_row + 1)
+
+            # nrows: number of data rows to read
+            # csv_end_row is inclusive and 0-indexed (excluding header)
+            if csv_end_row is None:
+                nrows = None
+            elif csv_start_row is None:
+                nrows = csv_end_row + 1
+            else:
+                nrows = csv_end_row - csv_start_row + 1
+
             data = pd.read_csv(
                 filepath,
                 usecols=[tcol, xcol, ycol, zcol],
                 parse_dates=[tcol],
                 index_col=tcol,
                 dtype={xcol: 'f4', ycol: 'f4', zcol: 'f4'},
+                skiprows=skiprows,
+                nrows=nrows,
             )
             # rename to standard names
             data = data.rename(columns={xcol: 'x', ycol: 'y', zcol: 'z'})
@@ -104,6 +131,9 @@ def read(
         })
 
     elif ftype in (".cwa", ".gt3x", ".bin"):
+
+        if csv_start_row is not None or csv_end_row is not None:
+            warnings.warn("--csv-start-row and --csv-end-row are only supported for CSV files. Ignoring.")
 
         data, info = actipy.read_device(
             filepath,

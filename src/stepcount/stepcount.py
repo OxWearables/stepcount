@@ -79,6 +79,12 @@ def main():
                         type=float, default=None)
     parser.add_argument("--start-first-complete-minute", action='store_true',
                         help="Start data from the first complete minute (uses 1 second tolerance)")
+    parser.add_argument("--csv-start-row",
+                        help="Row number to start reading from (0-indexed, excluding header).",
+                        type=int, default=None)
+    parser.add_argument("--csv-end-row",
+                        help="Row number to stop reading at, inclusive (0-indexed, excluding header).",
+                        type=int, default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -106,6 +112,8 @@ def main():
         sample_rate=args.sample_rate,
         resample_hz=30 if args.model_type == 'ssl' else None,
         start_first_complete_minute=args.start_first_complete_minute,
+        csv_start_row=args.csv_start_row,
+        csv_end_row=args.csv_end_row,
         verbose=verbose
     )
     info.update(info_read)
