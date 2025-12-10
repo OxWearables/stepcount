@@ -85,6 +85,9 @@ def main():
     parser.add_argument("--csv-end-row",
                         help="Row number to stop reading at, inclusive (0-indexed, excluding header).",
                         type=int, default=None)
+    parser.add_argument("--csv-time-format",
+                        help="Format string for parsing the time column (e.g., '%%Y-%%m-%%d %%H:%%M:%%S.%%f').",
+                        type=str, default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -114,6 +117,7 @@ def main():
         start_first_complete_minute=args.start_first_complete_minute,
         csv_start_row=args.csv_start_row,
         csv_end_row=args.csv_end_row,
+        csv_time_format=args.csv_time_format,
         verbose=verbose
     )
     info.update(info_read)
