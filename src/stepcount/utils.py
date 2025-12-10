@@ -20,6 +20,7 @@ def read(
     start_first_complete_minute: bool = False,
     csv_start_row: int = None,
     csv_end_row: int = None,
+    csv_time_format: str = None,
     verbose: bool = True
 ):
     """
@@ -43,6 +44,8 @@ def read(
       Only applies to CSV files. Default is None (read from the beginning).
     - csv_end_row (int, optional): The row number to stop reading at, inclusive (0-indexed, excluding header).
       Only applies to CSV files. Default is None (read to the end).
+    - csv_time_format (str, optional): Format string for parsing the time column (e.g., '%Y-%m-%d %H:%M:%S.%f').
+      Only applies to CSV files. Default is None (auto-detect).
     - verbose (bool, optional): If True, enables verbose output during processing. Default is True.
 
     Returns:
@@ -86,15 +89,25 @@ def read(
             else:
                 nrows = csv_end_row - csv_start_row + 1
 
-            data = pd.read_csv(
-                filepath,
+            # Common read_csv kwargs
+            read_kwargs = dict(
                 usecols=[tcol, xcol, ycol, zcol],
-                parse_dates=[tcol],
-                index_col=tcol,
                 dtype={xcol: 'f4', ycol: 'f4', zcol: 'f4'},
                 skiprows=skiprows,
                 nrows=nrows,
             )
+
+            if csv_time_format is None:
+                # Auto-detect datetime format
+                read_kwargs['parse_dates'] = [tcol]
+                read_kwargs['index_col'] = tcol
+                data = pd.read_csv(filepath, **read_kwargs)
+            else:
+                # Use specified datetime format
+                data = pd.read_csv(filepath, **read_kwargs)
+                data[tcol] = pd.to_datetime(data[tcol], format=csv_time_format)
+                data = data.set_index(tcol)
+
             # rename to standard names
             data = data.rename(columns={xcol: 'x', ycol: 'y', zcol: 'z'})
             data.index.name = 'time'
@@ -132,8 +145,8 @@ def read(
 
     elif ftype in (".cwa", ".gt3x", ".bin"):
 
-        if csv_start_row is not None or csv_end_row is not None:
-            warnings.warn("--csv-start-row and --csv-end-row are only supported for CSV files. Ignoring.")
+        if csv_start_row is not None or csv_end_row is not None or csv_time_format is not None:
+            warnings.warn("--csv-start-row, --csv-end-row, and --csv-time-format are only supported for CSV files. Ignoring.")
 
         data, info = actipy.read_device(
             filepath,
