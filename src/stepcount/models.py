@@ -505,7 +505,13 @@ def make_windows(data, window_sec, fn=None, return_index=False, verbose=True):
         X.append(x)
         T.append(t)
 
-    X = np.asarray(X)
+    # Handle potentially inhomogeneous window sizes gracefully
+    # (pandas resample can produce windows with different sample counts)
+    try:
+        X = np.stack(X, axis=0)
+    except ValueError:
+        # Windows have different shapes - use object array for compatibility
+        X = np.array(X, dtype=object)
 
     if return_index:
         T = pd.DatetimeIndex(T, name=data.index.name)
