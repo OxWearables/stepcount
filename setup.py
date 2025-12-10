@@ -75,6 +75,8 @@ setuptools.setup(
             "tomli",
             "jupyter",
             "matplotlib",
+            "pytest>=7.0",
+            "pytest-cov>=4.0",
         ],
         "docs": [
             "sphinx>=4.2",
