@@ -42,10 +42,9 @@ def main():
                         type=str, default='cpu')
     parser.add_argument("--sample-rate", "-r", help="Sample rate for measurement, otherwise inferred.",
                         type=int, default=None)
-    parser.add_argument("--txyz",
-                        help=("Use this option to specify the column names for time, x, y, z "
-                              "in the input file, in that order. Use a comma-separated string. "
-                              "Default: 'time,x,y,z'"),
+    parser.add_argument("--csv-txyz",
+                        help=("Column names for time, x, y, z in CSV files. "
+                              "Comma-separated string. Default: 'time,x,y,z'"),
                         type=str, default="time,x,y,z")
     parser.add_argument("--exclude-wear-below", "-w",
                         help="Exclude days with wear time below threshold. Pass values as strings, e.g.: '12H', '30min'. "
@@ -88,6 +87,9 @@ def main():
     parser.add_argument("--csv-time-format",
                         help="Format string for parsing the time column (e.g., '%%Y-%%m-%%d %%H:%%M:%%S.%%f').",
                         type=str, default=None)
+    parser.add_argument("--csv-txyz-idxs",
+                        help="Column indices for time,x,y,z (0-indexed, e.g., '0,1,2,3'). Overrides --csv-txyz.",
+                        type=str, default=None)
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
 
@@ -108,7 +110,7 @@ def main():
     # Load file
     data, info_read = utils.read(
         args.filepath,
-        usecols=args.txyz,
+        usecols=args.csv_txyz,
         start_time=args.start,
         end_time=args.end,
         calibration_stdtol_min=args.calibration_stdtol_min,
@@ -118,6 +120,7 @@ def main():
         csv_start_row=args.csv_start_row,
         csv_end_row=args.csv_end_row,
         csv_time_format=args.csv_time_format,
+        csv_txyz_idxs=args.csv_txyz_idxs,
         verbose=verbose
     )
     info.update(info_read)

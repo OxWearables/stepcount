@@ -21,6 +21,7 @@ def read(
     csv_start_row: int = None,
     csv_end_row: int = None,
     csv_time_format: str = None,
+    csv_txyz_idxs: str = None,
     verbose: bool = True
 ):
     """
@@ -46,6 +47,8 @@ def read(
       Only applies to CSV files. Default is None (read to the end).
     - csv_time_format (str, optional): Format string for parsing the time column (e.g., '%Y-%m-%d %H:%M:%S.%f').
       Only applies to CSV files. Default is None (auto-detect).
+    - csv_txyz_idxs (str, optional): Column indices for time,x,y,z as comma-separated string (0-indexed, e.g., '0,1,2,3').
+      Overrides usecols for CSV files. Default is None (use usecols/csv_txyz).
     - verbose (bool, optional): If True, enables verbose output during processing. Default is True.
 
     Returns:
@@ -69,7 +72,23 @@ def read(
     if ftype in (".csv", ".pkl"):
 
         if ftype == ".csv":
-            tcol, xcol, ycol, zcol = usecols.split(',')
+            # Determine column names: either from indices or from usecols
+            if csv_txyz_idxs is not None:
+                # Parse and validate indices
+                try:
+                    tidx, xidx, yidx, zidx = map(int, csv_txyz_idxs.split(','))
+                except ValueError:
+                    raise ValueError(f"csv_txyz_idxs must be 4 comma-separated integers, got: '{csv_txyz_idxs}'")
+                if any(i < 0 for i in [tidx, xidx, yidx, zidx]):
+                    raise ValueError(f"csv_txyz_idxs must be non-negative integers, got: '{csv_txyz_idxs}'")
+                # Read header to get column names at those indices
+                header = pd.read_csv(filepath, nrows=0).columns.tolist()
+                max_idx = max(tidx, xidx, yidx, zidx)
+                if max_idx >= len(header):
+                    raise ValueError(f"Column index {max_idx} out of range. CSV has {len(header)} columns.")
+                tcol, xcol, ycol, zcol = header[tidx], header[xidx], header[yidx], header[zidx]
+            else:
+                tcol, xcol, ycol, zcol = usecols.split(',')
 
             # Validate csv_start_row and csv_end_row
             if csv_start_row is not None and csv_end_row is not None:
@@ -145,8 +164,8 @@ def read(
 
     elif ftype in (".cwa", ".gt3x", ".bin"):
 
-        if csv_start_row is not None or csv_end_row is not None or csv_time_format is not None:
-            warnings.warn("--csv-start-row, --csv-end-row, and --csv-time-format are only supported for CSV files. Ignoring.")
+        if csv_start_row is not None or csv_end_row is not None or csv_time_format is not None or csv_txyz_idxs is not None:
+            warnings.warn("--csv-* options are only supported for CSV files. Ignoring.")
 
         data, info = actipy.read_device(
             filepath,
