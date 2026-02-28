@@ -13,8 +13,6 @@ import pytest
 import numpy as np
 import pandas as pd
 from pathlib import Path
-import tempfile
-import shutil
 import json
 
 from stepcount import utils
@@ -223,7 +221,7 @@ class TestImputeMissing:
     def test_impute_missing_skip_full_missing_days(self):
         """Test that fully missing days are skipped."""
         # Create data with one completely missing day
-        times = pd.date_range('2024-01-15', periods=2*24*3600*10, freq='100ms')
+        times = pd.date_range('2024-01-15', periods=2 * 24 * 3600 * 10, freq='100ms')
         data = pd.DataFrame(
             np.random.randn(len(times), 3) * 0.1 + [0, 0, 1],
             columns=['x', 'y', 'z'],
@@ -396,8 +394,14 @@ class TestReadCSV:
         assert isinstance(data.index, pd.DatetimeIndex)
 
     def test_read_csv_with_row_limits(self, temp_dir, sample_rate):
-        """Test reading CSV with row limits."""
-        # Create a small test CSV
+        """Test reading CSV with row limits (csv_start_row = header row, csv_end_row = last data row)."""
+        # Create a CSV with 3 metadata preamble lines, then header + 1000 data rows
+        # File layout:
+        #   row 0: "# metadata line 1"
+        #   row 1: "# metadata line 2"
+        #   row 2: "# metadata line 3"
+        #   row 3: "time,x,y,z"          <-- header
+        #   row 4..1003: data rows
         times = pd.date_range('2024-01-15', periods=1000, freq='100ms')
         df = pd.DataFrame({
             'time': times,
@@ -406,13 +410,18 @@ class TestReadCSV:
             'z': np.random.randn(1000) * 0.1 + 1.0
         })
         csv_path = temp_dir / "test_rows.csv"
-        df.to_csv(csv_path, index=False)
+        with open(csv_path, 'w') as f:
+            f.write("# metadata line 1\n")
+            f.write("# metadata line 2\n")
+            f.write("# metadata line 3\n")
+        df.to_csv(csv_path, index=False, mode='a')
 
-        # Read only rows 100-199 (100 rows)
+        # csv_start_row=3 means header is at file row 3 (skip preamble)
+        # csv_end_row=103 means stop at file row 103 (read 100 data rows: rows 4-103)
         data, info = utils.read(
             str(csv_path),
-            csv_start_row=100,
-            csv_end_row=199,
+            csv_start_row=3,
+            csv_end_row=103,
             sample_rate=sample_rate,
             resample_hz=None,
             verbose=False
