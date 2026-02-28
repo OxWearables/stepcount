@@ -441,7 +441,7 @@ class WalkDetectorSSL:
         model.to(self.device)
 
         sslmodel.train(model, train_loader, val_loader, self.device, class_weights, weights_path=self.weights_path)
-        model.load_state_dict(torch.load(self.weights_path, self.device))
+        model.load_state_dict(torch.load(self.weights_path, map_location=self.device))
 
         if self.verbose:
             print('Training HMM')
