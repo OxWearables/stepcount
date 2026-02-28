@@ -483,6 +483,22 @@ class TestWalkDetectorSSLBasic:
         assert detector.device == 'cpu'
         assert detector.batch_size == 100
 
+    def test_walk_detector_ssl_init_with_repo_path(self):
+        """Test WalkDetectorSSL stores ssl_repo_path."""
+        detector = models.WalkDetectorSSL(
+            device='cpu',
+            ssl_repo_path='/my/local/ssl-wearables',
+            verbose=False
+        )
+
+        assert detector.ssl_repo_path == '/my/local/ssl-wearables'
+
+    def test_walk_detector_ssl_init_default_repo_path(self):
+        """Test WalkDetectorSSL defaults ssl_repo_path to None."""
+        detector = models.WalkDetectorSSL(device='cpu', verbose=False)
+
+        assert detector.ssl_repo_path is None
+
     @pytest.mark.skip(reason="SSL model requires valid state_dict to be loaded before predict (needs model weights)")
     def test_walk_detector_ssl_predict_empty(self):
         """Test WalkDetectorSSL handles empty input.

@@ -374,12 +374,14 @@ class WalkDetectorSSL:
         batch_size=100,
         weights_path='state_dict.pt',
         repo_tag='v1.0.0',
+        ssl_repo_path=None,
         hmm_params=None,
         verbose=False,
     ):
         self.device = device
         self.weights_path = weights_path
         self.repo_tag = repo_tag
+        self.ssl_repo_path = ssl_repo_path
         self.batch_size = batch_size
         self.state_dict = None
 
@@ -434,7 +436,8 @@ class WalkDetectorSSL:
         walk = c[1]
         class_weights = [(walk * 9.0) / notwalk, 1.0]
 
-        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=True)
+        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=True,
+                                    repo_path=getattr(self, 'ssl_repo_path', None))
         model.to(self.device)
 
         sslmodel.train(model, train_loader, val_loader, self.device, class_weights, weights_path=self.weights_path)
@@ -482,7 +485,8 @@ class WalkDetectorSSL:
 
     def load_model(self):
 
-        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False)
+        model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False,
+                                    repo_path=getattr(self, 'ssl_repo_path', None))
         model.load_state_dict(self.state_dict)
         model.to(self.device)
 

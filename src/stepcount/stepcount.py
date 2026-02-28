@@ -40,6 +40,9 @@ def main():
                         choices=['ssl', 'rf'], default='ssl')
     parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only)",
                         type=str, default='cpu')
+    parser.add_argument("--ssl-repo-path",
+                        help="Path to a local copy of the ssl-wearables repo for offline use (SSL only)",
+                        type=str, default=None)
     parser.add_argument("--sample-rate", "-r", help="Sample rate for measurement, otherwise inferred.",
                         type=int, default=None)
     parser.add_argument("--csv-txyz",
@@ -167,6 +170,8 @@ def main():
     model.wd.verbose = verbose
 
     model.wd.device = args.pytorch_device
+    if args.ssl_repo_path is not None:
+        model.wd.ssl_repo_path = args.ssl_repo_path
 
     Y, W, T_steps = model.predict_from_frame(data)
 
