@@ -570,6 +570,37 @@ class TestCLIEndToEnd:
         assert result.returncode == 0
         assert '--ssl-repo-path' in result.stdout
 
+    def test_cli_download_models_in_help(self):
+        """Test that --download-models appears in --help output."""
+        result = subprocess.run(
+            [sys.executable, '-m', 'stepcount.stepcount', '--help'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode == 0
+        assert '--download-models' in result.stdout
+
+    def test_cli_download_models_no_filepath(self):
+        """Test that --download-models works without a filepath argument."""
+        from unittest.mock import patch
+        with patch('stepcount.stepcount.download_models') as mock_dl:
+            # Simulate calling main() with --download-models
+            with patch('sys.argv', ['stepcount', '--download-models']):
+                stepcount.main()
+            mock_dl.assert_called_once_with(force_download=False, ssl_repo_path=None)
+
+    def test_cli_no_filepath_no_download_models(self):
+        """Test that omitting filepath without --download-models gives an error."""
+        result = subprocess.run(
+            [sys.executable, '-m', 'stepcount.stepcount'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode != 0
+        assert 'filepath' in result.stderr.lower() or 'required' in result.stderr.lower()
+
     @pytest.fixture
     def small_csv_file(self, tmp_path):
         """Create a small CSV file for quick E2E testing."""

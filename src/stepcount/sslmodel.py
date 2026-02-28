@@ -216,6 +216,8 @@ def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
     :param bool pretrained: Initialise the model with UKB self-supervised pretrained weights.
     :param repo_path: Path to a local copy of the ssl-wearables repo. When provided, uses this
         directly with source='local', skipping GitHub download and cache lookup.
+        Note: when repo_path is provided, the tag parameter is ignored — the caller
+        is responsible for ensuring the local repo matches the expected version.
     :return: pytorch SSL model
     :rtype: nn.Module
     """
