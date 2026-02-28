@@ -47,7 +47,7 @@ class StepCounter:
 
         if wd_type == 'ssl':
             wd_defaults = {
-                'device': 'cpu',
+                'device': 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu',
                 'batch_size': 100,
                 'verbose': verbose
             }
@@ -489,6 +489,9 @@ class WalkDetectorSSL:
                                     repo_path=getattr(self, 'ssl_repo_path', None))
         model.load_state_dict(self.state_dict)
         model.to(self.device)
+
+        if self.verbose:
+            print(f"Using pytorch device: {self.device}")
 
         return model
 

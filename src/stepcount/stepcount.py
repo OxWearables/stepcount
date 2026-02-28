@@ -38,8 +38,9 @@ def main():
     parser.add_argument('--model-type', '-t',
                         help='Enter model type to run (Self-Supervised Learning model or Random Forest)',
                         choices=['ssl', 'rf'], default='ssl')
-    parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only)",
-                        type=str, default='cpu')
+    parser.add_argument("--pytorch-device", "-d", help="Pytorch device to use, e.g.: 'cpu' or 'cuda:0' (for SSL only). "
+                        "Default: 'mps' if available, otherwise 'cpu'",
+                        type=str, default=None)
     parser.add_argument("--ssl-repo-path",
                         help="Path to a local copy of the ssl-wearables repo for offline use (SSL only)",
                         type=str, default=None)
@@ -178,7 +179,11 @@ def main():
     model.verbose = verbose
     model.wd.verbose = verbose
 
-    model.wd.device = args.pytorch_device
+    if args.pytorch_device is not None:
+        model.wd.device = args.pytorch_device
+    elif args.model_type == 'ssl':
+        import torch
+        model.wd.device = 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu'
     if args.ssl_repo_path is not None:
         model.wd.ssl_repo_path = args.ssl_repo_path
 
