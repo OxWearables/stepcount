@@ -208,15 +208,23 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-def get_sslnet(tag='v1.0.0', pretrained=False):
+def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
     """
     Load and return the Self Supervised Learning (SSL) model from pytorch hub.
 
     :param str tag: Tag on the ssl-wearables repo to check out
     :param bool pretrained: Initialise the model with UKB self-supervised pretrained weights.
+    :param repo_path: Path to a local copy of the ssl-wearables repo. When provided, uses this
+        directly with source='local', skipping GitHub download and cache lookup.
     :return: pytorch SSL model
     :rtype: nn.Module
     """
+
+    if repo_path is not None:
+        sslnet: nn.Module = torch.hub.load(str(repo_path), 'harnet10', trust_repo=True,
+                                           source='local', class_num=2, pretrained=pretrained,
+                                           verbose=verbose)
+        return sslnet
 
     repo_name = 'ssl-wearables'
     repo = f'OxWearables/{repo_name}:{tag}'

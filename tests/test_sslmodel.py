@@ -243,6 +243,34 @@ class TestGetSSLNet:
         call_kwargs = mock_hub_load.call_args[1]
         assert call_kwargs['pretrained'] is True
 
+    @patch('stepcount.sslmodel.torch.hub.load')
+    def test_repo_path_uses_local_source(self, mock_hub_load):
+        """When repo_path is provided, should use source='local' and skip cache lookup."""
+        mock_model = Mock(spec=nn.Module)
+        mock_hub_load.return_value = mock_model
+
+        result = sslmodel.get_sslnet(repo_path='/my/local/ssl-wearables')
+
+        assert result == mock_model
+        mock_hub_load.assert_called_once()
+        call_args = mock_hub_load.call_args
+        assert call_args[0][0] == '/my/local/ssl-wearables'
+        assert call_args[1]['source'] == 'local'
+
+    @patch('stepcount.sslmodel.torch.hub.load')
+    @patch('stepcount.sslmodel.torch_cache_path')
+    def test_no_repo_path_uses_cache_logic(self, mock_cache_path, mock_hub_load):
+        """When repo_path is None, should use the existing GitHub/cache logic."""
+        mock_cache_path.exists.return_value = True
+        mock_cache_path.iterdir.return_value = []
+        mock_hub_load.return_value = Mock(spec=nn.Module)
+
+        sslmodel.get_sslnet(repo_path=None)
+
+        call_args = mock_hub_load.call_args
+        # Should use github source when no local cache exists
+        assert call_args[1]['source'] == 'github'
+
 
 class TestPredict:
     """Tests for predict function."""

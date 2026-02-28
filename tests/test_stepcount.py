@@ -559,6 +559,17 @@ class TestCLIEndToEnd:
         )
         assert result.returncode == 0
 
+    def test_cli_ssl_repo_path_option(self):
+        """Test that --ssl-repo-path option is recognized."""
+        result = subprocess.run(
+            [sys.executable, '-m', 'stepcount.stepcount', '--help'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        assert result.returncode == 0
+        assert '--ssl-repo-path' in result.stdout
+
     @pytest.fixture
     def small_csv_file(self, tmp_path):
         """Create a small CSV file for quick E2E testing."""
