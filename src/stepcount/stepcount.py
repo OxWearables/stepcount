@@ -31,7 +31,7 @@ def main():
         description="A tool to estimate step counts from accelerometer data",
         add_help=True
     )
-    parser.add_argument("filepath", help="Enter file to be processed")
+    parser.add_argument("filepath", nargs='?', default=None, help="Enter file to be processed")
     parser.add_argument("--outdir", "-o", help="Enter folder location to save output files", default="outputs/")
     parser.add_argument("--model-path", "-m", help="Enter custom model file to use", default=None)
     parser.add_argument("--force-download", action="store_true", help="Force download of model file")
@@ -93,8 +93,17 @@ def main():
     parser.add_argument("--csv-txyz-idxs",
                         help="Column indices for time,x,y,z (0-indexed, e.g., '0,1,2,3'). Overrides --csv-txyz.",
                         type=str, default=None)
+    parser.add_argument("--download-models", action="store_true",
+                        help="Download all model files and exit. No input file needed.")
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
+
+    if args.download_models:
+        download_models(force_download=args.force_download, ssl_repo_path=args.ssl_repo_path)
+        return
+
+    if args.filepath is None:
+        parser.error("filepath is required (unless using --download-models)")
 
     before = time.time()
 
@@ -461,6 +470,47 @@ def main():
 
     after = time.time()
     print(f"Done! ({round(after - before,2)}s)")
+
+
+def download_models(force_download=False, ssl_repo_path=None):
+    """Download all model files for offline use."""
+
+    for model_type in ('ssl', 'rf'):
+        pth = pathlib.Path(__file__).parent / f"{__model_version__[model_type]}.joblib.lzma"
+        if force_download or not pth.exists():
+            url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__[model_type]}.joblib.lzma"
+            print(f"Downloading {url}...")
+            tmp_pth = pth.with_suffix('.tmp')
+            try:
+                with urllib.request.urlopen(url, timeout=60) as f_src, open(tmp_pth, "wb") as f_dst:
+                    shutil.copyfileobj(f_src, f_dst)
+                if utils.md5(tmp_pth) != __model_md5__[model_type]:
+                    raise ValueError(
+                        f"MD5 mismatch for {model_type} model. Download may be corrupted."
+                    )
+                os.replace(tmp_pth, pth)
+            except Exception:
+                if tmp_pth.exists():
+                    tmp_pth.unlink()
+                raise
+            print(f"Saved to {pth}")
+        else:
+            print(f"Already exists: {pth}")
+
+    # Cache ssl-wearables repo
+    if ssl_repo_path is None:
+        from stepcount import sslmodel
+        print("Caching ssl-wearables repo...")
+        sslmodel.get_sslnet(tag='v1.0.0', pretrained=False)
+        print("Done caching ssl-wearables repo.")
+    else:
+        if not pathlib.Path(ssl_repo_path).is_dir():
+            raise FileNotFoundError(
+                f"--ssl-repo-path does not exist or is not a directory: {ssl_repo_path}"
+            )
+        print(f"Using local ssl-wearables repo: {ssl_repo_path}")
+
+    print("All models downloaded.")
 
 
 def load_model(
