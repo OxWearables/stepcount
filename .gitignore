@@ -123,6 +123,9 @@ doc/tmp.sv
 env/
 doc/source/savefig/
 
+# venv
+venv/
+
 # Misc
 data/
 torch_hub_cache/
