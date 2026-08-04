@@ -4,6 +4,7 @@ import sys
 import pathlib
 import urllib
 import shutil
+import ssl
 import time
 import argparse
 import json
@@ -98,6 +99,9 @@ def main():
                         help="Download all model files and exit. No input file needed.")
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
+
+    # Arm the certificate fallback before any model download can run.
+    _ensure_download_ssl_context(verbose=not args.quiet)
 
     if args.download_models:
         download_models(force_download=args.force_download, ssl_repo_path=args.ssl_repo_path)
@@ -477,6 +481,69 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
+def _ensure_download_ssl_context(verbose=True):
+    """Fall back to certifi's CA bundle when the default HTTPS context is unusable.
+
+    On affected OpenSSL builds (CVE-2026-34180), constructing the default SSL
+    context raises while loading the OS certificate store, which would otherwise
+    break every HTTPS download here — the model files and the torch.hub fetch.
+    certifi's bundle sidesteps the OS trust store. This engages only when the
+    default context is already broken and no custom hook is installed, so healthy
+    machines, and applications that configured their own trust, are untouched.
+    """
+    # A non-default hook means trust was configured deliberately elsewhere;
+    # respect it rather than overwriting it.
+    if ssl._create_default_https_context is not ssl.create_default_context:
+        return
+
+    try:
+        ssl.create_default_context()
+        return  # default context works; nothing to do
+    except ssl.SSLError:
+        pass
+
+    try:
+        import certifi
+    except ImportError:
+        return  # nothing we can do; let the original download error surface
+
+    def _certifi_https_context(*_args, **_kwargs):
+        return ssl.create_default_context(cafile=certifi.where())
+
+    # urllib and torch.hub both build their default context via this hook.
+    ssl._create_default_https_context = _certifi_https_context
+
+    if verbose:
+        print(
+            "Note: could not load the system certificate store "
+            "(known OpenSSL issue); using certifi CA bundle for downloads."
+        )
+
+
+def _download_to_file(url, dest, expected_md5=None, timeout=60):
+    """Download ``url`` to ``dest`` atomically.
+
+    Writes to a temp file and swaps it into place only once complete and (when
+    requested) MD5-verified, so an interrupted or corrupt download never leaves a
+    truncated file behind. The temp name is per-process so concurrent downloads
+    of the same file don't clobber each other, and a connection timeout keeps a
+    stalled server from hanging indefinitely.
+    """
+    dest = pathlib.Path(dest)
+    tmp_pth = dest.with_name(f"{dest.name}.{os.getpid()}.tmp")
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as f_src, open(tmp_pth, "wb") as f_dst:
+            shutil.copyfileobj(f_src, f_dst)
+        if expected_md5 is not None and utils.md5(tmp_pth) != expected_md5:
+            raise ValueError(
+                f"MD5 mismatch for downloaded file {dest.name}. Download may be corrupted."
+            )
+        os.replace(tmp_pth, dest)
+    except BaseException:
+        tmp_pth.unlink(missing_ok=True)
+        raise
+
+
 def download_models(force_download=False, ssl_repo_path=None):
     """Download all model files for offline use."""
 
@@ -485,19 +552,7 @@ def download_models(force_download=False, ssl_repo_path=None):
         if force_download or not pth.exists():
             url = f"https://wearables-files.ndph.ox.ac.uk/files/models/stepcount/{__model_version__[model_type]}.joblib.lzma"
             print(f"Downloading {url}...")
-            tmp_pth = pth.with_suffix('.tmp')
-            try:
-                with urllib.request.urlopen(url, timeout=60) as f_src, open(tmp_pth, "wb") as f_dst:
-                    shutil.copyfileobj(f_src, f_dst)
-                if utils.md5(tmp_pth) != __model_md5__[model_type]:
-                    raise ValueError(
-                        f"MD5 mismatch for {model_type} model. Download may be corrupted."
-                    )
-                os.replace(tmp_pth, pth)
-            except Exception:
-                if tmp_pth.exists():
-                    tmp_pth.unlink()
-                raise
+            _download_to_file(url, pth, expected_md5=__model_md5__[model_type])
             print(f"Saved to {pth}")
         else:
             print(f"Already exists: {pth}")
@@ -555,8 +610,10 @@ def load_model(
 
         print(f"Downloading {url}...")
 
-        with urllib.request.urlopen(url) as f_src, open(pth, "wb") as f_dst:
-            shutil.copyfileobj(f_src, f_dst)
+        _download_to_file(
+            url, pth,
+            expected_md5=__model_md5__[model_type] if check_md5 else None,
+        )
 
     if check_md5:
         assert utils.md5(pth) == __model_md5__[model_type], (

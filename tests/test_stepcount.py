@@ -450,6 +450,172 @@ class TestLoadModel:
         )
 
 
+class TestDownloadToFile:
+    """Tests for the atomic download helper `_download_to_file`."""
+
+    def test_success_writes_dest_and_cleans_temp_with_timeout(self, tmp_path, monkeypatch):
+        import io
+        import hashlib
+        import urllib.request
+        payload = b"model-payload-bytes"
+        dest = tmp_path / "model.joblib.lzma"
+        seen = {}
+
+        def fake_urlopen(url, timeout=None):
+            seen['timeout'] = timeout
+            return io.BytesIO(payload)
+
+        monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+
+        stepcount._download_to_file(
+            "http://example/model", dest,
+            expected_md5=hashlib.md5(payload).hexdigest(),
+        )
+
+        assert dest.read_bytes() == payload
+        assert seen['timeout'] == 60                   # a stalled server can't hang the download
+        assert list(tmp_path.glob("*.tmp")) == []      # no temp left behind
+
+    def test_md5_mismatch_raises_and_leaves_no_files(self, tmp_path, monkeypatch):
+        import io
+        import urllib.request
+        dest = tmp_path / "model.joblib.lzma"
+
+        monkeypatch.setattr(urllib.request, "urlopen",
+                            lambda url, timeout=None: io.BytesIO(b"corrupt"))
+
+        with pytest.raises(ValueError, match="MD5 mismatch"):
+            stepcount._download_to_file(
+                "http://example/model", dest, expected_md5="0" * 32)
+
+        assert not dest.exists()                        # bad download never lands at dest
+        assert list(tmp_path.glob("*.tmp")) == []       # temp cleaned up on failure
+
+    def test_failure_midstream_preserves_existing_dest(self, tmp_path, monkeypatch):
+        import os
+        import urllib.request
+        dest = tmp_path / "model.joblib.lzma"
+        dest.write_bytes(b"previous-good-model")        # a valid model already in place
+
+        class _BoomReader:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *a):
+                return False
+
+            def read(self, *a):
+                raise OSError("connection reset mid-download")
+
+        monkeypatch.setattr(urllib.request, "urlopen",
+                            lambda url, timeout=None: _BoomReader())
+
+        with pytest.raises(OSError):
+            stepcount._download_to_file(
+                "http://example/model", dest, expected_md5="0" * 32)
+
+        assert dest.read_bytes() == b"previous-good-model"  # a failed download can't corrupt a good file
+        # the per-process temp is cleaned up, nothing left behind
+        assert not (tmp_path / f"{dest.name}.{os.getpid()}.tmp").exists()
+        assert list(tmp_path.glob("*.tmp")) == []
+
+
+class TestEnsureDownloadSSLContext:
+    """Tests for the certifi SSL-context fallback used for model downloads."""
+
+    def test_noop_when_default_context_works(self, monkeypatch):
+        """When the active context factory builds fine, the HTTPS hook is untouched."""
+        import ssl
+
+        def ok_factory(*a, **k):
+            return "ok-context-sentinel"
+
+        # Force the "works" branch host-independently: make the default factory
+        # succeed, and keep the active hook identical to it so the
+        # default-in-effect guard holds. (Without this the test is coupled to the
+        # host's real trust store and would spuriously fail on a broken one.)
+        monkeypatch.setattr(ssl, 'create_default_context', ok_factory)
+        monkeypatch.setattr(ssl, '_create_default_https_context', ok_factory)
+
+        stepcount._ensure_download_ssl_context(verbose=False)
+
+        assert ssl._create_default_https_context is ok_factory
+
+    def test_falls_back_to_certifi_when_store_broken(self, monkeypatch):
+        """A broken default store installs a certifi-backed hook that still verifies."""
+        import ssl
+        certifi = pytest.importorskip('certifi')
+
+        real_create = ssl.create_default_context
+        seen_cafiles = []
+
+        def spy(*args, **kwargs):
+            seen_cafiles.append(kwargs.get('cafile'))
+            # Simulate the broken Windows store: the no-arg default build fails,
+            # but building from an explicit cafile (what the fallback does) works.
+            if not kwargs.get('cafile'):
+                raise ssl.SSLError("[ASN1: NOT_ENOUGH_DATA] not enough data")
+            return real_create(*args, **kwargs)
+
+        # Model the stdlib default hook being active (identity holds) but broken.
+        monkeypatch.setattr(ssl, 'create_default_context', spy)
+        monkeypatch.setattr(ssl, '_create_default_https_context', spy)
+
+        stepcount._ensure_download_ssl_context(verbose=False)
+
+        hook = ssl._create_default_https_context
+        assert hook is not spy                       # a new fallback hook was installed
+        ctx = hook()                                 # exercise it, not just its identity
+        assert isinstance(ctx, ssl.SSLContext)
+        assert certifi.where() in seen_cafiles       # fallback uses certifi's CA bundle
+        assert ctx.check_hostname is True            # verification is preserved...
+        assert ctx.verify_mode == ssl.CERT_REQUIRED  # ...not silently downgraded
+
+    def test_preserves_custom_hook_when_store_broken(self, monkeypatch):
+        """A custom HTTPS hook installed by an embedding app is not overwritten."""
+        import ssl
+
+        def _boom(*a, **k):
+            raise ssl.SSLError("[ASN1: NOT_ENOUGH_DATA] not enough data")
+
+        def custom_hook(*a, **k):
+            return "custom-context-sentinel"
+
+        # Default factory is broken, but a distinct custom hook is already active.
+        monkeypatch.setattr(ssl, 'create_default_context', _boom)
+        monkeypatch.setattr(ssl, '_create_default_https_context', custom_hook)
+
+        stepcount._ensure_download_ssl_context(verbose=False)
+
+        # The custom hook must be respected, never silently replaced by certifi.
+        assert ssl._create_default_https_context is custom_hook
+
+    def test_no_fallback_without_certifi(self, monkeypatch):
+        """If certifi is unavailable, leave the HTTPS hook alone (surface original error)."""
+        import ssl
+        import builtins
+
+        def _boom(*a, **k):
+            raise ssl.SSLError("[ASN1: NOT_ENOUGH_DATA] not enough data")
+
+        # Model the default hook being active (identity holds) but the store broken.
+        monkeypatch.setattr(ssl, 'create_default_context', _boom)
+        monkeypatch.setattr(ssl, '_create_default_https_context', _boom)
+
+        real_import = builtins.__import__
+
+        def _no_certifi(name, *args, **kwargs):
+            if name == 'certifi':
+                raise ImportError("No module named 'certifi'")
+            return real_import(name, *args, **kwargs)
+
+        monkeypatch.setattr(builtins, '__import__', _no_certifi)
+        stepcount._ensure_download_ssl_context(verbose=False)
+
+        # certifi import failed, so no fallback was installed — hook is unchanged.
+        assert ssl._create_default_https_context is _boom
+
+
 class TestENMOCalculation:
     """Tests for ENMO (Euclidean Norm Minus One) calculation."""
 
@@ -584,7 +750,10 @@ class TestCLIEndToEnd:
     def test_cli_download_models_no_filepath(self):
         """Test that --download-models works without a filepath argument."""
         from unittest.mock import patch
-        with patch('stepcount.stepcount.download_models') as mock_dl:
+        # Stub the SSL setup too, so main() can't mutate global ssl state on a
+        # broken-store host and leak the process-global hook into later tests.
+        with patch('stepcount.stepcount.download_models') as mock_dl, \
+                patch('stepcount.stepcount._ensure_download_ssl_context'):
             # Simulate calling main() with --download-models
             with patch('sys.argv', ['stepcount', '--download-models']):
                 stepcount.main()
