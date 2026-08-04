@@ -51,6 +51,7 @@ setuptools.setup(
     include_package_data=False,
     install_requires=[
         "actipy>=3.8.0",
+        "certifi>=2024.7.4",  # CA bundle for the HTTPS fallback; floor clears CVE-2024-39689
         "numpy==1.24.*",
         "scipy==1.10.*",
         "pandas==2.0.*",
