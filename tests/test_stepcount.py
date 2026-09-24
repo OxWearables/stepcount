@@ -248,9 +248,43 @@ class TestSummarizeCadence:
 class TestNumbaDetectBouts:
     """Tests for bout detection using numba."""
 
+    def test_concurrent_first_calls_create_one_dispatcher(self, monkeypatch):
+        """Concurrent first calls share one lazily created dispatcher."""
+        import threading
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+
+        import numba
+
+        worker_count = 8
+        start = threading.Barrier(worker_count)
+        count_lock = threading.Lock()
+        compile_calls = 0
+
+        def slow_njit(func):
+            nonlocal compile_calls
+            with count_lock:
+                compile_calls += 1
+            time.sleep(0.05)
+            return func
+
+        monkeypatch.setattr(numba, 'njit', slow_njit)
+        monkeypatch.setattr(stepcount, '_compiled_detect_bouts', None)
+
+        arr = np.ones(3, dtype=int)
+
+        def detect():
+            start.wait()
+            return stepcount.numba_detect_bouts(arr)
+
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            results = list(executor.map(lambda _: detect(), range(worker_count)))
+
+        assert compile_calls == 1
+        assert results == [[(0, 3)]] * worker_count
+
     def test_detect_bouts_basic(self):
         """Test basic bout detection."""
-        # Clear bout pattern
         arr = np.array([0, 1, 1, 1, 1, 0, 0, 0, 1, 1, 0])
 
         bouts = stepcount.numba_detect_bouts(arr, min_percent_ones=0.6, max_trailing_zeros=2)
@@ -364,7 +398,6 @@ class TestSummarizeBouts:
 
         summary = stepcount.summarize_bouts(steps, data, steptol=3)
 
-        # Should return empty DataFrame
         assert len(summary['bouts']) == 0
 
     def test_summarize_bouts_time_since_last(self, step_counts_series, accel_data_1_5_days):
@@ -391,7 +424,6 @@ class TestPlot:
         fig = stepcount.plot(step_counts_series)
 
         assert fig is not None
-        # Clean up
         import matplotlib.pyplot as plt
         plt.close(fig)
 
@@ -654,19 +686,15 @@ class TestIntegration:
 
     def test_full_summary_pipeline(self, step_counts_series, accel_data_1_5_days):
         """Test running all summary functions together."""
-        # ENMO
         enmo_summary = stepcount.summarize_enmo(accel_data_1_5_days)
         assert 'avg' in enmo_summary
 
-        # Steps
         steps_summary = stepcount.summarize_steps(step_counts_series, steptol=3)
         assert 'total_steps' in steps_summary
 
-        # Cadence
         cadence_summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
         assert 'cadence_peak1' in cadence_summary
 
-        # Bouts
         bouts_summary = stepcount.summarize_bouts(
             step_counts_series, accel_data_1_5_days, steptol=3
         )
@@ -691,6 +719,50 @@ class TestIntegration:
 class TestCLIEndToEnd:
     """End-to-end CLI tests using subprocess."""
 
+    def test_cli_module_import_is_lightweight(self):
+        """Importing the CLI must not load processing dependencies needed only after parsing."""
+        probe = """
+import sys
+from typing import get_type_hints
+import stepcount.stepcount as stepcount
+
+for name in (
+    'summarize_enmo',
+    'summarize_steps',
+    'summarize_cadence',
+    'summarize_bouts',
+    '_detect_bouts',
+):
+    get_type_hints(getattr(stepcount, name))
+
+heavy_modules = {
+    'actipy',
+    'hmmlearn',
+    'imblearn',
+    'joblib',
+    'matplotlib',
+    'numba',
+    'numpy',
+    'pandas',
+    'scipy',
+    'sklearn',
+    'torch',
+    'torchvision',
+    'transforms3d',
+}
+loaded = sorted(heavy_modules.intersection(sys.modules))
+print(','.join(loaded))
+"""
+        result = subprocess.run(
+            [sys.executable, '-c', probe],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == ''
+
     def test_cli_help(self):
         """Test that --help works and shows usage info."""
         result = subprocess.run(
@@ -712,7 +784,6 @@ class TestCLIEndToEnd:
             text=True,
             timeout=30
         )
-        # Should fail with non-zero exit code
         assert result.returncode != 0
 
     def test_cli_module_invocation(self):
@@ -818,7 +889,6 @@ class TestCLIEndToEnd:
 
         assert result.returncode == 0
 
-        # Verify output files exist
         basename = small_csv_file.stem
         result_dir = outdir / basename
         assert (result_dir / f'{basename}-Info.json').exists()
@@ -849,7 +919,6 @@ class TestCLIEndToEnd:
             with open(info_path) as f:
                 info = json.load(f)
 
-            # Check for expected keys
             expected_keys = ['Filename', 'TotalSteps', 'StepsDayAvg']
             for key in expected_keys:
                 assert key in info, f"Missing key: {key}"
