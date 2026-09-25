@@ -12,9 +12,9 @@ help: ## List available targets
 install: ## Editable install with dev dependencies
 	$(PYTHON) -m pip install -e .[dev]
 
-lint: ## Run flake8 the same way CI does (syntax errors fail; style is advisory)
-	$(PYTHON) -m flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-	$(PYTHON) -m flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+lint: ## Run Ruff the same way CI does (syntax errors fail; style is advisory)
+	$(PYTHON) -m ruff check . --select=E9,F63,F7,F82
+	$(PYTHON) -m ruff check . --exit-zero
 
 test: ## Run the test suite
 	$(PYTHON) -m pytest

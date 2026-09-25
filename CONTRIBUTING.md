@@ -98,9 +98,9 @@ to run your own tests.
 We are a team of researchers first and developers second, so please be patient if your issue or PR is taking long to be addressed. Just sit and relax!
 
 ### Source Code Style
-We recommend that you use a Python linter (e.g.
-[flake8](https://flake8.pycqa.org/en/latest/)) -- this will help you follow
-standard [Python coding style](https://www.python.org/dev/peps/pep-0008/).
+Run `ruff check . --select=E9,F63,F7,F82` before submitting changes. Run
+`ruff check .` to see the additional style and complexity findings currently
+reported by CI without blocking changes.
 
 
 ### Packaging (maintainers only)

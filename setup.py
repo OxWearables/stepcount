@@ -68,7 +68,7 @@ setuptools.setup(
     ],
     extras_require={
         "dev": [
-            "flake8",
+            "ruff",
             "autopep8",
             "ipython",
             "ipdb",
