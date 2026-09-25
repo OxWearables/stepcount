@@ -27,6 +27,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setuptools.setup(
     name="stepcount",
+    # Keep the dependency stack compatible with the supported Python versions.
     python_requires=">=3.8, <3.11",
     version=versioneer.get_version(),
     cmdclass=versioneer.get_cmdclass(),
@@ -49,6 +50,7 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src", exclude=("test", "tests")),
     package_dir={"": "src"},
     include_package_data=False,
+    package_data={"stepcount": ["py.typed"]},
     install_requires=[
         "actipy>=3.8.0",
         "certifi>=2024.7.4",  # CA bundle for the HTTPS fallback; floor clears CVE-2024-39689
@@ -76,6 +78,8 @@ setuptools.setup(
             "tomli",
             "jupyter",
             "matplotlib",
+            "mypy==1.14.1",
+            "pandas-stubs==2.0.2.230605",
             "pytest>=7.0",
             "pytest-cov>=4.0",
         ],

@@ -1,6 +1,10 @@
+from __future__ import annotations
+
 import argparse
 import json
 from collections import OrderedDict
+from os import PathLike
+from typing import Any, Sequence, Union
 
 import pandas as pd
 from pathlib import Path
@@ -8,10 +12,10 @@ from tqdm.auto import tqdm
 
 
 def collate_outputs(
-    results_dir,
-    collated_results_dir="collated_outputs/",
-    included=["daily", "hourly", "minutely", "bouts"],
-):
+    results_dir: Union[str, PathLike[str]],
+    collated_results_dir: Union[str, PathLike[str]] = "collated_outputs/",
+    included: Sequence[str] = ("daily", "hourly", "minutely", "bouts"),
+) -> None:
     """Collate all results files in <results_dir>.
     :param str results_dir: Root directory in which to search for result files.
     :param str collated_results_dir: Directory to write the collated files to.
@@ -29,8 +33,8 @@ def collate_outputs(
     # - *-Minutely.json files contain minute-level summaries
     # - *-Bouts.json files contain bout information
 
-    info_files = []
-    csv_files = {}
+    info_files: list[Path] = []
+    csv_files: dict[str, list[Path]] = {}
 
     # lowercase the include list
     included  = [x.lower() for x in included]
@@ -75,25 +79,33 @@ def collate_outputs(
     return
 
 
-def collate_jsons(file_list, outfile, overwrite=True):
+def collate_jsons(
+    file_list: Sequence[Path],
+    outfile: Path,
+    overwrite: bool = True,
+) -> None:
     """ Collate a list of JSON files into a single CSV file."""
 
     if overwrite and outfile.exists():
         print(f"Overwriting existing file: {outfile}")
         outfile.unlink()  # remove existing file
 
-    df = []
+    records: list[dict[str, Any]] = []
     for file in tqdm(file_list):
         with open(file, 'r') as f:
-            df.append(json.load(f, object_pairs_hook=OrderedDict))
-    df = pd.DataFrame.from_dict(df)  # merge to a dataframe
+            records.append(json.load(f, object_pairs_hook=OrderedDict))
+    df = pd.DataFrame(records)  # merge to a dataframe
     df = df.applymap(convert_ordereddict)  # convert any OrderedDict cell values to regular dict
     df.to_csv(outfile, index=False)
 
     return
 
 
-def collate_csvs(file_list, outfile, overwrite=True):
+def collate_csvs(
+    file_list: Sequence[Path],
+    outfile: Path,
+    overwrite: bool = True,
+) -> None:
     """ Collate a list of CSV files into a single CSV file."""
 
     if overwrite and outfile.exists():
@@ -109,21 +121,21 @@ def collate_csvs(file_list, outfile, overwrite=True):
     return
 
 
-def convert_ordereddict(value):
+def convert_ordereddict(value: Any) -> Any:
     """ Convert OrderedDict to regular dict """
     if isinstance(value, OrderedDict):
         return dict(value)
     return value
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('results_dir', help="Root directory in which to search for result files")
     parser.add_argument('--output', '-o', default="collated-outputs/", help="Directory to write the collated files to")
     parser.add_argument('--include', '-i', nargs='+', default=["daily", "hourly", "minutely", "bouts"], help="Type of result files to collate ('daily', 'hourly', 'minutely', 'bouts')")
     args = parser.parse_args()
 
-    return collate_outputs(
+    collate_outputs(
         results_dir=args.results_dir,
         collated_results_dir=args.output,
         included=args.include,

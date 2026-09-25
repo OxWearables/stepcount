@@ -1,29 +1,38 @@
+from __future__ import annotations
+
 import pathlib
 import json
 import hashlib
 import warnings
-from typing import Union
+from os import PathLike
+from typing import Any, Dict, Literal, Optional, Tuple, TypeVar, Union, cast
+
 import numpy as np
 import pandas as pd
 from pandas.tseries.frequencies import to_offset
 import actipy
 
+from stepcount._types import NDArray
+
+
+PandasObject = TypeVar("PandasObject", "pd.Series[Any]", "pd.DataFrame")
+
 
 def read(
     filepath: str,
     usecols: str = 'time,x,y,z',
-    start_time: str = None,
-    end_time: str = None,
-    calibration_stdtol_min: float = None,
-    sample_rate: float = None,
-    resample_hz: str = 'uniform',
+    start_time: Optional[str] = None,
+    end_time: Optional[str] = None,
+    calibration_stdtol_min: Optional[float] = None,
+    sample_rate: Optional[float] = None,
+    resample_hz: Optional[Union[str, float]] = 'uniform',
     start_first_complete_minute: bool = False,
-    csv_start_row: int = None,
-    csv_end_row: int = None,
-    csv_time_format: str = None,
-    csv_txyz_idxs: str = None,
+    csv_start_row: Optional[int] = None,
+    csv_end_row: Optional[int] = None,
+    csv_time_format: Optional[str] = None,
+    csv_txyz_idxs: Optional[str] = None,
     verbose: bool = True
-):
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Read and preprocess activity data from a file.
 
@@ -83,7 +92,10 @@ def read(
                     raise ValueError(f"csv_txyz_idxs must be non-negative integers, got: '{csv_txyz_idxs}'")
                 # Read header to get column names at those indices
                 # Skip csv_start_row rows to reach the actual header row
-                header = pd.read_csv(filepath, nrows=0, skiprows=csv_start_row).columns.tolist()
+                header_kwargs: Dict[str, Any] = {"nrows": 0}
+                if csv_start_row is not None:
+                    header_kwargs["skiprows"] = csv_start_row
+                header = pd.read_csv(filepath, **header_kwargs).columns.tolist()
                 max_idx = max(tidx, xidx, yidx, zidx)
                 if max_idx >= len(header):
                     raise ValueError(f"Column index {max_idx} out of range. CSV has {len(header)} columns.")
@@ -112,7 +124,7 @@ def read(
                 nrows = csv_end_row - csv_start_row  # rows (csv_start_row+1) to csv_end_row
 
             # Common read_csv kwargs
-            read_kwargs = dict(
+            read_kwargs: Dict[str, Any] = dict(
                 usecols=[tcol, xcol, ycol, zcol],
                 dtype={xcol: 'f4', ycol: 'f4', zcol: 'f4'},
                 skiprows=skiprows,
@@ -189,9 +201,9 @@ def read(
 
     # Trim the data if start/end times are specified
     if start_time is not None:
-        data = data.loc[start_time:]
+        data = cast(Any, data).loc[cast(Any, start_time):]
     if end_time is not None:
-        data = data.loc[:end_time]
+        data = cast(Any, data).loc[:cast(Any, end_time)]
 
     # Update wear stats
     info.update(calculate_wear_stats(data))
@@ -199,7 +211,7 @@ def read(
     return data, info
 
 
-def calculate_wear_stats(data: pd.DataFrame):
+def calculate_wear_stats(data: pd.DataFrame) -> Dict[str, Any]:
     """
     Calculate wear time and related information from raw accelerometer data.
 
@@ -229,17 +241,18 @@ def calculate_wear_stats(data: pd.DataFrame):
     else:
         na = data.isna().any(axis=1)  # TODO: check na only on x,y,z cols?
         dt = infer_freq(data.index).total_seconds()
-        start_time = data.index[0].strftime(TIME_FORMAT)
-        end_time = data.index[-1].strftime(TIME_FORMAT)
+        datetime_index = cast(pd.DatetimeIndex, data.index)
+        start_time = datetime_index[0].strftime(TIME_FORMAT)
+        end_time = datetime_index[-1].strftime(TIME_FORMAT)
         wear_start_time = data.first_valid_index()
         if wear_start_time is not None:
-            wear_start_time = wear_start_time.strftime(TIME_FORMAT)
+            wear_start_time = pd.Timestamp(cast(Any, wear_start_time)).strftime(TIME_FORMAT)
         wear_end_time = data.last_valid_index()
         if wear_end_time is not None:
-            wear_end_time = wear_end_time.strftime(TIME_FORMAT)
+            wear_end_time = pd.Timestamp(cast(Any, wear_end_time)).strftime(TIME_FORMAT)
         nonwear_duration = na.sum() * dt / (60 * 60 * 24)
         wear_duration = n_data * dt / (60 * 60 * 24) - nonwear_duration 
-        coverage = (~na).groupby(na.index.hour).mean()
+        coverage = (~na).groupby(cast(pd.DatetimeIndex, na.index).hour).mean()
         covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
 
     return {
@@ -253,7 +266,7 @@ def calculate_wear_stats(data: pd.DataFrame):
     }
 
 
-def calculate_daily_wear_stats(data: pd.DataFrame):
+def calculate_daily_wear_stats(data: pd.DataFrame) -> pd.DataFrame:
     """
     Calculate daily wear time statistics from raw accelerometer data.
 
@@ -276,9 +289,10 @@ def calculate_daily_wear_stats(data: pd.DataFrame):
     dt = infer_freq(data.index).total_seconds()
 
     # Group by date
-    date_groups = data.groupby(data.index.date)
+    datetime_index = cast(pd.DatetimeIndex, data.index)
+    date_groups = data.groupby(datetime_index.date)
 
-    results = []
+    results: list[Dict[str, Any]] = []
 
     for date, day_data in date_groups:
         day_na = na.loc[day_data.index]
@@ -296,7 +310,7 @@ def calculate_daily_wear_stats(data: pd.DataFrame):
         wear_hours = wear_samples * dt / 3600
 
         results.append({
-            'Date': pd.to_datetime(date),
+            'Date': pd.to_datetime(cast(Any, date)),
             'WearTime(hours)': round(wear_hours, 2)
         })
 
@@ -312,9 +326,9 @@ def calculate_daily_wear_stats(data: pd.DataFrame):
 
 
 def flag_wear_below_days(
-    x: Union[pd.Series, pd.DataFrame],
+    x: PandasObject,
     min_wear: str = '12H'
-):
+) -> PandasObject:
     """
     Set days containing less than the specified minimum wear time (`min_wear`) to NaN.
 
@@ -333,27 +347,29 @@ def flag_wear_below_days(
         print("No data to exclude")
         return x
 
-    min_wear = pd.Timedelta(min_wear)
+    min_wear_delta = pd.Timedelta(min_wear)
     dt = infer_freq(x.index)
-    ok = x.notna()
-    if isinstance(ok, pd.DataFrame):
-        ok = ok.all(axis=1)
+    not_na = x.notna()
+    if isinstance(not_na, pd.DataFrame):
+        ok = not_na.all(axis=1)
+    else:
+        ok = not_na
+    datetime_index = cast(pd.DatetimeIndex, x.index)
     ok = (
-        ok
-        .groupby(x.index.date)
+        ok.groupby(datetime_index.date)
         .sum() * dt
-        >= min_wear
+        >= min_wear_delta
     )
     # keep ok days, rest is set to NaN
     x = x.copy()  # make a copy to avoid modifying the original data
-    x[np.isin(x.index.date, ok[~ok].index)] = np.nan
+    x[np.isin(datetime_index.date, ok[~ok].index)] = np.nan
     return x
 
 
 def drop_first_last_days(
-    x: Union[pd.Series, pd.DataFrame],
-    first_or_last='both'
-):
+    x: PandasObject,
+    first_or_last: Literal['first', 'last', 'both'] = 'both'
+) -> PandasObject:
     """
     Drop the first day, last day, or both from a time series.
 
@@ -372,20 +388,21 @@ def drop_first_last_days(
         print("No data to drop")
         return x
 
+    datetime_index = cast(pd.DatetimeIndex, x.index)
     if first_or_last == 'first':
-        x = x[x.index.date != x.index.date[0]]
+        x = x[datetime_index.date != datetime_index.date[0]]
     elif first_or_last == 'last':
-        x = x[x.index.date != x.index.date[-1]]
+        x = x[datetime_index.date != datetime_index.date[-1]]
     elif first_or_last == 'both':
-        x = x[(x.index.date != x.index.date[0]) & (x.index.date != x.index.date[-1])]
+        x = x[(datetime_index.date != datetime_index.date[0]) & (datetime_index.date != datetime_index.date[-1])]
     return x
 
 
 def impute_missing(
-    data: pd.DataFrame,
-    extrapolate=True,
-    skip_full_missing_days=True
-):
+    data: PandasObject,
+    extrapolate: bool = True,
+    skip_full_missing_days: bool = True
+) -> PandasObject:
     """
     Impute missing values in the given DataFrame using a multi-step approach.
 
@@ -414,30 +431,37 @@ def impute_missing(
       the first and last day have full 24-hour coverage.
     - If `skip_full_missing_days` is True, days with all missing values will be excluded from the imputation process.
     """
-    def fillna(subframe):
-        if isinstance(subframe, pd.Series):
-            x = subframe.to_numpy()
-            nan = np.isnan(x)
-            nanlen = len(x[nan])
-            if 0 < nanlen < len(x):  # check x contains a NaN and is not all NaN
-                x[nan] = np.nanmean(x)
-                return x  # will be cast back to a Series automatically
-            else:
-                return subframe
+    def fillna(series: pd.Series[Any]) -> pd.Series[Any]:
+        missing = series.isna()
+        if missing.any() and not missing.all():
+            return series.fillna(series.mean())
+        return series
 
-    def impute(data):
-        return (
-            data
-            # first attempt imputation using same day of week
-            .groupby([data.index.weekday, data.index.hour, data.index.minute // 5])
-            .transform(fillna)
-            # then try within weekday/weekend
-            .groupby([data.index.weekday >= 5, data.index.hour, data.index.minute // 5])
-            .transform(fillna)
-            # finally, use all other days
-            .groupby([data.index.hour, data.index.minute // 5])
-            .transform(fillna)
+    def impute(frame: PandasObject) -> PandasObject:
+        datetime_index = cast(pd.DatetimeIndex, frame.index)
+
+        def impute_series(series: pd.Series[Any]) -> pd.Series[Any]:
+            return (
+                series
+                # first attempt imputation using same day of week
+                .groupby([datetime_index.weekday, datetime_index.hour, datetime_index.minute // 5])
+                .transform(fillna)
+                # then try within weekday/weekend
+                .groupby([datetime_index.weekday >= 5, datetime_index.hour, datetime_index.minute // 5])
+                .transform(fillna)
+                # finally, use all other days
+                .groupby([datetime_index.hour, datetime_index.minute // 5])
+                .transform(fillna)
+            )
+
+        if isinstance(frame, pd.Series):
+            return impute_series(frame)
+
+        result = cast(
+            pd.DataFrame,
+            cast(Any, frame).apply(impute_series),
         )
+        return cast(PandasObject, result)  # type: ignore[redundant-cast]
 
     if skip_full_missing_days:
         # Compute dates where ALL values are NaN (across all columns if DataFrame)
@@ -448,42 +472,50 @@ def impute_missing(
         else:
             # For Series: just check if each value is NaN
             row_all_na = data.isna()
-        full_na_dates = row_all_na.groupby(data.index.date).all()
-        full_na_dates = full_na_dates[full_na_dates].index  # Extract dates where entire day is NaN
+        datetime_index = cast(pd.DatetimeIndex, data.index)
+        full_na_flags = row_all_na.groupby(datetime_index.date).all()
+        full_na_dates = full_na_flags[full_na_flags].index
 
     if extrapolate:  # extrapolate beyond start/end times to have full 24h
         freq = infer_freq(data.index)
         if pd.isna(freq):
             warnings.warn("Cannot infer frequency, using 1s")
             freq = pd.Timedelta('1s')
-        freq = to_offset(freq)
+        offset = to_offset(freq)
+        if offset is None:
+            raise ValueError(f"Cannot convert frequency to an offset: {freq}")
+        reindex_kwargs: Dict[str, Any] = {
+            "method": "nearest",
+            "tolerance": pd.Timedelta('1m'),
+            "limit": 1,
+        }
+        datetime_index = cast(pd.DatetimeIndex, data.index)
         data = data.reindex(
             pd.date_range(
                 # Note that at exactly 00:00:00, the floor('D') and ceil('D') will be the same
-                data.index[0].floor('D'),
-                data.index[-1].ceil('D'),
-                freq=freq,
+                datetime_index[0].floor('D'),
+                datetime_index[-1].ceil('D'),
+                freq=offset,
                 inclusive='left',
                 name='time',
             ),
-            method='nearest',
-            tolerance=pd.Timedelta('1m'),
-            limit=1)
+            **reindex_kwargs,
+        )
 
     data = impute(data)
 
     if skip_full_missing_days:
         # Set rows for fully-missing dates back to NaN
-        mask = np.isin(data.index.date, full_na_dates)
+        mask = np.isin(cast(pd.DatetimeIndex, data.index).date, full_na_dates)
         data.loc[mask] = np.nan
 
     return data
 
 
 def impute_days(
-    x: pd.Series,
-    method='mean'
-):
+    x: pd.Series[Any],
+    method: Literal['mean', 'median'] = 'mean'
+) -> pd.Series[Any]:
     """
     Impute missing values for data with a daily resolution.
 
@@ -511,35 +543,34 @@ def impute_days(
     if x.isna().all():
         return x
 
-    def fillna(x):
+    def fillna(values: pd.Series[Any]) -> pd.Series[Any]:
         if method == 'mean':
-            return x.fillna(x.mean())
+            return values.fillna(values.mean())
         elif method == 'median':
-            return x.fillna(x.median())
+            return values.fillna(values.median())
         else:
             raise ValueError(f"Unknown method: {method}")
 
     with warnings.catch_warnings():
         warnings.filterwarnings('ignore', message='Mean of empty slice')
+        datetime_index = cast(pd.DatetimeIndex, x.index)
         return (
             x
-            .groupby(x.index.weekday).transform(fillna)
-            .groupby(x.index.weekday >= 5).transform(fillna)
+            .groupby(datetime_index.weekday).transform(fillna)
+            .groupby(datetime_index.weekday >= 5).transform(fillna)
             .transform(fillna)
         )
 
 
-def infer_freq(t):
+def infer_freq(t: pd.Index) -> pd.Timedelta:
     """ Like pd.infer_freq but more forgiving """
     tdiff = t.to_series().diff()
     q1, q3 = tdiff.quantile([0.25, 0.75])
     tdiff = tdiff[(q1 <= tdiff) & (tdiff <= q3)]
-    freq = tdiff.mean()
-    freq = pd.Timedelta(freq)
-    return freq
+    return pd.Timedelta(cast(Any, tdiff.mean()))
 
 
-def resolve_path(path):
+def resolve_path(path: Union[str, PathLike[str]]) -> Tuple[pathlib.Path, str, str]:
     """ Return parent folder, file name and file extension """
     p = pathlib.Path(path)
     extension = p.suffixes[0]
@@ -548,7 +579,7 @@ def resolve_path(path):
     return dirname, filename, extension
 
 
-def md5(fname):
+def md5(fname: Union[str, PathLike[str]]) -> str:
     hash_md5 = hashlib.md5()
     with open(fname, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -557,7 +588,7 @@ def md5(fname):
 
 
 class NpEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         if isinstance(obj, np.integer):
             return int(obj)
         if isinstance(obj, np.floating):
@@ -569,7 +600,7 @@ class NpEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 
-def nanint(x):
+def nanint(x: Union[float, np.floating[Any]]) -> Union[int, float]:
     if np.isnan(x):
-        return x
+        return float(x)
     return int(x)

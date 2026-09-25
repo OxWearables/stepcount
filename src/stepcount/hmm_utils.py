@@ -1,26 +1,32 @@
+from __future__ import annotations
+
+from typing import Any, Dict, Literal, Optional, Tuple
+
 import numpy as np
 from hmmlearn.hmm import CategoricalHMM
 
+from stepcount._types import HMMParams, NDArray
 
-class HMMSmoother():
+
+class HMMSmoother:
     def __init__(
         self,
-        use_hmmlearn=False,
-        n_components=None,
-        train_test_split=False,
-        ste="st",
-        startprob=None,
-        emissionprob=None,
-        transmat=None,
-        n_iter=100,
-        n_trials=100,
-        random_state=123,
-        stratify_groups=True,
+        use_hmmlearn: bool = False,
+        n_components: Optional[int] = None,
+        train_test_split: bool = False,
+        ste: str = "st",
+        startprob: Optional[NDArray] = None,
+        emissionprob: Optional[NDArray] = None,
+        transmat: Optional[NDArray] = None,
+        n_iter: int = 100,
+        n_trials: int = 100,
+        random_state: int = 123,
+        stratify_groups: bool = True,
     ) -> None:
         self.use_hmmlearn = use_hmmlearn
         if use_hmmlearn:
             assert n_components is not None, "Must specify n_components when use_hmmlearn=True"
-            self.n_components = n_components
+        self.n_components = n_components
         self.train_test_split = train_test_split
         self.ste = ste
         self.startprob = startprob
@@ -30,8 +36,16 @@ class HMMSmoother():
         self.n_trials = n_trials
         self.random_state = random_state
         self.stratify_groups = stratify_groups
+        self.labels: Optional[NDArray] = None
+        self.hmm: Any = None
+        self.score: Any = None
 
-    def fit(self, Y_pred, Y_true, groups=None):
+    def fit(
+        self,
+        Y_pred: NDArray,
+        Y_true: NDArray,
+        groups: Optional[NDArray] = None,
+    ) -> HMMSmoother:
         self.labels = np.unique(Y_true)
         if self.use_hmmlearn:
             assert len(self.labels) == self.n_components, f"n_components ({self.n_components}) doesn't match number of labels ({len(self.labels)})"
@@ -43,18 +57,25 @@ class HMMSmoother():
             self.transmat = compute_transition(Y_true, self.labels, groups)
         return self
 
-    def predict(self, Y, groups=None):
+    def predict(self, Y: NDArray, groups: Optional[NDArray] = None) -> NDArray:
         if self.use_hmmlearn:
             return self.hmmlearn_fit_predict(Y, groups=groups, method='predict')
         return self.viterbi(Y, groups)
 
-    def predict_proba(self, Y, groups=None):
+    def predict_proba(self, Y: NDArray, groups: Optional[NDArray] = None) -> NDArray:
         if self.use_hmmlearn:
             return self.hmmlearn_fit_predict(Y, groups=groups, method='predict_proba')
         raise NotImplementedError
 
-    def viterbi(self, Y, groups=None):
-        params = {
+    def viterbi(self, Y: NDArray, groups: Optional[NDArray] = None) -> NDArray:
+        if (
+            self.startprob is None
+            or self.emissionprob is None
+            or self.transmat is None
+            or self.labels is None
+        ):
+            raise RuntimeError("HMMSmoother must be fitted before prediction")
+        params: HMMParams = {
             'prior': self.startprob,
             'emission': self.emissionprob,
             'transition': self.transmat,
@@ -69,20 +90,28 @@ class HMMSmoother():
             ])
         return Y_vit
 
-    def hmmlearn_fit_predict(self, Y, groups=None, method='predict'):
+    def hmmlearn_fit_predict(
+        self,
+        Y: NDArray,
+        groups: Optional[NDArray] = None,
+        method: Literal['predict', 'predict_proba'] = 'predict',
+    ) -> NDArray:
 
-        hmm_params = dict(
-            n_components=self.n_components,
-            method=method,
-            train_test_split=self.train_test_split,
-            ste=self.ste,
-            startprob=self.startprob,
-            emissionprob=self.emissionprob,
-            transmat=self.transmat,
-            n_iter=self.n_iter,
-            n_trials=self.n_trials,
-            random_state=self.random_state,
-        )
+        if self.n_components is None:
+            raise RuntimeError("n_components is required when using hmmlearn")
+
+        hmm_params: Dict[str, Any] = {
+            "n_components": self.n_components,
+            "method": method,
+            "train_test_split": self.train_test_split,
+            "ste": self.ste,
+            "startprob": self.startprob,
+            "emissionprob": self.emissionprob,
+            "transmat": self.transmat,
+            "n_iter": self.n_iter,
+            "n_trials": self.n_trials,
+            "random_state": self.random_state,
+        }
 
         if Y.ndim == 1:
             Y = Y[:, None]
@@ -91,18 +120,28 @@ class HMMSmoother():
             groups = np.ones(len(Y))
 
         if self.stratify_groups:
-            Y_pred = []
-            score = []
-            hmm = []
+            Y_pred_parts: list[NDArray] = []
+            scores: list[float] = []
+            hmms: list[Any] = []
             for g in ordered_unique(groups):
-                _hmm, _score, _Y_pred = hmmlearn_fit_predict(Y[groups == g], groups=None, **hmm_params)
-                Y_pred.append(_Y_pred)
-                score.append(_score)
-                hmm.append(_hmm)
-            Y_pred = np.concatenate(Y_pred)
+                _hmm, _score, _Y_pred = hmmlearn_fit_predict(
+                    Y[groups == g],
+                    groups=None,
+                    **hmm_params,
+                )
+                Y_pred_parts.append(_Y_pred)
+                scores.append(_score)
+                hmms.append(_hmm)
+            Y_pred = np.concatenate(Y_pred_parts)
+            score: Any = scores
+            hmm: Any = hmms
 
         else:
-            hmm, score, Y_pred = hmmlearn_fit_predict(Y, groups=groups, **hmm_params)
+            hmm, score, Y_pred = hmmlearn_fit_predict(
+                Y,
+                groups=groups,
+                **hmm_params,
+            )
 
         self.hmm = hmm
         self.score = score
@@ -111,20 +150,20 @@ class HMMSmoother():
 
 
 def hmmlearn_fit_predict(
-    Y,
-    groups=None,
-    n_components=2,
-    method='predict',
-    train_test_split=False,
-    ste="st",
-    startprob=None,
-    emissionprob=None,
-    transmat=None,
-    n_iter=100,
-    n_trials=100,
-    random_state=123,
-    **kwargs,
-):
+    Y: NDArray,
+    groups: Optional[NDArray] = None,
+    n_components: int = 2,
+    method: Literal['predict', 'predict_proba'] = 'predict',
+    train_test_split: bool = False,
+    ste: str = "st",
+    startprob: Optional[NDArray] = None,
+    emissionprob: Optional[NDArray] = None,
+    transmat: Optional[NDArray] = None,
+    n_iter: int = 100,
+    n_trials: int = 100,
+    random_state: int = 123,
+    **kwargs: Any,
+) -> Tuple[Any, float, NDArray]:
 
     if method == 'predict_proba' and len(np.unique(Y)) < 2:
         # TODO:
@@ -144,7 +183,8 @@ def hmmlearn_fit_predict(
         Y_train = Y_test = Y
         groups_train = groups_test = groups
 
-    best_score = best_hmm = None
+    best_score: Optional[float] = None
+    best_hmm: Any = None
 
     for idx in range(n_trials + 1):
 
@@ -193,11 +233,14 @@ def hmmlearn_fit_predict(
             hmm.emissionprob_ = emissionprob
 
         hmm.fit(Y_train, lengths_from_groups(groups_train))
-        score = hmm.score(Y_test, lengths_from_groups(groups_test))
+        score = float(hmm.score(Y_test, lengths_from_groups(groups_test)))
 
         if best_score is None or score > best_score:
             best_score = score
             best_hmm = hmm
+
+    if best_hmm is None or best_score is None:
+        raise RuntimeError("HMM fitting did not run; n_trials must be non-negative")
 
     if method == 'predict_proba':
         Y_pred = best_hmm.predict_proba(Y, lengths_from_groups(groups))
@@ -207,15 +250,19 @@ def hmmlearn_fit_predict(
     return best_hmm, best_score, Y_pred
 
 
-def compute_transition(Y, labels=None, groups=None):
+def compute_transition(
+    Y: NDArray,
+    labels: Optional[NDArray] = None,
+    groups: Optional[NDArray] = None,
+) -> NDArray:
     """ Compute transition matrix from sequence """
 
     if labels is None:
         labels = np.unique(Y)
 
-    def _compute_transition(Y):
+    def _compute_transition(values: NDArray) -> NDArray:
         transition = np.vstack([
-            np.sum(Y[1:][(Y == label)[:-1]].reshape(-1, 1) == labels, axis=0)
+            np.sum(values[1:][(values == label)[:-1]].reshape(-1, 1) == labels, axis=0)
             for label in labels
         ])
         return transition
@@ -223,17 +270,24 @@ def compute_transition(Y, labels=None, groups=None):
     if groups is None:
         transition = _compute_transition(Y)
     else:
-        transition = sum((
-            _compute_transition(Y[groups == g])
-            for g in ordered_unique(groups)
-        ))
+        transition = np.zeros((len(labels), len(labels)), dtype=float)
+        for g in ordered_unique(groups):
+            transition += _compute_transition(Y[groups == g])
 
-    transition = transition / np.sum(transition, axis=1).reshape(-1, 1)
+    row_sums = np.sum(transition, axis=1)
+    zero_rows = np.flatnonzero(row_sums == 0)
+    transition[zero_rows, zero_rows] = 1
+    row_sums[zero_rows] = 1
+    transition = transition / row_sums.reshape(-1, 1)
 
     return transition
 
 
-def compute_emission(Y_pred, Y_true, labels=None):
+def compute_emission(
+    Y_pred: NDArray,
+    Y_true: NDArray,
+    labels: Optional[NDArray] = None,
+) -> NDArray:
     """ Compute emission matrix from predicted and true sequences """
 
     if labels is None:
@@ -252,7 +306,11 @@ def compute_emission(Y_pred, Y_true, labels=None):
     return emission
 
 
-def compute_prior(Y_true, labels=None, uniform=True):
+def compute_prior(
+    Y_true: NDArray,
+    labels: Optional[NDArray] = None,
+    uniform: bool = True,
+) -> NDArray:
     """ Compute prior probabilities from sequence """
 
     if labels is None:
@@ -269,13 +327,13 @@ def compute_prior(Y_true, labels=None, uniform=True):
     return prior
 
 
-def viterbi(Y, hmm_params):
+def viterbi(Y: NDArray, hmm_params: HMMParams) -> NDArray:
     ''' https://en.wikipedia.org/wiki/Viterbi_algorithm '''
 
     if len(Y) == 0:
         return np.empty_like(Y)
 
-    def log(x):
+    def log(x: Any) -> Any:
         SMALL_NUMBER = 1e-16
         return np.log(x + SMALL_NUMBER)
 
@@ -309,12 +367,12 @@ def viterbi(Y, hmm_params):
     return viterbi_path
 
 
-def ordered_unique(x):
+def ordered_unique(x: NDArray) -> NDArray:
     """ np.unique without sorting """
     return x[np.sort(np.unique(x, return_index=True)[1])]
 
 
-def lengths_from_groups(groups):
+def lengths_from_groups(groups: Optional[NDArray]) -> Optional[NDArray]:
     if groups is None or len(np.unique(groups)) == 1:
         lengths = None
     else:

@@ -1,4 +1,9 @@
-""" Helper classes and functions for the SSL model """
+"""Helpers for the self-supervised learning model."""
+
+from __future__ import annotations
+
+from os import PathLike
+from typing import Any, Callable, Optional, Sequence, Tuple, Union, cast
 
 import torch
 import torch.nn as nn
@@ -8,22 +13,28 @@ from pathlib import Path
 from transforms3d.axangles import axangle2mat
 from tqdm import tqdm
 from torchvision import transforms
+from torch.utils.data import DataLoader
 from torch.utils.data.dataset import Dataset
+from torch.optim import Adam  # type: ignore[attr-defined]  # Export is absent from PyTorch stubs.
+
+from stepcount._types import NDArray
+
+
+Device = Union[str, torch.device]
+DatasetItem = Tuple[torch.Tensor, Any, Any]
 
 verbose = True
 torch_cache_path = Path(__file__).parent / 'torch_hub_cache'
 
-torch.multiprocessing.set_sharing_strategy('file_system')
+torch.multiprocessing.set_sharing_strategy('file_system')  # type: ignore[no-untyped-call]  # Missing from PyTorch stubs.
 
 
 class RandomSwitchAxis:
     """
-    Randomly switch the three axises for the raw files
-    Input size: 3 * FEATURE_SIZE
+    Randomly permute the three axes in a raw sample.
     """
 
-    def __call__(self, sample):
-        # 3 * FEATURE
+    def __call__(self, sample: torch.Tensor) -> torch.Tensor:
         x = sample[0, :]
         y = sample[1, :]
         z = sample[2, :]
@@ -51,8 +62,7 @@ class RotationAxis:
     Rotation along an axis
     """
 
-    def __call__(self, sample):
-        # 3 * FEATURE_SIZE
+    def __call__(self, sample: NDArray) -> NDArray:
         sample = np.swapaxes(sample, 0, 1)
         angle = np.random.uniform(low=-np.pi, high=np.pi)
         axis = np.random.uniform(low=-1, high=1, size=sample.shape[1])
@@ -66,7 +76,7 @@ class RandomDecimation:
     Randomly decimate the input along the time axis
     """
 
-    def __call__(self, sample):
+    def __call__(self, sample: torch.Tensor) -> torch.Tensor:
         decimation_factor = random.randint(1, 3)
         T = sample.shape[1]
         sample = sample[:, ::decimation_factor]
@@ -80,14 +90,16 @@ class RandomDecimation:
         return sample
 
 
-class NormalDataset(Dataset):
-    def __init__(self,
-                 X,
-                 y=None,
-                 pid=None,
-                 name="",
-                 augmentation=False,
-                 transpose_channels_first=True):
+class NormalDataset(Dataset[DatasetItem]):
+    def __init__(
+        self,
+        X: NDArray,
+        y: Optional[NDArray] = None,
+        pid: Optional[NDArray] = None,
+        name: str = "",
+        augmentation: bool = False,
+        transpose_channels_first: bool = True,
+    ) -> None:
 
         X = X.astype(
             "f4"
@@ -97,12 +109,13 @@ class NormalDataset(Dataset):
             X = np.transpose(X, (0, 2, 1))
         self.X = torch.from_numpy(X)
 
+        self.y: Optional[torch.Tensor]
         if y is not None:
             self.y = torch.tensor(y)
         else:
             self.y = None
 
-        self.pid = pid
+        self.pid: Optional[NDArray] = pid
 
         if augmentation:
             self.transform = transforms.Compose([RandomSwitchAxis(), RotationAxis(), 
@@ -110,29 +123,30 @@ class NormalDataset(Dataset):
         else:
             self.transform = None
 
-    def __len__(self):
+    def __len__(self) -> int:
         return len(self.X)
 
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
+    def __getitem__(self, idx: Union[int, torch.Tensor]) -> DatasetItem:
+        index: Any = idx.tolist() if isinstance(idx, torch.Tensor) else idx
 
-        sample = self.X[idx, :]
+        sample = self.X[index, :]
 
+        y_value: Any
         if self.y is not None:
-            y = self.y[idx]
+            y_value = self.y[index]
         else:
-            y = np.NaN
+            y_value = np.NaN
 
+        pid_value: Any
         if self.pid is not None:
-            pid = self.pid[idx]
+            pid_value = self.pid[index]
         else:
-            pid = np.NaN
+            pid_value = np.NaN
 
         if self.transform is not None:
             sample = self.transform(sample)
 
-        return sample, y, pid
+        return sample, y_value, pid_value
 
 
 class EarlyStopping:
@@ -141,12 +155,12 @@ class EarlyStopping:
 
     def __init__(
         self,
-        patience=5,
-        verbose=False,
-        delta=0,
-        path="checkpoint.pt",
-        trace_func=print,
-    ):
+        patience: int = 5,
+        verbose: bool = False,
+        delta: float = 0,
+        path: Union[str, PathLike[str]] = "checkpoint.pt",
+        trace_func: Callable[[str], None] = print,
+    ) -> None:
         """
         Args:
             patience (int): How long to wait after last time v
@@ -166,7 +180,7 @@ class EarlyStopping:
         self.patience = patience
         self.verbose = verbose
         self.counter = 0
-        self.best_score = None
+        self.best_score: Optional[float] = None
         self.early_stop = False
         self.val_loss_min = np.Inf
         self.delta = delta
@@ -174,7 +188,7 @@ class EarlyStopping:
 
         self.path = path
 
-    def __call__(self, val_loss, model):
+    def __call__(self, val_loss: float, model: nn.Module) -> None:
 
         score = -val_loss
 
@@ -194,7 +208,7 @@ class EarlyStopping:
             self.save_checkpoint(val_loss, model)
             self.counter = 0
 
-    def save_checkpoint(self, val_loss, model):
+    def save_checkpoint(self, val_loss: float, model: nn.Module) -> None:
         """Saves model when validation loss decrease."""
         if self.verbose:
             msg = "Validation loss decreased"
@@ -208,7 +222,11 @@ class EarlyStopping:
         self.val_loss_min = val_loss
 
 
-def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
+def get_sslnet(
+    tag: str = 'v1.0.0',
+    pretrained: bool = False,
+    repo_path: Optional[Union[str, PathLike[str]]] = None,
+) -> nn.Module:
     """
     Load and return the Self Supervised Learning (SSL) model from pytorch hub.
 
@@ -223,9 +241,13 @@ def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
     """
 
     if repo_path is not None:
-        sslnet: nn.Module = torch.hub.load(str(repo_path), 'harnet10', trust_repo=True,
-                                           source='local', class_num=2, pretrained=pretrained,
-                                           verbose=verbose)
+        sslnet = cast(
+            nn.Module,
+            torch.hub.load(  # type: ignore[no-untyped-call]  # torch.hub is untyped upstream.
+                str(repo_path), 'harnet10', trust_repo=True, source='local',
+                class_num=2, pretrained=pretrained, verbose=verbose,
+            ),
+        )
         return sslnet
 
     repo_name = 'ssl-wearables'
@@ -234,9 +256,9 @@ def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
     if not torch_cache_path.exists():
         Path.mkdir(torch_cache_path, parents=True, exist_ok=True)
 
-    torch.hub.set_dir(str(torch_cache_path))
+    torch.hub.set_dir(str(torch_cache_path))  # type: ignore[no-untyped-call]  # torch.hub is untyped upstream.
 
-    # find repo cache dir that matches repo name and tag
+    # Reuse a matching local checkout to avoid an unnecessary network fetch.
     cache_dirs = [f for f in torch_cache_path.iterdir() if f.is_dir()]
     repo_path = next((f for f in cache_dirs if repo_name in f.name and tag in f.name), None)
 
@@ -249,12 +271,22 @@ def get_sslnet(tag='v1.0.0', pretrained=False, repo_path=None):
         if verbose:
             print(f'Using local {repo_path}')
 
-    sslnet: nn.Module = torch.hub.load(repo_path, 'harnet10', trust_repo=True, source=source, class_num=2,
-                                       pretrained=pretrained, verbose=verbose)
+    sslnet = cast(
+        nn.Module,
+        torch.hub.load(  # type: ignore[no-untyped-call]  # torch.hub is untyped upstream.
+            repo_path, 'harnet10', trust_repo=True, source=source, class_num=2,
+            pretrained=pretrained, verbose=verbose,
+        ),
+    )
     return sslnet
 
 
-def predict(model, dataloader, device, output_logits=False):
+def predict(
+    model: nn.Module,
+    dataloader: DataLoader[Any],
+    device: Device,
+    output_logits: bool = False,
+) -> Tuple[NDArray, NDArray, NDArray]:
     """
     Iterate over the dataloader and do prediction with a pytorch model.
 
@@ -268,9 +300,9 @@ def predict(model, dataloader, device, output_logits=False):
     """
 
 
-    predictions_list = []
-    true_list = []
-    pid_list = []
+    predictions_list: list[torch.Tensor] = []
+    true_list: list[torch.Tensor] = []
+    pid_list: list[Any] = []
     model.eval()
 
     if len(dataloader) == 0:
@@ -279,7 +311,7 @@ def predict(model, dataloader, device, output_logits=False):
     with torch.inference_mode():
         for x, y, pid in tqdm(dataloader, total=len(dataloader), mininterval=5, disable=not verbose, bar_format='Classifying segments: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]'):
             x = x.to(device, dtype=torch.float)
-            logits = model(x)
+            logits = cast(torch.Tensor, model(x))
             true_list.append(y)
             if output_logits:
                 predictions_list.append(logits.cpu())
@@ -288,25 +320,34 @@ def predict(model, dataloader, device, output_logits=False):
                 predictions_list.append(pred_y.cpu())
             pid_list.extend(pid)
 
-    true_list = torch.cat(true_list)
-    predictions_list = torch.cat(predictions_list)
+    true_tensor = torch.cat(true_list)
+    predictions_tensor = torch.cat(predictions_list)
 
     if output_logits:
         return (
-            torch.flatten(true_list).numpy(),
-            predictions_list.numpy(),
+            torch.flatten(true_tensor).numpy(),
+            predictions_tensor.numpy(),
             np.array(pid_list),
         )
     else:
         return (
-            torch.flatten(true_list).numpy(),
-            torch.flatten(predictions_list).numpy(),
+            torch.flatten(true_tensor).numpy(),
+            torch.flatten(predictions_tensor).numpy(),
             np.array(pid_list),
         )
 
 
-def train(model, train_loader, val_loader, device, class_weights=None, weights_path='weights.pt',
-          num_epoch=100, learning_rate=0.0001, patience=5):
+def train(
+    model: nn.Module,
+    train_loader: DataLoader[Any],
+    val_loader: DataLoader[Any],
+    device: Device,
+    class_weights: Optional[Sequence[float]] = None,
+    weights_path: Union[str, PathLike[str]] = 'weights.pt',
+    num_epoch: int = 100,
+    learning_rate: float = 0.0001,
+    patience: int = 5,
+) -> nn.Module:
     """
     Iterate over the training dataloader and train a pytorch model.
     After each epoch, validate model and early stop when validation loss function bottoms out.
@@ -324,13 +365,13 @@ def train(model, train_loader, val_loader, device, class_weights=None, weights_p
     :param learning_rate: Adam learning rate
     :param patience: early stopping patience
     """
-    optimizer = torch.optim.Adam(
+    optimizer = Adam(
         model.parameters(), lr=learning_rate, amsgrad=True
     )
 
     if class_weights is not None:
-        class_weights = torch.FloatTensor(class_weights).to(device)
-        loss_fn = nn.CrossEntropyLoss(weight=class_weights)
+        weight_tensor = torch.FloatTensor(class_weights).to(device)
+        loss_fn = nn.CrossEntropyLoss(weight=weight_tensor)
     else:
         loss_fn = nn.CrossEntropyLoss()
 
@@ -340,8 +381,8 @@ def train(model, train_loader, val_loader, device, class_weights=None, weights_p
 
     for epoch in range(num_epoch):
         model.train()
-        train_losses = []
-        train_acces = []
+        train_losses: list[torch.Tensor] = []
+        train_acces: list[torch.Tensor] = []
         for x, y, _ in tqdm(train_loader, total=len(train_loader), disable=not verbose, bar_format='Training: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]'):
             x.requires_grad_(True)
             x = x.to(device, dtype=torch.float)
@@ -349,9 +390,9 @@ def train(model, train_loader, val_loader, device, class_weights=None, weights_p
 
             optimizer.zero_grad()
 
-            logits = model(x)
-            loss = loss_fn(logits, true_y)
-            loss.backward()
+            logits = cast(torch.Tensor, model(x))
+            loss = cast(torch.Tensor, loss_fn(logits, true_y))
+            loss.backward()  # type: ignore[no-untyped-call]  # Missing from PyTorch stubs.
             optimizer.step()
 
             pred_y = torch.argmax(logits, dim=1)
@@ -386,18 +427,23 @@ def train(model, train_loader, val_loader, device, class_weights=None, weights_p
     return model
 
 
-def _validate_model(model, val_loader, device, loss_fn):
+def _validate_model(
+    model: nn.Module,
+    val_loader: DataLoader[Any],
+    device: Device,
+    loss_fn: nn.Module,
+) -> Tuple[float, float]:
     """ Iterate over a validation data loader and return mean model loss and accuracy. """
     model.eval()
-    losses = []
-    acces = []
+    losses: list[torch.Tensor] = []
+    acces: list[torch.Tensor] = []
     with torch.inference_mode():
         for x, y, _ in val_loader:
             x = x.to(device, dtype=torch.float)
             true_y = y.to(device, dtype=torch.long)
 
-            logits = model(x)
-            loss = loss_fn(logits, true_y)
+            logits = cast(torch.Tensor, model(x))
+            loss = cast(torch.Tensor, loss_fn(logits, true_y))
 
             pred_y = torch.argmax(logits, dim=1)
 
@@ -406,6 +452,6 @@ def _validate_model(model, val_loader, device, loss_fn):
 
             losses.append(loss.cpu().detach())
             acces.append(val_acc.cpu().detach())
-    losses = np.array(losses)
-    acces = np.array(acces)
-    return np.mean(losses), np.mean(acces)
+    loss_array = np.array(losses)
+    accuracy_array = np.array(acces)
+    return float(np.mean(loss_array)), float(np.mean(accuracy_array))

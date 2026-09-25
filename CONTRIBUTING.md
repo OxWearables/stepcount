@@ -36,6 +36,22 @@ As you will be editing and testing the code, pull the latest version from the re
 
 The `--editable` flag makes sure changes in `stepcount/` are immediately reflected in the installation. `"[dev,docs]"` installs additional packages useful for development.
 
+### Type checking
+
+Run the production-package type checks with:
+
+```console
+$ make typecheck
+```
+
+The checker deliberately targets Python 3.8 while Stepcount supports Python
+3.8–3.10. Generated Versioneer code and downloaded Torch Hub sources are not
+part of the checked package.
+
+> **Deferred modernization:** In a separate breaking release, raise the Python
+> minimum to a supported version, modernize the scientific dependency stack,
+> adopt the current mypy release, and update the CI matrix and package metadata.
+
 
 ### How to Contribute
 

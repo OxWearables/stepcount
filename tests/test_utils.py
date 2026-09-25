@@ -218,6 +218,38 @@ class TestImputeMissing:
 
         assert np.allclose(orig_mean, result_mean, rtol=0.1)
 
+    def test_impute_missing_handles_dataframe_columns_independently(self):
+        """Partial gaps use each column's values without cross-column pooling."""
+        times = pd.to_datetime([
+            "2024-01-01 12:00:00",
+            "2024-01-08 12:00:00",
+            "2024-01-15 12:00:00",
+        ])
+        data = pd.DataFrame(
+            {
+                "a": [1.0, np.nan, 3.0],
+                "b": [100.0, 300.0, np.nan],
+                "all_missing": [np.nan, np.nan, np.nan],
+            },
+            index=times,
+        )
+
+        result = utils.impute_missing(
+            data,
+            extrapolate=False,
+            skip_full_missing_days=False,
+        )
+
+        expected = pd.DataFrame(
+            {
+                "a": [1.0, 2.0, 3.0],
+                "b": [100.0, 300.0, 200.0],
+                "all_missing": [np.nan, np.nan, np.nan],
+            },
+            index=times,
+        )
+        pd.testing.assert_frame_equal(result, expected)
+
     def test_impute_missing_skip_full_missing_days(self):
         """Test that fully missing days are skipped."""
         # Create data with one completely missing day

@@ -54,6 +54,24 @@ class TestComputeTransition:
         assert trans.shape == (2, 2)
         assert np.allclose(trans.sum(axis=1), [1.0, 1.0])
 
+    def test_transition_uses_self_transition_for_empty_rows(self):
+        """States without observed outgoing transitions remain stochastic."""
+        Y = np.array([0, 1])
+
+        trans = hmm_utils.compute_transition(Y, labels=np.array([0, 1]))
+
+        assert np.allclose(trans, [[0.0, 1.0], [0.0, 1.0]])
+        assert np.isfinite(trans).all()
+        assert np.allclose(trans.sum(axis=1), 1.0)
+
+    def test_transition_with_singleton_groups_is_finite(self):
+        Y = np.array([0, 1])
+        groups = np.array([0, 1])
+
+        trans = hmm_utils.compute_transition(Y, groups=groups)
+
+        assert np.allclose(trans, np.eye(2))
+
     def test_transition_single_state(self):
         """Test transition when sequence is all one state."""
         Y = np.array([1, 1, 1, 1])
@@ -227,6 +245,12 @@ class TestHMMSmoother:
 
         assert len(result) == len(Y_test)
         assert set(result).issubset({0, 1})
+
+    def test_hmm_smoother_predict_requires_fit(self):
+        smoother = hmm_utils.HMMSmoother()
+
+        with pytest.raises(RuntimeError, match="must be fitted"):
+            smoother.predict(np.array([0, 1]))
 
     def test_hmm_smoother_with_groups(self):
         """Test HMMSmoother respects groups during prediction."""
@@ -626,6 +650,14 @@ class TestHMMErrorPaths:
 
         with pytest.raises(AssertionError, match="n_components"):
             smoother.fit(Y_pred, Y_true)
+
+    def test_hmmlearn_negative_trials_fails_clearly(self):
+        with pytest.raises(RuntimeError, match="n_trials must be non-negative"):
+            hmm_utils.hmmlearn_fit_predict(
+                np.array([[0], [1]]),
+                n_components=2,
+                n_trials=-1,
+            )
 
     def test_compute_transition_all_same_label(self):
         """Test compute_transition with only one unique label."""

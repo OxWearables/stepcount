@@ -39,6 +39,16 @@ jobs:
           python -m build
           twine check --strict dist/*
 
+      - name: Verify typed package marker
+        run: |
+          set -euo pipefail
+          mapfile -t sdists < <(find dist -maxdepth 1 -type f -name '*.tar.gz')
+          mapfile -t wheels < <(find dist -maxdepth 1 -type f -name '*.whl')
+          test "${#sdists[@]}" -eq 1
+          test "${#wheels[@]}" -eq 1
+          tar -tzf "${sdists[0]}" | grep -E '/src/stepcount/py\.typed$'
+          unzip -Z1 "${wheels[0]}" | grep -Fx 'stepcount/py.typed'
+
       - name: Sanity check build
         run: |
           set -e

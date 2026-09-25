@@ -1,14 +1,20 @@
+from __future__ import annotations
+
+from typing import List, Optional, Tuple, Union, cast
+
 import numpy as np
 import scipy.stats as stats
 import scipy.signal as signal
 from scipy.ndimage import median_filter
 import statsmodels.tsa.stattools as stattools
 
+from stepcount._types import FeatureDict, NDArray
+
 
 MIN_WINDOW_SEC = 2  # seconds
 
 
-def extract_features(xyz, sample_rate=100):
+def extract_features(xyz: NDArray, sample_rate: float = 100) -> FeatureDict:
     ''' Extract commonly used HAR time-series features. xyz is a window of shape (N,3) '''
 
     if np.isnan(xyz).any():
@@ -22,30 +28,24 @@ def extract_features(xyz, sample_rate=100):
     v = np.linalg.norm(xyz, axis=1)
     v = median_filter(v, size=5, mode='nearest')
     v = v - 1  # detrend: "remove gravity"
-    v = np.clip(v, -2, 2)  # clip abnormaly high values
+    v = np.clip(v, -2, 2)  # Limit extreme values before feature extraction.
 
-    # Moments features
     feats.update(moments_features(v, sample_rate))
 
-    # Quantile features
     feats.update(quantile_features(v, sample_rate))
 
-    # Autocorrelation features
     feats.update(autocorr_features(v, sample_rate))
 
-    # Spectral features
     feats.update(spectral_features(v, sample_rate))
 
-    # FFT features
     feats.update(fft_features(v, sample_rate))
 
-    # Peak features
     feats.update(peaks_features(v, sample_rate))
 
     return feats
 
 
-def moments_features(v, sample_rate=None):
+def moments_features(v: NDArray, sample_rate: Optional[float] = None) -> FeatureDict:
     """ Moments """
     avg = np.mean(v)
     std = np.std(v)
@@ -63,14 +63,14 @@ def moments_features(v, sample_rate=None):
     return feats
 
 
-def quantile_features(v, sample_rate=None):
+def quantile_features(v: NDArray, sample_rate: Optional[float] = None) -> FeatureDict:
     """ Quantiles (min, 25th, med, 75th, max) """
     feats = {}
     feats['min'], feats['q25'], feats['med'], feats['q75'], feats['max'] = np.quantile(v, (0, .25, .5, .75, 1))
     return feats
 
 
-def autocorr_features(v, sample_rate):
+def autocorr_features(v: NDArray, sample_rate: float) -> FeatureDict:
     """ Autocorrelation features """
 
     with np.errstate(divide='ignore', invalid='ignore'):  # ignore invalid div warnings
@@ -105,7 +105,7 @@ def autocorr_features(v, sample_rate):
     return feats
 
 
-def spectral_features(v, sample_rate):
+def spectral_features(v: NDArray, sample_rate: float) -> FeatureDict:
     """ Spectral entropy, average power, dominant frequencies """
 
     feats = {}
@@ -131,7 +131,7 @@ def spectral_features(v, sample_rate):
     return feats
 
 
-def fft_features(v, sample_rate, nfreqs=5):
+def fft_features(v: NDArray, sample_rate: float, nfreqs: int = 5) -> FeatureDict:
     """ Power of frequencies 0Hz, 1Hz, 2Hz, ... using Welch's method """
 
     _, powers = signal.welch(
@@ -148,10 +148,10 @@ def fft_features(v, sample_rate, nfreqs=5):
     return feats
 
 
-def peaks_features(v, sample_rate):
+def peaks_features(v: NDArray, sample_rate: float) -> FeatureDict:
     """ Features of the signal peaks """
 
-    feats = {}
+    feats: FeatureDict = {}
     u = butterfilt(v, 5, fs=sample_rate)  # lowpass 5Hz
     peaks, peak_props = signal.find_peaks(u, distance=0.2 * sample_rate, prominence=0.25)
     feats['npeaks'] = len(peaks) / (len(v) / sample_rate)  # peaks/sec
@@ -165,9 +165,16 @@ def peaks_features(v, sample_rate):
     return feats
 
 
-def butterfilt(x, cutoffs, fs, order=4, axis=0):
+def butterfilt(
+    x: NDArray,
+    cutoffs: Union[float, Tuple[float, float]],
+    fs: float,
+    order: int = 4,
+    axis: int = 0,
+) -> NDArray:
     """ Butterworth filter """
     nyq = 0.5 * fs
+    Wn: Union[float, Tuple[float, float]]
     if isinstance(cutoffs, tuple):
         hicut, lowcut = cutoffs
         if hicut > 0:
@@ -181,10 +188,10 @@ def butterfilt(x, cutoffs, fs, order=4, axis=0):
         Wn = cutoffs / nyq
     sos = signal.butter(order, Wn, btype=btype, analog=False, output='sos')
     y = signal.sosfiltfilt(sos, x, axis=axis)
-    return y
+    return cast(NDArray, y)
 
 
-def get_feature_names():
+def get_feature_names() -> List[str]:
     """ Hacky way to get the list of feature names """
 
     feats = extract_features(np.zeros((500, 3)), 100)

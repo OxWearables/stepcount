@@ -11,30 +11,37 @@ import argparse
 import json
 import re
 from collections import defaultdict
+from os import PathLike
 from threading import Lock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional, Tuple, Union, cast
 
 from stepcount import __version__
 from stepcount import __model_version__
 from stepcount import __model_md5__
 
 if TYPE_CHECKING:
-    import numpy as np
     import pandas as pd
+    from matplotlib.figure import Figure
+    from stepcount._types import NDArray as _NDArray
+    from stepcount.models import StepCounter
+    from typing_extensions import TypeAlias
 
-    _NDArray = np.ndarray
-    _DataFrame = pd.DataFrame
-    _Series = pd.Series
+    _DataFrame: TypeAlias = pd.DataFrame
+    # pandas-stubs 2.0 exposes Series as generic in annotations but not when
+    # resolving a conditional type alias under mypy 1.14.
+    _Series: TypeAlias = pd.Series[Any]  # type: ignore[misc]
+    _Figure: TypeAlias = Figure
 else:
     _NDArray = Any
     _DataFrame = Any
     _Series = Any
+    _Figure = Any
 
 warnings.filterwarnings('ignore', message='Mean of empty slice')  # shut .median() warning when all-NaN
 
 
 
-def main():
+def main() -> None:
 
     parser = argparse.ArgumentParser(
         description="A tool to estimate step counts from accelerometer data",
@@ -177,20 +184,22 @@ def main():
     model_path = pathlib.Path(__file__).parent / f"{__model_version__[args.model_type]}.joblib.lzma"
     check_md5 = args.model_path is None
     model = load_model(args.model_path or model_path, args.model_type, check_md5, args.force_download)
+    # The nested detectors expose model-specific attributes after joblib restores them.
+    wd_runtime: Any = model.wd
     # TODO: implement reset_sample_rate()
     model.sample_rate = info['ResampleRate']
     model.window_len = int(np.ceil(info['ResampleRate'] * model.window_sec))
-    model.wd.sample_rate = info['ResampleRate']
+    wd_runtime.sample_rate = info['ResampleRate']
     model.verbose = verbose
-    model.wd.verbose = verbose
+    wd_runtime.verbose = verbose
 
     if args.pytorch_device is not None:
-        model.wd.device = args.pytorch_device
+        wd_runtime.device = args.pytorch_device
     elif args.model_type == 'ssl':
         import torch
-        model.wd.device = 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu'
+        wd_runtime.device = 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu'
     if args.ssl_repo_path is not None:
-        model.wd.ssl_repo_path = args.ssl_repo_path
+        wd_runtime.ssl_repo_path = args.ssl_repo_path
 
     Y, W, T_steps = model.predict_from_frame(data)
 
@@ -366,7 +375,7 @@ def main():
     hourly.reset_index(inplace=True)
     hourly.insert(0, 'Filename', info['Filename'])
     hourly.to_csv(f"{outdir}/{basename}-Hourly.csv.gz", index=False)
-    del hourly  # free memory
+    del hourly
 
     hourly_adj = pd.concat([
         steps_summary_adj['hourly_steps'],
@@ -376,7 +385,7 @@ def main():
     hourly_adj.reset_index(inplace=True)
     hourly_adj.insert(0, 'Filename', info['Filename'])
     hourly_adj.to_csv(f"{outdir}/{basename}-HourlyAdjusted.csv.gz", index=False)
-    del hourly_adj  # free memory
+    del hourly_adj
 
     minutely = pd.concat([
         steps_summary['minutely_steps'],
@@ -386,7 +395,7 @@ def main():
     minutely.reset_index(inplace=True)
     minutely.insert(0, 'Filename', info['Filename'])
     minutely.to_csv(f"{outdir}/{basename}-Minutely.csv.gz", index=False)
-    del minutely  # free memory
+    del minutely
 
     minutely_adj = pd.concat([
         steps_summary_adj['minutely_steps'],
@@ -396,7 +405,7 @@ def main():
     minutely_adj.reset_index(inplace=True)
     minutely_adj.insert(0, 'Filename', info['Filename'])
     minutely_adj.to_csv(f"{outdir}/{basename}-MinutelyAdjusted.csv.gz", index=False)
-    del minutely_adj  # free memory
+    del minutely_adj
 
     daily = pd.concat([
         steps_summary['daily_steps'],
@@ -441,7 +450,7 @@ def main():
     print(f"Done! ({round(after - before,2)}s)")
 
 
-def _ensure_download_ssl_context(verbose=True):
+def _ensure_download_ssl_context(verbose: bool = True) -> None:
     """Fall back to certifi's CA bundle when the default HTTPS context is unusable.
 
     On affected OpenSSL builds (CVE-2026-34180), constructing the default SSL
@@ -467,7 +476,7 @@ def _ensure_download_ssl_context(verbose=True):
     except ImportError:
         return  # nothing we can do; let the original download error surface
 
-    def _certifi_https_context(*_args, **_kwargs):
+    def _certifi_https_context(*_args: Any, **_kwargs: Any) -> ssl.SSLContext:
         return ssl.create_default_context(cafile=certifi.where())
 
     # urllib and torch.hub both build their default context via this hook.
@@ -480,7 +489,12 @@ def _ensure_download_ssl_context(verbose=True):
         )
 
 
-def _download_to_file(url, dest, expected_md5=None, timeout=60):
+def _download_to_file(
+    url: str,
+    dest: Union[str, PathLike[str]],
+    expected_md5: Optional[str] = None,
+    timeout: float = 60,
+) -> None:
     """Download ``url`` to ``dest`` atomically.
 
     Writes to a temp file and swaps it into place only once complete and (when
@@ -508,7 +522,10 @@ def _download_to_file(url, dest, expected_md5=None, timeout=60):
         raise
 
 
-def download_models(force_download=False, ssl_repo_path=None):
+def download_models(
+    force_download: bool = False,
+    ssl_repo_path: Optional[Union[str, PathLike[str]]] = None,
+) -> None:
     """Download all model files for offline use."""
 
     for model_type in ('ssl', 'rf'):
@@ -538,11 +555,11 @@ def download_models(force_download=False, ssl_repo_path=None):
 
 
 def load_model(
-    model_path: str,
-    model_type: str,
+    model_path: Union[str, PathLike[str]],
+    model_type: Literal['rf', 'ssl'],
     check_md5: bool = True,
     force_download: bool = False
-):
+) -> "StepCounter":
     """
     Load a trained model from the specified path. Download the model if it does not exist.
 
@@ -588,7 +605,7 @@ def load_model(
             "to download the model file again."
         )
 
-    return joblib.load(pth)
+    return cast("StepCounter", joblib.load(pth))
 
 
 def summarize_enmo(
@@ -597,7 +614,7 @@ def summarize_enmo(
     min_wear_per_day: float = 21 * 60,
     min_wear_per_hour: float = 50,
     min_wear_per_minute: float = 0.5,
-):
+) -> Dict[str, Any]:
     """
     Summarize ENMO information from raw accelerometer data, e.g. daily and hourly averages, percentiles, etc.
 
@@ -618,14 +635,22 @@ def summarize_enmo(
     import numpy as np
     from stepcount import utils
 
-    def _is_enough(x, min_wear=None, dt=None):
+    def _is_enough(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> bool:
         if min_wear is None:
             return True  # no minimum wear time, then default to True
         if dt is None:
             dt = utils.infer_freq(x.index).total_seconds()
-        return x.notna().sum() * dt / 60 > min_wear
+        return bool(x.notna().sum() * dt / 60 > min_wear)
 
-    def _mean(x, min_wear=None, dt=None):
+    def _mean(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.mean()
@@ -687,7 +712,7 @@ def summarize_steps(
     min_wear_per_day: float = 21 * 60,
     min_wear_per_hour: float = 50,
     min_wear_per_minute: float = 0.5,
-):
+) -> Dict[str, Any]:
     """
     Summarize a series of step counts, e.g. daily and hourly averages, percentiles, etc.
 
@@ -713,41 +738,70 @@ def summarize_steps(
     # there's a bug with .resample().sum(skipna)
     # https://github.com/pandas-dev/pandas/issues/29382
 
-    def _is_enough(x, min_wear=None, dt=None):
+    def _is_enough(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> bool:
         if min_wear is None:
             return True  # no minimum wear time, then default to True
         if dt is None:
             dt = utils.infer_freq(x.index).total_seconds()
-        return x.notna().sum() * dt / 60 > min_wear
+        return bool(x.notna().sum() * dt / 60 > min_wear)
 
-    def _sum(x, min_wear=None, dt=None):
+    def _sum(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if x.isna().all():  # have to explicitly check this because pandas' .sum() returns 0 if all-NaN
             return np.nan
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.sum()
 
-    def _mean(x, min_wear=None, dt=None):
+    def _mean(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.mean()
 
-    def _min(x, min_wear=None, dt=None):
+    def _min(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.min()
 
-    def _max(x, min_wear=None, dt=None):
+    def _max(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.max()
 
-    def _median(x, min_wear=None, dt=None):
+    def _median(
+        x: Any,
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Any:
         if not _is_enough(x, min_wear, dt):
             return np.nan
         return x.median()
 
-    def _percentile_at(x, ps=(5, 25, 50, 75, 95), min_wear=None, dt=None):
+    def _percentile_at(
+        x: Any,
+        ps: Tuple[int, ...] = (5, 25, 50, 75, 95),
+        min_wear: Optional[float] = None,
+        dt: Optional[float] = None,
+    ) -> Dict[str, Any]:
         percentiles = {f'p{p:02}_at': np.nan for p in ps}
         if not _is_enough(x, min_wear, dt):
             return percentiles
@@ -761,7 +815,7 @@ def summarize_steps(
                 pass
         return percentiles
 
-    def _tdelta_to_str(tdelta):
+    def _tdelta_to_str(tdelta: Any) -> Any:
         if pd.isna(tdelta):
             return np.nan
         hours, rem = divmod(tdelta.seconds, 3600)
@@ -777,9 +831,9 @@ def summarize_steps(
 
     if adjust_estimates:
         # adjusted estimates account for NAs
-        minutely_steps = Y.resample('T').agg(_sum, min_wear=min_wear_per_minute, dt=dt).rename('Steps')  # up to 30s/min missingness
-        hourly_steps = Y.resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt).rename('Steps')  # up to 10min/h missingness
-        daily_steps = Y.resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt).rename('Steps')  # up to 3h/d missingness
+        minutely_steps = cast(Any, Y).resample('T').agg(_sum, min_wear=min_wear_per_minute, dt=dt).rename('Steps')  # up to 30s/min missingness
+        hourly_steps = cast(Any, Y).resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt).rename('Steps')  # up to 10min/h missingness
+        daily_steps = cast(Any, Y).resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt).rename('Steps')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week = utils.impute_days(daily_steps).groupby(daily_steps.index.weekday).mean()
@@ -797,9 +851,9 @@ def summarize_steps(
         weekday_max_steps = day_of_week[day_of_week.index < 5].max()
     else:
         # crude (unadjusted) estimates ignore NAs
-        minutely_steps = Y.resample('T').agg(_sum).rename('Steps')
-        hourly_steps = Y.resample('H').agg(_sum).rename('Steps')
-        daily_steps = Y.resample('D').agg(_sum).rename('Steps')
+        minutely_steps = cast(Any, Y).resample('T').agg(_sum).rename('Steps')
+        hourly_steps = cast(Any, Y).resample('H').agg(_sum).rename('Steps')
+        daily_steps = cast(Any, Y).resample('D').agg(_sum).rename('Steps')
         avg_steps = daily_steps.mean()
         med_steps = daily_steps.median()
         min_steps = daily_steps.min()
@@ -819,9 +873,8 @@ def summarize_steps(
 
     if adjust_estimates:
         # adjusted estimates account for NAs
-        # minutely_walk = (W.resample('T').agg(_sum, min_wear=min_wear_per_minute, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 30s/min missingness
-        hourly_walk = (W.resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
-        daily_walk = (W.resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
+        hourly_walk = (cast(Any, W).resample('H').agg(_sum, min_wear=min_wear_per_hour, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 10min/h missingness
+        daily_walk = (cast(Any, W).resample('D').agg(_sum, min_wear=min_wear_per_day, dt=dt) * dt / 60).rename('Walk(mins)')  # up to 3h/d missingness
         # adjusted estimates first form a 7-day representative week before final aggregation
         # TODO: 7-day padding for shorter recordings
         day_of_week_walk = utils.impute_days(daily_walk).groupby(daily_walk.index.weekday).mean()
@@ -839,9 +892,8 @@ def summarize_steps(
         weekday_max_walk = day_of_week_walk[day_of_week_walk.index < 5].max()
     else:
         # crude (unadjusted) estimates ignore NAs
-        # minutely_walk = (W.resample('T').agg(_sum) * dt / 60).rename('Walk(mins)')
-        hourly_walk = (W.resample('H').agg(_sum) * dt / 60).rename('Walk(mins)')
-        daily_walk = (W.resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
+        hourly_walk = (cast(Any, W).resample('H').agg(_sum) * dt / 60).rename('Walk(mins)')
+        daily_walk = (cast(Any, W).resample('D').agg(_sum) * dt / 60).rename('Walk(mins)')
         avg_walk = daily_walk.mean()
         med_walk = daily_walk.median()
         min_walk = daily_walk.min()
@@ -960,7 +1012,7 @@ def summarize_cadence(
     steptol: int = 3,
     min_walk_per_day: int = 5,
     adjust_estimates: bool = False
-):
+) -> Dict[str, Any]:
     """
     Summarize cadence information from a series of step counts.
 
@@ -986,7 +1038,12 @@ def summarize_cadence(
     dt = utils.infer_freq(Y.index).total_seconds()
     min_steps_per_min = steptol * 60 / dt  # rescale steptol to steps/min
 
-    def _cadence_max(x, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day, n=1):
+    def _cadence_max(
+        x: Any,
+        min_steps_per_min: float = min_steps_per_min,
+        min_walk_per_day: int = min_walk_per_day,
+        n: int = 1,
+    ) -> Any:
         y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
@@ -994,7 +1051,11 @@ def summarize_cadence(
             return np.nan
         return y.nlargest(n, keep='all').mean()
 
-    def _cadence_p95(x, min_steps_per_min=min_steps_per_min, min_walk_per_day=min_walk_per_day):
+    def _cadence_p95(
+        x: Any,
+        min_steps_per_min: float = min_steps_per_min,
+        min_walk_per_day: int = min_walk_per_day,
+    ) -> Any:
         y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
@@ -1002,7 +1063,7 @@ def summarize_cadence(
             return np.nan
         return y.quantile(.95)
 
-    minutely = Y.resample('T').sum().rename('Steps')  # steps/min
+    minutely = cast(Any, Y).resample('T').sum().rename('Steps')  # steps/min
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
 
@@ -1068,7 +1129,7 @@ def summarize_bouts(
     steptol: int = 3,
     bouts_min_walk: float = 0.8,
     bouts_max_idle: int = 3,
-):
+) -> Dict[str, _DataFrame]:
     """
     Summarize bouts of walking activity. For each detected bout, it calculates
     start and end times, duration, total steps, ENMO and cadence metrics.
@@ -1126,7 +1187,7 @@ def summarize_bouts(
             })
         }
 
-    bout_stats = defaultdict(list)
+    bout_stats: defaultdict[str, list[Any]] = defaultdict(list)
 
     dt = utils.infer_freq(Y.index)
     one_min = pd.Timedelta('1min')
@@ -1137,7 +1198,7 @@ def summarize_bouts(
     v *= 1000  # convert to mg
     v = v.resample(dt).mean().reindex(Y.index, method='nearest', tolerance=dt)
 
-    tlast = None
+    tlast: Optional[pd.Timestamp] = None
     for i, n in bouts:
         y = Y.iloc[i:i + n]
         bout_steps = y.sum()
@@ -1148,14 +1209,16 @@ def summarize_bouts(
         bout_cadence_25th = y.quantile(0.25)
         bout_cadence_50th = y.quantile(0.50)
         bout_cadence_75th = y.quantile(0.75)
-        tstart, tend = y.index[0], y.index[-1]
+        datetime_index = cast(pd.DatetimeIndex, y.index)
+        tstart, tend = datetime_index[0], datetime_index[-1]
         if tlast is not None:
             tsince = (tstart - tlast) / one_min
         else:
             tsince = np.nan
-        tlast = y.index[-1]
-        bout_enmo = v.loc[tstart:tend].mean()
-        bout_enmo_med = v.loc[tstart:tend].median()
+        tlast = tend
+        bout_values = cast(Any, v).loc[cast(Any, tstart):cast(Any, tend)]
+        bout_enmo = bout_values.mean()
+        bout_enmo_med = bout_values.median()
         bout_stats['StartTime'].append(tstart.strftime('%Y-%m-%d %H:%M:%S'))
         bout_stats['EndTime'].append(tend.strftime('%Y-%m-%d %H:%M:%S'))
         bout_stats['Duration(mins)'].append(bout_duration)
@@ -1169,10 +1232,10 @@ def summarize_bouts(
         bout_stats['ENMO(mg)'].append(bout_enmo)
         bout_stats['ENMOMed(mg)'].append(bout_enmo_med)
 
-    bout_stats = pd.DataFrame(bout_stats)
+    bout_stats_frame = pd.DataFrame(bout_stats)
 
     return {
-        'bouts': bout_stats,
+        'bouts': bout_stats_frame,
     }
 
 
@@ -1180,7 +1243,7 @@ def _detect_bouts(
     arr: _NDArray,
     min_percent_ones: float = 0.8,
     max_trailing_zeros: int = 3
-):
+) -> List[Tuple[int, int]]:
     """
     For a series of 0s and 1s, find the start and duration of each bout.
     A bout is a series of 0s and 1s where any expanding average is at least
@@ -1210,8 +1273,8 @@ def _detect_bouts(
         Output: [(1, 1), (4, 2), (9, 3), (15, 4)]
     """
 
-    bouts = []
-    bout_start = None
+    bouts: list[Tuple[int, int]] = []
+    bout_start: Optional[int] = None
     bout_length = 0
     bout_sum = 0
     trailing_zeros = 0
@@ -1243,11 +1306,15 @@ def _detect_bouts(
     return bouts
 
 
-_compiled_detect_bouts = None
+_compiled_detect_bouts: Optional[Any] = None
 _detect_bouts_compile_lock = Lock()
 
 
-def numba_detect_bouts(arr, min_percent_ones=0.8, max_trailing_zeros=3):
+def numba_detect_bouts(
+    arr: _NDArray,
+    min_percent_ones: float = 0.8,
+    max_trailing_zeros: int = 3,
+) -> List[Tuple[int, int]]:
     """Detect walking bouts, compiling the implementation on first use."""
     global _compiled_detect_bouts
 
@@ -1260,10 +1327,13 @@ def numba_detect_bouts(arr, min_percent_ones=0.8, max_trailing_zeros=3):
                 dispatcher = njit(_detect_bouts)
                 _compiled_detect_bouts = dispatcher
 
-    return dispatcher(arr, min_percent_ones, max_trailing_zeros)
+    return cast(List[Tuple[int, int]], dispatcher(arr, min_percent_ones, max_trailing_zeros))
 
 
-def plot(Y, title=None):
+def plot(
+    Y: Union[_Series, _DataFrame],
+    title: Optional[str] = None,
+) -> _Figure:
     """
     Plot time series of steps per minute for each day.
 
@@ -1281,26 +1351,25 @@ def plot(Y, title=None):
 
     MAX_STEPS_PER_MINUTE = 180
 
-    if isinstance(Y, pd.DataFrame):
-        Y = Y['Steps']
+    series: Any = Y['Steps'] if isinstance(Y, pd.DataFrame) else Y
 
-    assert isinstance(Y, pd.Series), "Y must be a pandas Series, or a DataFrame with a 'Steps' column"
+    assert isinstance(series, pd.Series), "Y must be a pandas Series, or a DataFrame with a 'Steps' column"
 
     # Resample to 1 minute intervals
     # Note: .sum() returns 0 when all values are NaN, so we need to use a custom function
-    def _sum(x):
+    def _sum(x: Any) -> Any:
         if x.isna().all():
             return np.nan
         return x.sum()
 
-    Y = Y.resample('1T').agg(_sum)
+    series = series.resample('1T').agg(_sum)
 
-    dates_index = Y.index.normalize()
+    dates_index = series.index.normalize()
     unique_dates = dates_index.unique()
 
     fig = plt.figure(figsize=(10, len(unique_dates) * 2))
 
-    for i, (day, y) in enumerate(Y.groupby(dates_index)):
+    for i, (day, y) in enumerate(series.groupby(dates_index)):
         ax = fig.add_subplot(len(unique_dates), 1, i + 1)
 
         ax.plot(y.index, y, label='steps/min')

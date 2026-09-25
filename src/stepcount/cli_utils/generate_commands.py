@@ -1,9 +1,17 @@
+from __future__ import annotations
+
 import argparse
 import os
 
 
 
-def generate_commands(input_dir, output_dir, cmdsfile='list-of-commands.txt', fext="cwa", cmdopts=""):
+def generate_commands(
+    input_dir: str,
+    output_dir: str,
+    cmdsfile: str = 'list-of-commands.txt',
+    fext: str = "cwa",
+    cmdopts: str = "",
+) -> None:
     """Generate a text file listing processing commands for files found under input_dir/
 
     :param str input_dir: Directory containing accelerometer files to process.
@@ -53,7 +61,7 @@ def generate_commands(input_dir, output_dir, cmdsfile='list-of-commands.txt', fe
     print('List of commands written to ', cmdsfile)
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('input_dir')
     parser.add_argument('--output_dir', '-d', required=True)

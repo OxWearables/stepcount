@@ -1,7 +1,13 @@
+from __future__ import annotations
+
 import warnings
 from copy import deepcopy
 from collections import defaultdict, Counter
+from os import PathLike
+from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast, overload
+
 import torch
+import torch.nn as nn
 import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks
@@ -18,22 +24,28 @@ from stepcount import sslmodel
 from tqdm.auto import tqdm
 from torch.utils.data import DataLoader
 
+from stepcount._types import FeatureDict, NDArray, Numeric, PeakParams
+
+
+CVIndices = Sequence[Any]
+ScoreSummary = Dict[str, Dict[str, Numeric]]
+
 
 class StepCounter:
 
     def __init__(
         self,
-        window_sec=5,
-        sample_rate=100,
-        steptol=3,
-        pnr=1.0,
-        lowpass_hz=5,
-        cv=5,
-        wd_type='ssl',
-        wd_params=None,
-        n_jobs=-1,
-        verbose=False
-    ):
+        window_sec: float = 5,
+        sample_rate: float = 100,
+        steptol: int = 3,
+        pnr: float = 1.0,
+        lowpass_hz: float = 5,
+        cv: int = 5,
+        wd_type: Literal['ssl', 'rf'] = 'ssl',
+        wd_params: Optional[Dict[str, Any]] = None,
+        n_jobs: int = -1,
+        verbose: bool = False
+    ) -> None:
         self.window_sec = window_sec
         self.sample_rate = sample_rate
         self.steptol = steptol
@@ -46,12 +58,12 @@ class StepCounter:
         wd_params = wd_params or dict()
 
         if wd_type == 'ssl':
-            wd_defaults = {
+            wd_defaults: Dict[str, Any] = {
                 'device': 'mps' if hasattr(torch.backends, 'mps') and torch.backends.mps.is_available() else 'cpu',
                 'batch_size': 100,
                 'verbose': verbose
             }
-            wd = WalkDetectorSSL
+            wd: Any = WalkDetectorSSL
             # ssl is pretrained with 10s/30hz
             self.window_sec = 10
             self.sample_rate = 30
@@ -72,13 +84,19 @@ class StepCounter:
             if key not in wd_params:
                 wd_params[key] = value
         self.wd_params = wd_params
-        self.wd = wd(**self.wd_params)
+        self.wd: Union[WalkDetectorRF, WalkDetectorSSL] = wd(**self.wd_params)
 
         self.window_len = int(np.ceil(self.window_sec * self.sample_rate))
-        self.find_peaks_params = None
-        self.cv_scores = None
+        self.find_peaks_params: Optional[PeakParams] = None
+        self.cv_scores: Optional[Dict[str, Any]] = None
+        self.cv_results: Dict[str, Any] = {}
 
-    def fit(self, X, Y, groups=None):
+    def fit(
+        self,
+        X: NDArray,
+        Y: NDArray,
+        groups: Optional[NDArray] = None,
+    ) -> StepCounter:
 
         # define walk/non-walk based on threshold
         W = np.zeros_like(Y)
@@ -113,15 +131,15 @@ class StepCounter:
         sample_weight = calc_sample_weight(W, self.pnr)
         sample_weight_w = sample_weight[whr_walk_pred]
 
-        def mae(x):
+        def mae(x: NDArray) -> float:
             Ywp = batch_count_peaks_from_V(Vw, self.sample_rate, to_params(x))
             err = metrics.mean_absolute_error(Yw, Ywp, sample_weight=sample_weight_w)
-            return err
+            return float(err)
 
-        def to_params(x):
-            params = {
-                "distance": x[0],
-                "prominence": x[1],
+        def to_params(x: NDArray) -> PeakParams:
+            params: PeakParams = {
+                "distance": float(x[0]),
+                "prominence": float(x[1]),
             }
             return params
 
@@ -183,11 +201,17 @@ class StepCounter:
 
         return self
 
-    def predict(self, X, groups=None, return_walk=False, return_step_times=False):
+    def predict(
+        self,
+        X: NDArray,
+        groups: Optional[NDArray] = None,
+        return_walk: bool = False,
+        return_step_times: bool = False,
+    ) -> Optional[Tuple[NDArray, Optional[NDArray], Optional[NDArray]]]:
 
         if self.find_peaks_params is None:
             print("Model not yet trained. Call .fit() first.")
-            return
+            return None
 
         # check X quality
         ok = np.flatnonzero(~np.asarray([np.isnan(x).any() for x in X]))
@@ -223,9 +247,12 @@ class StepCounter:
 
         return Y, W, Z
 
-    def predict_from_frame(self, data):
+    def predict_from_frame(
+        self,
+        data: pd.DataFrame,
+    ) -> Tuple[pd.Series[Any], pd.Series[Any], pd.Series[Any]]:
 
-        def fn(chunk):
+        def fn(chunk: pd.DataFrame) -> NDArray:
             """ Process the chunk. Apply padding if length is not enough. """
             n = len(chunk)
             x = chunk[['x', 'y', 'z']].to_numpy()
@@ -242,17 +269,26 @@ class StepCounter:
 
         X, T = make_windows(data, self.window_sec, fn=fn, return_index=True, verbose=self.verbose)
 
-        Y, W, Z = self.predict(X, return_walk=True, return_step_times=True)
+        prediction = self.predict(
+            X,
+            return_walk=True,
+            return_step_times=True,
+        )
+        if prediction is None:
+            raise RuntimeError("Model not yet trained. Call .fit() first.")
+        Y_values, W_values, Z_values = prediction
+        if W_values is None or Z_values is None:
+            raise RuntimeError("Walk and step-time outputs were not produced")
 
-        Y = pd.Series(Y, index=T, name='Steps')
-        W = pd.Series(W, index=T, name='Walk')
+        Y = pd.Series(Y_values, index=T, name='Steps')
+        W = pd.Series(W_values, index=T, name='Walk')
 
-        T_steps = []
-        for t, z in zip(T, Z):
+        step_times: list[pd.Timestamp] = []
+        for t, z in zip(T, Z_values):
             if z is not None:
                 # convert the local window timestamps to global timestamps
-                T_steps.extend([t + pd.Timedelta(seconds=dt) for dt in z])
-        T_steps = pd.Series(T_steps, name='time')
+                step_times.extend([t + pd.Timedelta(seconds=dt) for dt in z])
+        T_steps = pd.Series(step_times, name='time')
 
         return Y, W, T_steps
 
@@ -260,17 +296,17 @@ class StepCounter:
 class WalkDetectorRF:
     def __init__(
         self,
-        sample_rate=100,
-        pnr=1.0,
-        calib_method='balanced_accuracy',
-        precision_tol=.9,
-        recall_tol=.9,
-        cv=5,
-        clf_params=None,
-        hmm_params=None,
-        n_jobs=-1,
-        verbose=False,
-    ):
+        sample_rate: float = 100,
+        pnr: float = 1.0,
+        calib_method: Optional[Literal['balanced_accuracy', 'f1', 'precision', 'recall']] = 'balanced_accuracy',
+        precision_tol: float = .9,
+        recall_tol: float = .9,
+        cv: int = 5,
+        clf_params: Optional[Dict[str, Any]] = None,
+        hmm_params: Optional[Dict[str, Any]] = None,
+        n_jobs: int = -1,
+        verbose: bool = False,
+    ) -> None:
 
         self.sample_rate = sample_rate
 
@@ -286,7 +322,7 @@ class WalkDetectorRF:
         clf_params = clf_params or dict()
         hmm_params = hmm_params or dict()
 
-        self.clf = BalancedRandomForestClassifier(
+        self.clf: Any = BalancedRandomForestClassifier(
             n_estimators=clf_params.get('n_estimators', 1000),
             replacement=clf_params.get('replacement', True),
             sampling_strategy=clf_params.get('sampling_strategy', 'not minority'),
@@ -298,17 +334,22 @@ class WalkDetectorRF:
 
         self.thresh = 0.5
 
-    def fit(self, X, Y, groups=None):
+    def fit(
+        self,
+        X: NDArray,
+        Y: NDArray,
+        groups: Optional[NDArray] = None,
+    ) -> WalkDetectorRF:
 
         X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
 
         whr_ok = ~(np.isnan(X_feats).any(1))
         X_feats = X_feats[whr_ok]
         Y = Y[whr_ok]
-        groups = groups[whr_ok]
+        filtered_groups = groups[whr_ok] if groups is not None else None
 
         Yp = cvp(
-            self.clf, X_feats, Y, groups,
+            self.clf, X_feats, Y, filtered_groups,
             method='predict_proba',
             fit_predict_groups=False,
             n_splits=self.cv,
@@ -347,11 +388,11 @@ class WalkDetectorRF:
         else:
             Ypp = Yp
 
-        self.hmms.fit(Ypp, Y, groups=groups)
+        self.hmms.fit(Ypp, Y, groups=filtered_groups)
 
         return self
 
-    def predict(self, X, groups=None):
+    def predict(self, X: NDArray, groups: Optional[NDArray] = None) -> NDArray:
 
         if len(X) == 0:
             warnings.warn("No data to predict")
@@ -370,30 +411,38 @@ class WalkDetectorRF:
 class WalkDetectorSSL:
     def __init__(
         self,
-        device='cpu',
-        batch_size=100,
-        weights_path='state_dict.pt',
-        repo_tag='v1.0.0',
-        ssl_repo_path=None,
-        hmm_params=None,
-        verbose=False,
-    ):
+        device: sslmodel.Device = 'cpu',
+        batch_size: int = 100,
+        weights_path: Union[str, PathLike[str]] = 'state_dict.pt',
+        repo_tag: str = 'v1.0.0',
+        ssl_repo_path: Optional[Union[str, PathLike[str]]] = None,
+        hmm_params: Optional[Dict[str, Any]] = None,
+        verbose: bool = False,
+    ) -> None:
         self.device = device
         self.weights_path = weights_path
         self.repo_tag = repo_tag
         self.ssl_repo_path = ssl_repo_path
         self.batch_size = batch_size
-        self.state_dict = None
+        self.state_dict: Optional[Mapping[str, Any]] = None
 
-        self.model = None
+        self.model: Optional[nn.Module] = None
+        self.n_jobs = 1
 
         self.verbose = verbose
 
         hmm_params = hmm_params or dict()
         self.hmms = hmm_utils.HMMSmoother(**hmm_params)
 
-    def fit(self, X, Y, groups=None):
+    def fit(
+        self,
+        X: NDArray,
+        Y: NDArray,
+        groups: Optional[NDArray] = None,
+    ) -> WalkDetectorSSL:
         sslmodel.verbose = self.verbose
+
+        split_groups = groups if groups is not None else np.arange(len(Y))
 
         if self.verbose:
             print('Training SSL')
@@ -401,7 +450,7 @@ class WalkDetectorSSL:
         # prepare training and validation sets
         folds = GroupShuffleSplit(
             1, test_size=0.2, random_state=41
-        ).split(X, Y, groups=groups)
+        ).split(X, Y, groups=split_groups)
         train_idx, val_idx = next(folds)
 
         x_train = X[train_idx]
@@ -410,8 +459,8 @@ class WalkDetectorSSL:
         y_train = Y[train_idx]
         y_val = Y[val_idx]
 
-        group_train = groups[train_idx]
-        group_val = groups[val_idx]
+        group_train = groups[train_idx] if groups is not None else None
+        group_val = groups[val_idx] if groups is not None else None
 
         train_dataset = sslmodel.NormalDataset(x_train, y_train, pid=group_train, name="training", augmentation=True)
         val_dataset = sslmodel.NormalDataset(x_val, y_val, pid=group_val, name="validation")
@@ -447,7 +496,7 @@ class WalkDetectorSSL:
             print('Training HMM')
 
         # train HMM with predictions of the validation set
-        y_val, y_val_pred, group_val = sslmodel.predict(model, val_loader, self.device, output_logits=True)
+        y_val, y_val_pred, _ = sslmodel.predict(model, val_loader, self.device, output_logits=True)
         y_val_pred_sf = softmax(y_val_pred, axis=1)
 
         self.hmms.fit(y_val_pred_sf, y_val, groups=group_val)
@@ -458,7 +507,7 @@ class WalkDetectorSSL:
 
         return self
 
-    def predict(self, X, groups=None):
+    def predict(self, X: NDArray, groups: Optional[NDArray] = None) -> NDArray:
 
         sslmodel.verbose = self.verbose
 
@@ -483,7 +532,10 @@ class WalkDetectorSSL:
 
         return y_pred
 
-    def load_model(self):
+    def load_model(self) -> nn.Module:
+
+        if self.state_dict is None:
+            raise RuntimeError("No fitted SSL model state is available")
 
         model = sslmodel.get_sslnet(tag=self.repo_tag, pretrained=False,
                                     repo_path=getattr(self, 'ssl_repo_path', None))
@@ -496,75 +548,127 @@ class WalkDetectorSSL:
         return model
 
 
-def make_windows(data, window_sec, fn=None, return_index=False, verbose=True):
+@overload
+def make_windows(
+    data: pd.DataFrame,
+    window_sec: float,
+    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
+    return_index: Literal[False] = False,
+    verbose: bool = True,
+) -> NDArray:
+    ...
+
+
+@overload
+def make_windows(
+    data: pd.DataFrame,
+    window_sec: float,
+    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
+    return_index: Literal[True] = True,
+    verbose: bool = True,
+) -> Tuple[NDArray, pd.DatetimeIndex]:
+    ...
+
+
+def make_windows(
+    data: pd.DataFrame,
+    window_sec: float,
+    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
+    return_index: bool = False,
+    verbose: bool = True,
+) -> Union[NDArray, Tuple[NDArray, pd.DatetimeIndex]]:
     """ Split data into windows """
 
     if verbose:
         print("Defining segments...")
 
-    if fn is None:
-        def fn(x):
+    transform = fn
+    if transform is None:
+        def transform(x: pd.DataFrame) -> pd.DataFrame:
             return x
 
-    X, T = [], []
+    windows: list[Any] = []
+    times: list[Any] = []
     for t, x in data.resample(f"{window_sec}s", origin="start"):
-        x = fn(x)
-        X.append(x)
-        T.append(t)
+        transformed = transform(x)
+        windows.append(transformed)
+        times.append(t)
 
     # Handle potentially inhomogeneous window sizes gracefully
     # (pandas resample can produce windows with different sample counts)
     try:
-        X = np.stack(X, axis=0)
+        X = cast(NDArray, np.stack(windows, axis=0))
     except ValueError:
         # Windows have different shapes - use object array for compatibility
-        X = np.array(X, dtype=object)
+        X = cast(NDArray, np.array(windows, dtype=object))
 
     if return_index:
-        T = pd.DatetimeIndex(T, name=data.index.name)
+        T = pd.DatetimeIndex(times, name=data.index.name)
         return X, T
 
     return X
 
 
+@overload
 def cvp(
-    model, X, Y, groups,
-    method='predict',
-    fit_predict_groups=False,
-    return_indices=False,
-    n_splits=5,
-    n_jobs=-1,
-):
+    model: Any, X: Union[NDArray, pd.DataFrame], Y: NDArray,
+    groups: Optional[NDArray],
+    method: str = 'predict', fit_predict_groups: bool = False,
+    return_indices: Literal[False] = False, n_splits: int = 5, n_jobs: int = -1,
+) -> NDArray:
+    ...
+
+
+@overload
+def cvp(
+    model: Any, X: Union[NDArray, pd.DataFrame], Y: NDArray,
+    groups: Optional[NDArray],
+    method: str = 'predict', fit_predict_groups: bool = False,
+    return_indices: Literal[True] = True, n_splits: int = 5, n_jobs: int = -1,
+) -> Tuple[NDArray, List[Any]]:
+    ...
+
+
+def cvp(
+    model: Any, X: Union[NDArray, pd.DataFrame], Y: NDArray,
+    groups: Optional[NDArray],
+    method: str = 'predict', fit_predict_groups: bool = False,
+    return_indices: bool = False, n_splits: int = 5, n_jobs: int = -1,
+) -> Union[NDArray, Tuple[NDArray, List[Any]]]:
     """ Like cross_val_predict with custom tweaks """
 
+    split_groups = groups if groups is not None else np.arange(len(Y))
+
     if n_splits == -1:
-        n_splits = len(np.unique(groups))
+        n_splits = len(np.unique(split_groups))
 
     if isinstance(X, pd.DataFrame):
         X = X.to_numpy()
 
-    def worker(train_idxs, test_idxs):
-        X_train, Y_train, groups_train = X[train_idxs], Y[train_idxs], groups[train_idxs]
-        X_test, Y_test, groups_test = X[test_idxs], Y[test_idxs], groups[test_idxs]
+    def worker(train_idxs: Any, test_idxs: Any) -> Tuple[NDArray, Any]:
+        X_train, Y_train = X[train_idxs], Y[train_idxs]
+        X_test = X[test_idxs]
+        groups_train = groups[train_idxs] if groups is not None else None
+        groups_test = groups[test_idxs] if groups is not None else None
 
         m = deepcopy(model)
         m.n_jobs = 1
 
         if fit_predict_groups:
             m.fit(X_train, Y_train, groups=groups_train)
-            Y_test_pred = getattr(m, method)(X_test, groups=groups_test)
+            Y_test_pred = cast(NDArray, getattr(m, method)(X_test, groups=groups_test))
         else:
             m.fit(X_train, Y_train)
-            Y_test_pred = getattr(m, method)(X_test)
+            Y_test_pred = cast(NDArray, getattr(m, method)(X_test))
 
         return Y_test_pred, test_idxs
 
-    results = Parallel(n_jobs=n_jobs)(
+    results: list[Tuple[NDArray, Any]] = Parallel(n_jobs=n_jobs)(
         delayed(worker)(train_idxs, test_idxs)
-        for train_idxs, test_idxs in groupkfold(groups, n_splits)
+        for train_idxs, test_idxs in groupkfold(split_groups, n_splits)
     )
 
-    Y_pred = np.concatenate([r[0] for r in results])
+    Y_pred = cast(NDArray, np.concatenate([r[0] for r in results]))
     cv_test_idxs = [r[1] for r in results]
 
     if return_indices:
@@ -573,7 +677,7 @@ def cvp(
     return Y_pred
 
 
-def groupkfold(groups, n_splits=5):
+def groupkfold(groups: NDArray, n_splits: int = 5) -> Iterator[Tuple[Any, Any]]:
     """ Like GroupKFold but ordered """
 
     ord_unq_grps = groups[np.sort(np.unique(groups, return_index=True)[1])]
@@ -586,7 +690,13 @@ def groupkfold(groups, n_splits=5):
         yield train_idxs, test_idxs
 
 
-def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif'):
+def get_cv_scores(
+    yt: NDArray,
+    yp: NDArray,
+    cv_test_idxs: CVIndices,
+    sample_weight: Optional[NDArray] = None,
+    scorer_type: Literal['classif', 'regress'] = 'classif',
+) -> Tuple[Dict[str, List[float]], ScoreSummary]:
 
     classif_scorers = {
         'accuracy': metrics.accuracy_score,
@@ -602,13 +712,17 @@ def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif
         'mape': lambda yt, yp, sample_weight: smooth_mean_absolute_percentage_error(yt, yp, sample_weight=sample_weight),
     }
 
-    def smooth_mean_absolute_percentage_error(yt, yp, sample_weight=None):
+    def smooth_mean_absolute_percentage_error(
+        yt: NDArray,
+        yp: NDArray,
+        sample_weight: Optional[NDArray] = None,
+    ) -> float:
         yt, yp = yt.copy(), yp.copy()
         # add 1 where zero to smooth the mape
         whr = yt == 0
         yt[whr] += 1
         yp[whr] += 1
-        return metrics.mean_absolute_percentage_error(yt, yp, sample_weight=sample_weight)
+        return float(metrics.mean_absolute_percentage_error(yt, yp, sample_weight=sample_weight))
 
     if scorer_type == 'classif':
         scorers = classif_scorers
@@ -617,14 +731,15 @@ def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif
     else:
         raise ValueError(f"Unknown {scorer_type=}")
 
-    raw_scores = defaultdict(list)
+    raw_scores: defaultdict[str, list[float]] = defaultdict(list)
 
     for idxs in cv_test_idxs:
-        yt_, yp_, sample_weight_ = yt[idxs], yp[idxs], sample_weight[idxs]
+        yt_, yp_ = yt[idxs], yp[idxs]
+        sample_weight_ = sample_weight[idxs] if sample_weight is not None else None
         for scorer_name, scorer_fn in scorers.items():
-            raw_scores[scorer_name].append(scorer_fn(yt_, yp_, sample_weight=sample_weight_))
+            raw_scores[scorer_name].append(float(scorer_fn(yt_, yp_, sample_weight=sample_weight_)))
 
-    summary = {}
+    summary: ScoreSummary = {}
     for key, val in raw_scores.items():
         q0, q25, q50, q75, q100 = np.quantile(val, (0, .25, .5, .75, 1))
         avg, std = np.mean(val), np.std(val)
@@ -636,28 +751,87 @@ def get_cv_scores(yt, yp, cv_test_idxs, sample_weight=None, scorer_type='classif
     return raw_scores, summary
 
 
-def batch_extract_features(X, sample_rate, to_numpy=True, n_jobs=1, verbose=False):
+@overload
+def batch_extract_features(
+    X: NDArray, sample_rate: float, to_numpy: Literal[True] = True,
+    n_jobs: int = 1, verbose: bool = False,
+) -> NDArray:
+    ...
+
+
+@overload
+def batch_extract_features(
+    X: NDArray, sample_rate: float, to_numpy: Literal[False],
+    n_jobs: int = 1, verbose: bool = False,
+) -> pd.DataFrame:
+    ...
+
+
+def batch_extract_features(
+    X: NDArray, sample_rate: float, to_numpy: bool = True,
+    n_jobs: int = 1, verbose: bool = False,
+) -> Union[NDArray, pd.DataFrame]:
     """ Extract features for a list or array of windows """
 
 
-    X_feats = Parallel(n_jobs=n_jobs)(
+    feature_rows: list[FeatureDict] = Parallel(n_jobs=n_jobs)(
         delayed(features.extract_features)(x, sample_rate)
         for x in tqdm(X, total=len(X), mininterval=5, disable=not verbose, bar_format='Extracting features: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]')
     )
-    X_feats = pd.DataFrame(X_feats)
+    X_feats = pd.DataFrame(feature_rows)
 
     if to_numpy:
-        X_feats = X_feats.to_numpy()
+        return X_feats.to_numpy()
     return X_feats
 
 
-def batch_count_peaks(X, sample_rate, lowpass_hz, params, return_peaks=False):
+@overload
+def batch_count_peaks(
+    X: NDArray, sample_rate: float, lowpass_hz: float, params: PeakParams,
+    return_peaks: Literal[False] = False,
+) -> NDArray:
+    ...
+
+
+@overload
+def batch_count_peaks(
+    X: NDArray, sample_rate: float, lowpass_hz: float, params: PeakParams,
+    return_peaks: Literal[True],
+) -> Tuple[NDArray, List[NDArray]]:
+    ...
+
+
+def batch_count_peaks(
+    X: NDArray, sample_rate: float, lowpass_hz: float, params: PeakParams,
+    return_peaks: bool = False,
+) -> Union[NDArray, Tuple[NDArray, List[NDArray]]]:
     """ Count number of peaks for an array of signals """
     V = toV(X, sample_rate, lowpass_hz)
-    return batch_count_peaks_from_V(V, sample_rate, params, return_peaks)
+    if return_peaks:
+        return batch_count_peaks_from_V(V, sample_rate, params, True)
+    return batch_count_peaks_from_V(V, sample_rate, params, False)
 
 
-def batch_count_peaks_from_V(V, sample_rate, params, return_peaks=False):
+@overload
+def batch_count_peaks_from_V(
+    V: NDArray, sample_rate: float, params: PeakParams,
+    return_peaks: Literal[False] = False,
+) -> NDArray:
+    ...
+
+
+@overload
+def batch_count_peaks_from_V(
+    V: NDArray, sample_rate: float, params: PeakParams,
+    return_peaks: Literal[True],
+) -> Tuple[NDArray, List[NDArray]]:
+    ...
+
+
+def batch_count_peaks_from_V(
+    V: NDArray, sample_rate: float, params: PeakParams,
+    return_peaks: bool = False,
+) -> Union[NDArray, Tuple[NDArray, List[NDArray]]]:
     """ Count number of peaks for an array of signals """
 
     batch_peaks = batch_find_peaks_from_V(V, sample_rate, params)
@@ -669,7 +843,11 @@ def batch_count_peaks_from_V(V, sample_rate, params, return_peaks=False):
     return Y
 
 
-def batch_find_peaks_from_V(V, sample_rate, params):
+def batch_find_peaks_from_V(
+    V: NDArray,
+    sample_rate: float,
+    params: PeakParams,
+) -> List[NDArray]:
     """Find the peaks for an array of signals"""
 
     batch_peaks = [
@@ -684,15 +862,15 @@ def batch_find_peaks_from_V(V, sample_rate, params):
     return batch_peaks
 
 
-def toV(x, sample_rate, lowpass_hz):
-    V = np.linalg.norm(x, axis=-1)
+def toV(x: NDArray, sample_rate: float, lowpass_hz: float) -> NDArray:
+    V = cast(NDArray, np.linalg.norm(x, axis=-1))
     V = V - 1
     V = np.clip(V, -2, 2)
     V = features.butterfilt(V, lowpass_hz, sample_rate, axis=-1)
     return V
 
 
-def calc_sample_weight(yt, pnr=None):
+def calc_sample_weight(yt: NDArray, pnr: Optional[float] = None) -> NDArray:
     sample_weight = np.ones_like(yt, dtype='float')
     if pnr is None:
         return sample_weight
@@ -700,11 +878,17 @@ def calc_sample_weight(yt, pnr=None):
     return sample_weight
 
 
-def classification_report(yt, yp, pnr=1.0):
-    return metrics.classification_report(yt, yp, sample_weight=calc_sample_weight(yt, pnr=pnr))
+def classification_report(yt: NDArray, yp: NDArray, pnr: float = 1.0) -> str:
+    return cast(str, metrics.classification_report(yt, yp, sample_weight=calc_sample_weight(yt, pnr=pnr)))
 
 
-def calibrate(yp, yt, pnr=1.0, precision_tol=0.9, recall_tol=0.9):
+def calibrate(
+    yp: NDArray,
+    yt: NDArray,
+    pnr: float = 1.0,
+    precision_tol: float = 0.9,
+    recall_tol: float = 0.9,
+) -> Dict[str, Any]:
     sample_weight = calc_sample_weight(yt, pnr)
     precision, recall, thresh_pr = metrics.precision_recall_curve(yt, yp, sample_weight=sample_weight)
     fpr, tpr, thresh_roc = metrics.roc_curve(yt, yp, sample_weight=sample_weight)
@@ -773,5 +957,5 @@ def calibrate(yp, yt, pnr=1.0, precision_tol=0.9, recall_tol=0.9):
     return results
 
 
-def print_report():
+def print_report() -> None:
     pass

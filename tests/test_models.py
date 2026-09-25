@@ -14,6 +14,7 @@ Tests cover:
 import pytest
 import numpy as np
 import pandas as pd
+import torch
 
 from stepcount import models
 
@@ -372,6 +373,23 @@ class TestGetCVScores:
         assert 'rmse' in raw_scores
         assert 'mape' in raw_scores
 
+    @pytest.mark.parametrize("scorer_type", ["classif", "regress"])
+    def test_get_cv_scores_without_sample_weight(self, scorer_type):
+        """Unweighted scoring returns finite fold metrics."""
+        yt = np.array([0, 0, 1, 1, 0, 1, 0, 1])
+        yp = np.array([0, 1, 1, 1, 0, 1, 0, 0])
+        cv_test_idxs = [np.arange(4), np.arange(4, 8)]
+
+        raw_scores, _ = models.get_cv_scores(
+            yt,
+            yp,
+            cv_test_idxs,
+            sample_weight=None,
+            scorer_type=scorer_type,
+        )
+
+        assert all(np.isfinite(score) for scores in raw_scores.values() for score in scores)
+
 
 class TestBatchExtractFeatures:
     """Tests for batch feature extraction."""
@@ -499,6 +517,12 @@ class TestWalkDetectorSSLBasic:
 
         assert detector.ssl_repo_path is None
 
+    def test_walk_detector_ssl_load_requires_fitted_state(self):
+        detector = models.WalkDetectorSSL(device='cpu', verbose=False)
+
+        with pytest.raises(RuntimeError, match="No fitted SSL model state"):
+            detector.load_model()
+
     @pytest.mark.skip(reason="SSL model requires valid state_dict to be loaded before predict (needs model weights)")
     def test_walk_detector_ssl_predict_empty(self):
         """Test WalkDetectorSSL handles empty input.
@@ -623,6 +647,55 @@ class TestWalkDetectorRFFit:
         assert len(predictions) == 5
         assert set(predictions).issubset({0, 1})
 
+    def test_walk_detector_rf_fit_without_groups(self, walk_training_data, sample_rate):
+        """Default grouping keeps HMM transitions finite and normalized."""
+        X, Y, _ = walk_training_data
+        detector = models.WalkDetectorRF(
+            sample_rate=sample_rate,
+            cv=2,
+            n_jobs=1,
+            verbose=False,
+        )
+
+        detector.fit(X, Y)
+
+        assert np.isfinite(detector.hmms.transmat).all()
+        assert np.allclose(detector.hmms.transmat.sum(axis=1), 1.0)
+
+
+class TestWalkDetectorSSLFit:
+    def test_fit_without_groups_uses_one_hmm_sequence(self, monkeypatch, tmp_path):
+        """Synthetic split IDs are not reused as HMM sequence boundaries."""
+        X = np.zeros((20, 30, 3), dtype=float)
+        Y = np.tile([0, 1], 10)
+        model = torch.nn.Linear(1, 2)
+        weights_path = tmp_path / "weights.pt"
+
+        monkeypatch.setattr(models.sslmodel, "get_sslnet", lambda **kwargs: model)
+
+        def fake_train(model, *args, weights_path, **kwargs):
+            torch.save(model.state_dict(), weights_path)
+            return model
+
+        def fake_predict(model, dataloader, device, output_logits):
+            size = len(dataloader.dataset)
+            y_true = np.resize(np.array([0, 0, 1, 1]), size)
+            logits = np.column_stack([1 - y_true, y_true]).astype(float)
+            return y_true, logits, np.arange(size)
+
+        monkeypatch.setattr(models.sslmodel, "train", fake_train)
+        monkeypatch.setattr(models.sslmodel, "predict", fake_predict)
+
+        detector = models.WalkDetectorSSL(
+            device="cpu",
+            weights_path=weights_path,
+            verbose=False,
+        )
+        detector.fit(X, Y)
+
+        assert np.isfinite(detector.hmms.transmat).all()
+        assert np.allclose(detector.hmms.transmat, [[0.5, 0.5], [0.0, 1.0]])
+
 
 class TestCVP:
     """Tests for cvp() cross-validation predict utility."""
@@ -745,6 +818,43 @@ class TestPredictFromFrame:
         # Should have some windows
         assert len(Y) > 0
         assert len(W) == len(Y)
+
+    def test_predict_from_frame_requires_trained_model(self):
+        model = models.StepCounter(
+            wd_type="rf",
+            sample_rate=1,
+            window_sec=1,
+            verbose=False,
+        )
+        data = pd.DataFrame(
+            [[0.0, 0.0, 1.0]],
+            columns=["x", "y", "z"],
+            index=pd.date_range("2024-01-01", periods=1, freq="s"),
+        )
+
+        with pytest.raises(RuntimeError, match="Model not yet trained"):
+            model.predict_from_frame(data)
+
+    def test_predict_from_frame_requires_walk_and_step_outputs(self, monkeypatch):
+        model = models.StepCounter(
+            wd_type="rf",
+            sample_rate=1,
+            window_sec=1,
+            verbose=False,
+        )
+        data = pd.DataFrame(
+            [[0.0, 0.0, 1.0]],
+            columns=["x", "y", "z"],
+            index=pd.date_range("2024-01-01", periods=1, freq="s"),
+        )
+        monkeypatch.setattr(
+            model,
+            "predict",
+            lambda *args, **kwargs: (np.array([0.0]), None, None),
+        )
+
+        with pytest.raises(RuntimeError, match="outputs were not produced"):
+            model.predict_from_frame(data)
 
 
 class TestStepCounterFit:
