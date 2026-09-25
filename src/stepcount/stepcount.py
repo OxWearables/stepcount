@@ -815,6 +815,27 @@ def summarize_steps(
                 pass
         return percentiles
 
+    def _circular_timedelta_mean(values: Any) -> Any:
+        valid = values.dropna()
+        if valid.empty:
+            return pd.NaT
+        if len(valid) == 1:
+            return valid.iloc[0]
+
+        day_ns = pd.Timedelta(days=1).value
+        values_ns = valid.astype('timedelta64[ns]').astype(np.int64).to_numpy()
+        angles = values_ns * (2 * np.pi / day_ns)
+        mean_sin = np.sin(angles).mean()
+        mean_cos = np.cos(angles).mean()
+        if np.isclose(np.hypot(mean_sin, mean_cos), 0.0, atol=1e-12):
+            return pd.NaT
+
+        mean_angle = np.arctan2(mean_sin, mean_cos) % (2 * np.pi)
+        mean_ns = np.rint(mean_angle * day_ns / (2 * np.pi))
+        microsecond_ns = pd.Timedelta(microseconds=1).value
+        rounded_ns = int(np.rint(mean_ns / microsecond_ns)) * microsecond_ns % day_ns
+        return pd.Timedelta(rounded_ns, unit='ns')
+
     def _tdelta_to_str(tdelta: Any) -> Any:
         if pd.isna(tdelta):
             return np.nan
@@ -917,7 +938,7 @@ def summarize_steps(
     else:
         # crude (unadjusted) estimates ignore NAs
         daily_ptile_at = Y.groupby(pd.Grouper(freq='D')).apply(_percentile_at).unstack(1)
-    ptile_at_avgs = daily_ptile_at.mean()
+    ptile_at_avgs = daily_ptile_at.apply(_circular_timedelta_mean)
 
     # hour of day averages, 24-hour profile
     hour_steps = hourly_steps.groupby(hourly_steps.index.hour).mean().reindex(range(24))
@@ -1355,8 +1376,7 @@ def plot(
 
     assert isinstance(series, pd.Series), "Y must be a pandas Series, or a DataFrame with a 'Steps' column"
 
-    # Resample to 1 minute intervals
-    # Note: .sum() returns 0 when all values are NaN, so we need to use a custom function
+    # Preserve NaN for all-missing minute bins; pandas' sum returns 0 there.
     def _sum(x: Any) -> Any:
         if x.isna().all():
             return np.nan

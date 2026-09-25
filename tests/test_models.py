@@ -28,7 +28,6 @@ class TestMakeWindows:
         n_windows = 100
         n_samples = n_windows * sample_rate * window_sec
 
-        # Create evenly divisible test data
         times = pd.date_range('2024-01-15', periods=n_samples, freq=f'{1000000//sample_rate}us')
         data = pd.DataFrame(
             np.random.randn(n_samples, 3) * 0.1,
@@ -42,12 +41,10 @@ class TestMakeWindows:
 
         X = models.make_windows(data, window_sec, fn=fn, verbose=False)
 
-        # Check output - may be 3D (homogeneous) or object array (if windows vary)
         assert len(X) == n_windows
-        # Verify each window has the expected shape
         for window in X:
-            assert window.ndim == 2  # (samples_per_window, 3)
-            assert window.shape[1] == 3  # 3 columns (x, y, z)
+            assert window.ndim == 2
+            assert window.shape[1] == 3
 
     def test_make_windows_with_index(self, sample_rate):
         """Test window creation returns timestamps."""
@@ -121,12 +118,12 @@ class TestToV:
 
     def test_toV_shape(self, accel_window_walking, sample_rate):
         """Test toV output shape."""
-        X = np.expand_dims(accel_window_walking, 0)  # Add batch dimension
+        X = np.expand_dims(accel_window_walking, 0)
 
         V = models.toV(X, sample_rate, lowpass_hz=5)
 
-        assert V.shape[0] == 1  # batch size
-        assert V.shape[1] == accel_window_walking.shape[0]  # samples
+        assert V.shape[0] == 1
+        assert V.shape[1] == accel_window_walking.shape[0]
 
     def test_toV_removes_gravity(self, sample_rate):
         """Test that toV removes gravity (subtracts 1)."""
@@ -268,13 +265,11 @@ class TestCalibrate:
 
         results = models.calibrate(yp, yt)
 
-        # Should have various calibration results
         assert 'best_f1' in results
         assert 'best_precision' in results
         assert 'best_recall' in results
         assert 'best_balanced_accuracy' in results
 
-        # Each should have a threshold
         assert 'thresh' in results['best_f1']
         assert 0 <= results['best_f1']['thresh'] <= 1
 
@@ -314,7 +309,6 @@ class TestGroupKFold:
 
         assert len(splits) == 3
 
-        # Each split should have train and test indices
         for train_idx, test_idx in splits:
             assert len(train_idx[0]) > 0
             assert len(test_idx[0]) > 0
@@ -352,7 +346,6 @@ class TestGetCVScores:
         assert 'precision' in raw_scores
         assert 'recall' in raw_scores
 
-        # Summary should have statistics
         assert 'mean' in summary['accuracy']
         assert 'std' in summary['accuracy']
 
@@ -403,7 +396,7 @@ class TestBatchExtractFeatures:
         )
 
         assert feats.shape[0] == len(X)
-        assert feats.shape[1] > 20  # Should have many features
+        assert feats.shape[1] > 20
 
     def test_batch_extract_features_handles_nan(self, sample_rate):
         """Test batch feature extraction handles NaN windows."""
@@ -428,7 +421,6 @@ class TestStepCounterBasic:
         """Test StepCounter initialization with SSL type."""
         model = models.StepCounter(wd_type='ssl', verbose=False)
 
-        # SSL should set window_sec=10 and sample_rate=30
         assert model.window_sec == 10
         assert model.sample_rate == 30
 
@@ -456,10 +448,44 @@ class TestStepCounterBasic:
 
         X, _ = accel_windows_mixed
 
-        # Should print warning but not crash
         result = model.predict(X[:5])
 
-        assert result is None  # Returns None when untrained
+        assert result is None
+
+    def test_stepcounter_discards_peak_times_below_step_threshold(self, monkeypatch):
+        model = models.StepCounter(
+            wd_type='rf',
+            sample_rate=1,
+            window_sec=1,
+            steptol=3,
+            verbose=False,
+        )
+        model.find_peaks_params = {'distance': 1.0}
+        monkeypatch.setattr(model.wd, 'predict', lambda *args, **kwargs: np.ones(3))
+
+        peak_times = np.empty(3, dtype=object)
+        peak_times[0] = np.array([0.1, 0.2])
+        peak_times[1] = np.array([0.1, 0.2, 0.3])
+        peak_times[2] = np.array([0.1, 0.2, 0.3, 0.4])
+        monkeypatch.setattr(
+            models,
+            'batch_count_peaks',
+            lambda *args, **kwargs: (np.array([2.0, 3.0, 4.0]), peak_times),
+        )
+
+        prediction = model.predict(
+            np.zeros((3, 1, 3)),
+            return_walk=True,
+            return_step_times=True,
+        )
+
+        assert prediction is not None
+        counts, _, predicted_peak_times = prediction
+        np.testing.assert_array_equal(counts, [0.0, 3.0, 4.0])
+        assert predicted_peak_times is not None
+        assert predicted_peak_times[0] is None
+        np.testing.assert_array_equal(predicted_peak_times[1], peak_times[1])
+        np.testing.assert_array_equal(predicted_peak_times[2], peak_times[2])
 
 
 class TestWalkDetectorRFBasic:
@@ -470,7 +496,7 @@ class TestWalkDetectorRFBasic:
         detector = models.WalkDetectorRF(sample_rate=sample_rate, verbose=False)
 
         assert detector.sample_rate == sample_rate
-        assert detector.thresh == 0.5  # Default threshold
+        assert detector.thresh == 0.5
 
     def test_walk_detector_rf_predict_empty(self, sample_rate):
         """Test WalkDetectorRF handles empty input."""
@@ -623,7 +649,6 @@ class TestWalkDetectorRFFit:
 
         detector.fit(X, Y, groups=groups)
 
-        # Verify training completed
         assert detector.thresh is not None
         assert 0 <= detector.thresh <= 1
         assert detector.hmms.startprob is not None
@@ -704,7 +729,6 @@ class TestCVP:
         """Test cvp returns predictions for all samples."""
         np.random.seed(42)
 
-        # Simple feature array
         X = np.random.randn(50, 10)
         Y = np.array([0] * 25 + [1] * 25)
         groups = np.array(['A'] * 10 + ['B'] * 10 + ['C'] * 10 + ['D'] * 10 + ['E'] * 10)
@@ -731,7 +755,6 @@ class TestCVP:
         Yp, cv_idxs = models.cvp(clf, X, Y, groups, n_splits=5, n_jobs=1, return_indices=True)
 
         assert len(cv_idxs) == 5
-        # All indices should be covered
         all_idxs = np.concatenate([idx[0] for idx in cv_idxs])
         assert len(all_idxs) == len(Y)
 
@@ -749,8 +772,7 @@ class TestCVP:
         Yp = models.cvp(clf, X, Y, groups, method='predict_proba', n_splits=5, n_jobs=1)
 
         assert len(Yp) == len(Y)
-        assert Yp.shape[1] == 2  # Two classes
-        # Probabilities should sum to 1
+        assert Yp.shape[1] == 2
         assert np.allclose(Yp.sum(axis=1), 1.0)
 
 
@@ -905,7 +927,6 @@ class TestStepCounterFit:
 
         model.fit(X, Y, groups=groups)
 
-        # Verify model was trained
         assert model.find_peaks_params is not None
         assert 'distance' in model.find_peaks_params
         assert 'prominence' in model.find_peaks_params
@@ -927,17 +948,14 @@ class TestStepCounterFit:
 
         model.fit(X, Y, groups=groups)
 
-        # Check CV results structure
         cv_results = model.cv_results
         assert 'test_indices' in cv_results
-        assert len(cv_results['test_indices']) == 2  # cv=2
+        assert len(cv_results['test_indices']) == 2
 
-        # Walk detector scores
         wd_scores = cv_results['walk_detector']['scores']
         assert 'accuracy' in wd_scores
         assert 'f1' in wd_scores
 
-        # Step counter scores
         sc_scores = cv_results['step_counter']['scores']
         assert 'mae' in sc_scores
         assert 'rmse' in sc_scores

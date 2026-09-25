@@ -1,0 +1,170 @@
+{
+  "schema_version": 1,
+  "float_comparison_decimals": 6,
+  "fixture": {
+    "sha256": "b49ace733e10b606c9957b67098fbb7628061276f519ee83a8e13a0e2e9b9405",
+    "info_exact": {
+      "Device": "Axivity",
+      "DeviceID": 43923,
+      "ReadErrors": 0,
+      "SampleRate": 100.0,
+      "ReadOK": 1,
+      "StartTime": "2023-06-08 12:21:04",
+      "EndTime": "2023-06-08 15:19:33",
+      "NumTicks": 1021800
+    },
+    "info_approx": {
+      "DataSpan(days)": [0.12395172453703704, 1e-12]
+    }
+  },
+  "models": {
+    "rf": {
+      "model_version": "20230713",
+      "model_md5": "9a6ef63ca4d651c937c18b25d5af4e72",
+      "info_exact": {
+        "ResampleRate": 100.0,
+        "TotalSteps": 874,
+        "StepsDayAvg": 874,
+        "Steps5thAt": "13:12:54",
+        "Steps25thAt": "13:47:44",
+        "Steps50thAt": "14:24:29",
+        "Steps75thAt": "14:34:14",
+        "Steps95thAt": "14:58:59",
+        "CadencePeak1(steps/min)": 91,
+        "CadencePeak30(steps/min)": 65,
+        "Cadence95th(steps/min)": 90
+      },
+      "info_approx": {
+        "WearTime(days)": [0.11826388888888889, 1e-12],
+        "ENMO(mg)": [26.3532772064209, 0.001],
+        "TotalWalking(mins)": [10.083333333333334, 1e-12]
+      },
+      "steps": {
+        "rows": 2142,
+        "non_null": 2094,
+        "sum": 874,
+        "first_time": "2023-06-08 12:21:04.510",
+        "last_time": "2023-06-08 15:19:29.510",
+        "sha256": "819ed4a23cf7c7048583639629f81f5f6387db043086183ed2ba5b0abacd2c0d"
+      },
+      "step_times": {
+        "rows": 874,
+        "first_time": "2023-06-08 13:12:32.260000000",
+        "last_time": "2023-06-08 14:59:34.050000000",
+        "sha256": "49d42e6794d4a0865b3b44dec85ced363841e73ec854c593f5b1786d3bd9bc22"
+      },
+      "exports": {
+        "bouts": {
+          "columns": ["Filename", "StartTime", "EndTime", "Duration(mins)", "TimeSinceLast(mins)", "Steps", "Cadence(steps/min)", "CadenceSD(steps/min)", "Cadence25th(steps/min)", "Cadence50th(steps/min)", "Cadence75th(steps/min)", "ENMO(mg)", "ENMOMed(mg)"],
+          "rows": 14,
+          "sha256": "a13982f8788cbbb82ff589aaaecdbed67c15517ecd1b3e66d189696fef20ca3b"
+        },
+        "daily": {
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
+          "rows": 1,
+          "sha256": "dee5da633ae9a747ca5bc32cd8d8566664551057d7ad89a323667b99b0bec869"
+        },
+        "daily_adjusted": {
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
+          "rows": 1,
+          "sha256": "23c206d18217208a60267593437e9ca9d7a8423bc42b963bf67bd5b432730770"
+        },
+        "hourly": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 4,
+          "sha256": "2f7015cb65b126f7a42e11e8f4ae5b7a5e29ccaa7e38f338f2a446f91ed67c89"
+        },
+        "hourly_adjusted": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 24,
+          "sha256": "b80dc481c54ad54d6f448a799f6e1adcd08e59032432bfac39cae23511d59e87"
+        },
+        "minutely": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 179,
+          "sha256": "228f75b969ac564b6ceaee8c4564d34e9ea2705c504757be3327f787ecaf9220"
+        },
+        "minutely_adjusted": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 1440,
+          "sha256": "140f5d72261d31d948ab3d4fbbb5cc7f0e124cdc90ebe44ae0c60493200b52db"
+        }
+      }
+    },
+    "ssl": {
+      "model_version": "ssl-20230208",
+      "model_md5": "eea6179f079b554d5e2c8c98ccea8423",
+      "info_exact": {
+        "ResampleRate": 30,
+        "NumTicksAfterResample": 321284,
+        "TotalSteps": 723,
+        "StepsDayAvg": 723,
+        "Steps5thAt": "13:14:14",
+        "Steps25thAt": "13:47:34",
+        "Steps50thAt": "13:50:44",
+        "Steps75thAt": "14:33:24",
+        "Steps95thAt": "14:58:34",
+        "CadencePeak1(steps/min)": 100,
+        "CadencePeak30(steps/min)": 66,
+        "Cadence95th(steps/min)": 95
+      },
+      "info_approx": {
+        "WearTime(days)": [0.12114307868055557, 1e-12],
+        "NonwearTime(days)": [0.0028078422916666666, 1e-12],
+        "ENMO(mg)": [26.360279083251953, 0.001],
+        "TotalWalking(mins)": [8.333333333333334, 1e-12]
+      },
+      "steps": {
+        "rows": 1071,
+        "non_null": 1046,
+        "sum": 723,
+        "first_time": "2023-06-08 12:21:04.510",
+        "last_time": "2023-06-08 15:19:24.510",
+        "sha256": "e6d6221faf05af1271776c300d29a563a52b99622a57730c8ffecedf2335182d"
+      },
+      "step_times": {
+        "rows": 723,
+        "first_time": "2023-06-08 13:12:34.576666666",
+        "last_time": "2023-06-08 14:59:03.943333333",
+        "sha256": "5c50a4905313340425b82d18f290ca1eec57d3d4618fdbc3e26c224a8c9cc03e"
+      },
+      "exports": {
+        "bouts": {
+          "columns": ["Filename", "StartTime", "EndTime", "Duration(mins)", "TimeSinceLast(mins)", "Steps", "Cadence(steps/min)", "CadenceSD(steps/min)", "Cadence25th(steps/min)", "Cadence50th(steps/min)", "Cadence75th(steps/min)", "ENMO(mg)", "ENMOMed(mg)"],
+          "rows": 9,
+          "sha256": "88bc28ee864ffd69e734c6cba406209a5aa3ca5fa7ffc383c7266c647c2eb23b"
+        },
+        "daily": {
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
+          "rows": 1,
+          "sha256": "52cf6c9f189d891e9b69391e2178f5ee046a8a5305a78520c61a24253918b651"
+        },
+        "daily_adjusted": {
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
+          "rows": 1,
+          "sha256": "71cf7320ea72bfbe8e88f64d465481a4ca97e7c2b7be5b390ee5d6e24a682d4b"
+        },
+        "hourly": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 4,
+          "sha256": "f43aea63f0267c44b144b8b08de6fdf80ee87206bdad95cef87a062229b5a359"
+        },
+        "hourly_adjusted": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 24,
+          "sha256": "6abe7cd6b929a3f1299d8acdb066d9870d1271144ef61179941c970f487dcc76"
+        },
+        "minutely": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 179,
+          "sha256": "15570f3a4617a10ce820e7d80e97a89c3cc2536d089cf639059e51bdcc7eaae8"
+        },
+        "minutely_adjusted": {
+          "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
+          "rows": 1440,
+          "sha256": "01f6890e793145c5a5be8a53b2c5a172df64972aec8aa93406314104482ba773"
+        }
+      }
+    }
+  }
+}

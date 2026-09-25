@@ -10,14 +10,17 @@ Tests cover:
 - plot function
 - CLI end-to-end tests
 """
-import pytest
-import numpy as np
-import pandas as pd
+import json
 import subprocess
 import sys
-import json
-import gzip
+from types import SimpleNamespace
+from unittest.mock import MagicMock
+
 import matplotlib
+import numpy as np
+import pandas as pd
+import pytest
+
 matplotlib.use('Agg')  # Non-interactive backend for testing
 
 from stepcount import stepcount
@@ -42,14 +45,12 @@ class TestSummarizeENMO:
         """Test ENMO daily summary has correct shape."""
         summary = stepcount.summarize_enmo(accel_data_2_days)
 
-        # Should have 2 days
         assert len(summary['daily']) == 2
 
     def test_summarize_enmo_hourly_shape(self, accel_data_1_5_days):
         """Test ENMO hourly summary has expected entries."""
         summary = stepcount.summarize_enmo(accel_data_1_5_days)
 
-        # 1.5 days = 36 hours exactly
         assert len(summary['hourly']) == 36
 
     def test_summarize_enmo_hour_averages(self, accel_data_1_5_days):
@@ -63,7 +64,6 @@ class TestSummarizeENMO:
         """Test ENMO weekend/weekday split."""
         summary = stepcount.summarize_enmo(accel_data_2_days)
 
-        # Data starts on Friday (2024-01-19)
         assert 'weekend_avg' in summary
         assert 'weekday_avg' in summary
 
@@ -74,7 +74,6 @@ class TestSummarizeENMO:
             adjust_estimates=True
         )
 
-        # Should still produce valid averages
         assert not np.isnan(summary['avg'])
 
     def test_summarize_enmo_min_wear(self, accel_data_with_nonwear):
@@ -108,14 +107,12 @@ class TestSummarizeSteps:
         """Test total steps calculation."""
         summary = stepcount.summarize_steps(step_counts_series, steptol=3)
 
-        # Total should be sum of daily values
         assert summary['total_steps'] >= 0
 
     def test_summarize_steps_daily_stats(self, step_counts_series):
         """Test daily step statistics."""
         summary = stepcount.summarize_steps(step_counts_series, steptol=3)
 
-        # Check daily stats
         assert 'avg_steps' in summary
         assert 'med_steps' in summary
         assert 'min_steps' in summary
@@ -206,7 +203,6 @@ class TestSummarizeCadence:
         """Test that peak1 >= peak30."""
         summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
 
-        # Peak 1 minute should be >= peak 30 minutes
         if not np.isnan(summary['cadence_peak1']) and not np.isnan(summary['cadence_peak30']):
             assert summary['cadence_peak1'] >= summary['cadence_peak30']
 
@@ -290,7 +286,6 @@ class TestNumbaDetectBouts:
         bouts = stepcount.numba_detect_bouts(arr, min_percent_ones=0.6, max_trailing_zeros=2)
 
         assert len(bouts) > 0
-        # First bout should start at index 1
         assert bouts[0][0] == 1
 
     def test_detect_bouts_single_bout(self):
@@ -300,8 +295,8 @@ class TestNumbaDetectBouts:
         bouts = stepcount.numba_detect_bouts(arr, min_percent_ones=0.8, max_trailing_zeros=1)
 
         assert len(bouts) == 1
-        assert bouts[0][0] == 2  # Start at index 2
-        assert bouts[0][1] == 5  # Length 5
+        assert bouts[0][0] == 2
+        assert bouts[0][1] == 5
 
     def test_detect_bouts_no_bouts(self):
         """Test no bouts in sparse data."""
@@ -329,7 +324,6 @@ class TestNumbaDetectBouts:
         bouts = stepcount.numba_detect_bouts(arr, min_percent_ones=0.8, max_trailing_zeros=2)
 
         assert len(bouts) == 1
-        # Bout should be length 4 (trailing zeros excluded)
         assert bouts[0][1] == 4
 
     def test_detect_bouts_all_zeros(self):
@@ -347,8 +341,8 @@ class TestNumbaDetectBouts:
         bouts = stepcount.numba_detect_bouts(arr)
 
         assert len(bouts) == 1
-        assert bouts[0][0] == 0  # Start at beginning
-        assert bouts[0][1] == 5  # Full length
+        assert bouts[0][0] == 0
+        assert bouts[0][1] == 5
 
 
 class TestSummarizeBouts:
@@ -365,7 +359,6 @@ class TestSummarizeBouts:
         assert 'bouts' in summary
         bouts_df = summary['bouts']
 
-        # Should be a DataFrame with expected columns
         assert isinstance(bouts_df, pd.DataFrame)
 
     def test_summarize_bouts_columns(self, step_counts_series, accel_data_1_5_days):
@@ -486,8 +479,8 @@ class TestDownloadToFile:
     """Tests for the atomic download helper `_download_to_file`."""
 
     def test_success_writes_dest_and_cleans_temp_with_timeout(self, tmp_path, monkeypatch):
-        import io
         import hashlib
+        import io
         import urllib.request
         payload = b"model-payload-bytes"
         dest = tmp_path / "model.joblib.lzma"
@@ -505,8 +498,8 @@ class TestDownloadToFile:
         )
 
         assert dest.read_bytes() == payload
-        assert seen['timeout'] == 60                   # a stalled server can't hang the download
-        assert list(tmp_path.glob("*.tmp")) == []      # no temp left behind
+        assert seen['timeout'] == 60
+        assert list(tmp_path.glob("*.tmp")) == []
 
     def test_md5_mismatch_raises_and_leaves_no_files(self, tmp_path, monkeypatch):
         import io
@@ -520,8 +513,8 @@ class TestDownloadToFile:
             stepcount._download_to_file(
                 "http://example/model", dest, expected_md5="0" * 32)
 
-        assert not dest.exists()                        # bad download never lands at dest
-        assert list(tmp_path.glob("*.tmp")) == []       # temp cleaned up on failure
+        assert not dest.exists()
+        assert list(tmp_path.glob("*.tmp")) == []
 
     def test_failure_midstream_preserves_existing_dest(self, tmp_path, monkeypatch):
         import os
@@ -546,8 +539,7 @@ class TestDownloadToFile:
             stepcount._download_to_file(
                 "http://example/model", dest, expected_md5="0" * 32)
 
-        assert dest.read_bytes() == b"previous-good-model"  # a failed download can't corrupt a good file
-        # the per-process temp is cleaned up, nothing left behind
+        assert dest.read_bytes() == b"previous-good-model"
         assert not (tmp_path / f"{dest.name}.{os.getpid()}.tmp").exists()
         assert list(tmp_path.glob("*.tmp")) == []
 
@@ -596,12 +588,12 @@ class TestEnsureDownloadSSLContext:
         stepcount._ensure_download_ssl_context(verbose=False)
 
         hook = ssl._create_default_https_context
-        assert hook is not spy                       # a new fallback hook was installed
-        ctx = hook()                                 # exercise it, not just its identity
+        assert hook is not spy
+        ctx = hook()
         assert isinstance(ctx, ssl.SSLContext)
-        assert certifi.where() in seen_cafiles       # fallback uses certifi's CA bundle
-        assert ctx.check_hostname is True            # verification is preserved...
-        assert ctx.verify_mode == ssl.CERT_REQUIRED  # ...not silently downgraded
+        assert certifi.where() in seen_cafiles
+        assert ctx.check_hostname is True
+        assert ctx.verify_mode == ssl.CERT_REQUIRED
 
     def test_preserves_custom_hook_when_store_broken(self, monkeypatch):
         """A custom HTTPS hook installed by an embedding app is not overwritten."""
@@ -624,8 +616,8 @@ class TestEnsureDownloadSSLContext:
 
     def test_no_fallback_without_certifi(self, monkeypatch):
         """If certifi is unavailable, leave the HTTPS hook alone (surface original error)."""
-        import ssl
         import builtins
+        import ssl
 
         def _boom(*a, **k):
             raise ssl.SSLError("[ASN1: NOT_ENOUGH_DATA] not enough data")
@@ -825,7 +817,6 @@ print(','.join(loaded))
         # broken-store host and leak the process-global hook into later tests.
         with patch('stepcount.stepcount.download_models') as mock_dl, \
                 patch('stepcount.stepcount._ensure_download_ssl_context'):
-            # Simulate calling main() with --download-models
             with patch('sys.argv', ['stepcount', '--download-models']):
                 stepcount.main()
             mock_dl.assert_called_once_with(force_download=False, ssl_repo_path=None)
@@ -840,6 +831,148 @@ print(','.join(loaded))
         )
         assert result.returncode != 0
         assert 'filepath' in result.stderr.lower() or 'required' in result.stderr.lower()
+
+    @pytest.mark.parametrize("model_type, expected_resample", [("rf", None), ("ssl", 30)])
+    def test_cli_processing_pipeline_with_model_boundary_mocked(
+        self,
+        model_type,
+        expected_resample,
+        tmp_path,
+        monkeypatch,
+    ):
+        """Exercise CLI orchestration and every output writer without model I/O."""
+        from stepcount import utils
+
+        input_path = tmp_path / "synthetic.cwa"
+        output_root = tmp_path / model_type
+        times = pd.date_range("2024-01-15 10:00", periods=120, freq="1min")
+        data = pd.DataFrame(
+            {"x": 0.0, "y": 0.0, "z": 1.0},
+            index=times,
+        )
+        info = {
+            "Filename": str(input_path),
+            "Device": "Synthetic",
+            "Filesize(MB)": 0.0,
+            "SampleRate": 1,
+            "ResampleRate": 1,
+        }
+        steps = pd.Series(
+            np.tile([0, 3, 6, 9], 30),
+            index=times,
+            name="Steps",
+        )
+        walking = steps >= 3
+        step_times = pd.DataFrame({"time": times.repeat(steps.to_numpy())})
+
+        read = MagicMock(return_value=(data, info))
+        monkeypatch.setattr(utils, "read", read)
+        monkeypatch.setattr(stepcount, "_ensure_download_ssl_context", MagicMock())
+
+        detector = SimpleNamespace(sample_rate=None, verbose=True)
+        model = SimpleNamespace(
+            wd=detector,
+            sample_rate=None,
+            window_sec=60,
+            window_len=0,
+            verbose=True,
+            steptol=3,
+            predict_from_frame=MagicMock(return_value=(steps, walking, step_times)),
+        )
+        load_model = MagicMock(return_value=model)
+        monkeypatch.setattr(stepcount, "load_model", load_model)
+
+        argv = [
+            "stepcount",
+            str(input_path),
+            "--outdir",
+            str(output_root),
+            "--model-type",
+            model_type,
+            "--min-wear-per-day",
+            "0",
+            "--min-wear-per-hour",
+            "0",
+            "--min-wear-per-minute",
+            "0",
+            "--min-walk-per-day",
+            "1",
+            "--quiet",
+        ]
+        if model_type == "ssl":
+            argv.extend(["--pytorch-device", "cpu"])
+        monkeypatch.setattr(sys, "argv", argv)
+
+        stepcount.main()
+
+        assert read.call_args.kwargs["resample_hz"] == expected_resample
+        assert read.call_args.kwargs["verbose"] is False
+        assert load_model.call_args.args[1] == model_type
+        assert model.sample_rate == 1
+        assert model.window_len == 60
+        assert detector.sample_rate == 1
+        assert detector.verbose is False
+        if model_type == "ssl":
+            assert detector.device == "cpu"
+
+        result_dir = output_root / "synthetic"
+        expected_files = {
+            "synthetic-Bouts.csv.gz",
+            "synthetic-Daily.csv.gz",
+            "synthetic-DailyAdjusted.csv.gz",
+            "synthetic-Hourly.csv.gz",
+            "synthetic-HourlyAdjusted.csv.gz",
+            "synthetic-Info.json",
+            "synthetic-Minutely.csv.gz",
+            "synthetic-MinutelyAdjusted.csv.gz",
+            "synthetic-Steps.csv.gz",
+            "synthetic-StepTimes.csv.gz",
+            "synthetic-Steps.png",
+        }
+        assert {path.name for path in result_dir.iterdir()} == expected_files
+        result_info = json.loads((result_dir / "synthetic-Info.json").read_text())
+        assert result_info["TotalSteps"] == 540
+        assert result_info["StepCountArgs"]["model_type"] == model_type
+
+    def test_cli_empty_input_writes_info_without_loading_model(
+        self,
+        tmp_path,
+        monkeypatch,
+    ):
+        """The no-data path records metadata and exits before model loading."""
+        from stepcount import utils
+
+        input_path = tmp_path / "empty.cwa"
+        output_root = tmp_path / "output"
+        data = pd.DataFrame(
+            columns=["x", "y", "z"],
+            index=pd.DatetimeIndex([], name="time"),
+            dtype=float,
+        )
+        info = {
+            "Filename": str(input_path),
+            "Device": "Synthetic",
+            "Filesize(MB)": 0.0,
+            "SampleRate": 1,
+            "ResampleRate": 1,
+        }
+        monkeypatch.setattr(utils, "read", MagicMock(return_value=(data, info)))
+        monkeypatch.setattr(stepcount, "_ensure_download_ssl_context", MagicMock())
+        load_model = MagicMock()
+        monkeypatch.setattr(stepcount, "load_model", load_model)
+        monkeypatch.setattr(
+            sys,
+            "argv",
+            ["stepcount", str(input_path), "--outdir", str(output_root), "--quiet"],
+        )
+
+        with pytest.raises(SystemExit) as exc_info:
+            stepcount.main()
+
+        assert exc_info.value.code == 0
+        load_model.assert_not_called()
+        result_info = output_root / "empty" / "empty-Info.json"
+        assert json.loads(result_info.read_text())["Filename"] == str(input_path)
 
     @pytest.fixture
     def small_csv_file(self, tmp_path):
@@ -876,11 +1009,11 @@ print(','.join(loaded))
                 sys.executable, '-m', 'stepcount.stepcount',
                 str(small_csv_file),
                 '-o', str(outdir),
-                '-q'  # Quiet mode
+                '-q'
             ],
             capture_output=True,
             text=True,
-            timeout=600  # 10 minute timeout
+            timeout=600
         )
 
         if result.returncode != 0:

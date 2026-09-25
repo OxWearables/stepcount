@@ -40,7 +40,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: model-files
-          path: src/stepcount/*.joblib.lzma  # our model files have the extension .joblib.lzma
+          path: src/stepcount/*.joblib.lzma
 
       - name: Upload torch_hub_cache
         uses: actions/upload-artifact@v4
@@ -70,7 +70,7 @@ jobs:
         run: |
           set -e
           python -m pip install --upgrade pip
-          python -m pip install -e .  # install as editable to locate the torch hub cache more easily
+          python -m pip install -e . "pytest>=7.0"
 
       - name: Download model files
         uses: actions/download-artifact@v4
@@ -87,11 +87,19 @@ jobs:
       - name: Smoke test, nano-sample.csv.gz
         run: stepcount tests/data/nano-sample.csv.gz
 
-      - name: Smoke test, tiny-sample.cwa.gz
-        run: stepcount tests/data/tiny-sample.cwa.gz
-
       - name: Smoke test, nano-sample.csv.gz (RF)
         run: stepcount tests/data/nano-sample.csv.gz -t rf
 
-      - name: Smoke test, tiny-sample.cwa.gz (RF)
-        run: stepcount tests/data/tiny-sample.cwa.gz -t rf
+      - name: Numerical regression, tiny-sample.cwa.gz
+        id: regression
+        env:
+          STEPCOUNT_RUN_MODEL_REGRESSION: "1"
+          STEPCOUNT_REGRESSION_OUTPUT_DIR: regression-outputs
+        run: python -m pytest tests/test_cwa_regression.py
+
+      - name: Upload numerical regression outputs
+        if: always() && steps.regression.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: numerical-regression-${{ matrix.os }}-${{ matrix.python-version }}
+          path: regression-outputs

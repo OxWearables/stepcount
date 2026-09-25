@@ -64,11 +64,10 @@ class StepCounter:
                 'verbose': verbose
             }
             wd: Any = WalkDetectorSSL
-            # ssl is pretrained with 10s/30hz
+            # Match the SSL model's training configuration.
             self.window_sec = 10
             self.sample_rate = 30
-            # disable multiprocessing, pytorch will already use all available cores,
-            # and when using gpu we can only do 1 process at a time anyway
+            # PyTorch manages parallelism, and GPU inference must remain single-process.
             self.n_jobs = 1
         else:
             wd_defaults = {
@@ -98,14 +97,11 @@ class StepCounter:
         groups: Optional[NDArray] = None,
     ) -> StepCounter:
 
-        # define walk/non-walk based on threshold
         W = np.zeros_like(Y)
         W[Y >= self.steptol] = 1
-        # zero-out windows below the threshold
         Y = Y.copy()
         Y[Y < self.steptol] = 0
 
-        # train walk detector & cross-val-predict
         if self.verbose:
             print("Running cross_val_predict...")
         self.wd.n_jobs = 1
@@ -124,7 +120,6 @@ class StepCounter:
             print("Fitting walk detector...")
         self.wd.fit(X, W, groups=groups)
 
-        # train step counter
         Xw, Yw = X[whr_walk_pred], Y[whr_walk_pred]
         Vw = toV(Xw, self.sample_rate, self.lowpass_hz)
 
@@ -157,14 +152,12 @@ class StepCounter:
 
         self.find_peaks_params = to_params(res.x)
 
-        # performance -- walk detector
         _, wd_scores = get_cv_scores(
             W, Wp, cv_test_idxs,
             sample_weight=sample_weight,
             scorer_type='classif'
         )
 
-        # performance -- step count
         Yp = np.zeros_like(Y)
         Yp[whr_walk_pred] = batch_count_peaks_from_V(Vw, self.sample_rate, self.find_peaks_params)
         _, sc_scores = get_cv_scores(
@@ -173,7 +166,6 @@ class StepCounter:
             scorer_type='regress'
         )
 
-        # performance -- step count, walk periods only
         whr_walk_true = W == 1
         walk_true_idxs = np.flatnonzero(whr_walk_true)
         _, sc_scores_walk = get_cv_scores(
@@ -213,7 +205,6 @@ class StepCounter:
             print("Model not yet trained. Call .fit() first.")
             return None
 
-        # check X quality
         ok = np.flatnonzero(~np.asarray([np.isnan(x).any() for x in X]))
 
         X_ = X[ok]
@@ -229,8 +220,9 @@ class StepCounter:
             self.find_peaks_params,
             return_peaks=True
         )
-        # zero-out windows below the threshold
-        Y_[Y_ < self.steptol] = 0
+        below_threshold = Y_ < self.steptol
+        Y_[below_threshold] = 0
+        Z_[below_threshold] = None
 
         Y = np.full(len(X), fill_value=np.nan)
         Y[ok] = Y_
@@ -447,7 +439,6 @@ class WalkDetectorSSL:
         if self.verbose:
             print('Training SSL')
 
-        # prepare training and validation sets
         folds = GroupShuffleSplit(
             1, test_size=0.2, random_state=41
         ).split(X, Y, groups=split_groups)
@@ -479,7 +470,7 @@ class WalkDetectorSSL:
             num_workers=1,
         )
 
-        # balancing to 90% notwalk, 10% walk
+        # Weight classes toward the expected 90% non-walking / 10% walking mix.
         c = Counter(y_train)
         notwalk = c[0]
         walk = c[1]
@@ -718,7 +709,7 @@ def get_cv_scores(
         sample_weight: Optional[NDArray] = None,
     ) -> float:
         yt, yp = yt.copy(), yp.copy()
-        # add 1 where zero to smooth the mape
+        # Avoid undefined MAPE values when the target is zero.
         whr = yt == 0
         yt[whr] += 1
         yp[whr] += 1

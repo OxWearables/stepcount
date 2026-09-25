@@ -79,16 +79,19 @@ filterwarnings = [
 ]
 markers = [
     "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "model_regression: runs versioned model files against real device data",
 ]
 
 [tool.coverage.run]
 source = ["src/stepcount"]
+branch = true
 omit = [
     "src/stepcount/_version.py",
     "src/stepcount/torch_hub_cache/*",
 ]
 
 [tool.coverage.report]
+fail_under = 87
 exclude_lines = [
     "pragma: no cover",
     "def __repr__",
