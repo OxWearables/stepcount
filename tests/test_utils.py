@@ -250,6 +250,69 @@ class TestImputeMissing:
         )
         pd.testing.assert_frame_equal(result, expected)
 
+    def test_impute_missing_preserves_mixed_type_metadata(self):
+        times = pd.to_datetime([
+            "2024-01-01 12:00:00",
+            "2024-01-08 12:00:00",
+            "2024-01-15 12:00:00",
+        ])
+        data = pd.DataFrame(
+            {
+                "signal": [1.0, np.nan, 3.0],
+                "label": ["a", "b", "c"],
+                "partial_label": ["x", None, "z"],
+                "missing_metadata": [None, None, None],
+            },
+            index=times,
+        )
+
+        result = utils.impute_missing(
+            data,
+            extrapolate=False,
+            skip_full_missing_days=False,
+        )
+
+        expected = data.copy()
+        expected.loc[times[1], "signal"] = 2.0
+        pd.testing.assert_frame_equal(result, expected)
+
+    def test_impute_missing_matches_sequential_group_mean_reference(self):
+        rng = np.random.default_rng(42)
+        times = pd.date_range('2024-01-01', periods=14 * 24 * 12, freq='5min')
+        data = pd.DataFrame(
+            rng.normal(size=(len(times), 2)),
+            columns=['a', 'b'],
+            index=times,
+        )
+        missing = rng.choice(len(times), size=900, replace=False)
+        data.iloc[missing[:600], 0] = np.nan
+        data.iloc[missing[300:], 1] = np.nan
+
+        def fill_group(series):
+            if series.isna().any() and not series.isna().all():
+                return series.fillna(series.mean())
+            return series
+
+        def reference(series):
+            return (
+                series
+                .groupby([times.weekday, times.hour, times.minute // 5])
+                .transform(fill_group)
+                .groupby([times.weekday >= 5, times.hour, times.minute // 5])
+                .transform(fill_group)
+                .groupby([times.hour, times.minute // 5])
+                .transform(fill_group)
+            )
+
+        expected = data.apply(reference)
+        result = utils.impute_missing(
+            data,
+            extrapolate=False,
+            skip_full_missing_days=False,
+        )
+
+        pd.testing.assert_frame_equal(result, expected, rtol=0, atol=5e-16)
+
     def test_impute_missing_skip_full_missing_days(self):
         """Test that fully missing days are skipped."""
         # Create data with one completely missing day

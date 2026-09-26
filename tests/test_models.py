@@ -11,9 +11,11 @@ Tests cover:
 - StepCounter class (basic functionality)
 - WalkDetectorRF class (basic functionality)
 """
-import pytest
+from unittest.mock import Mock
+
 import numpy as np
 import pandas as pd
+import pytest
 import torch
 
 from stepcount import models
@@ -487,6 +489,101 @@ class TestStepCounterBasic:
         np.testing.assert_array_equal(predicted_peak_times[1], peak_times[1])
         np.testing.assert_array_equal(predicted_peak_times[2], peak_times[2])
 
+    @pytest.mark.parametrize('wd_type', ['rf', 'ssl'])
+    def test_predict_uses_common_indexed_detector_contract(self, monkeypatch, wd_type):
+        model = models.StepCounter(wd_type=wd_type, steptol=1, verbose=False)
+        model.find_peaks_params = {'distance': 1.0}
+        X = np.arange(4 * 6 * 3, dtype=np.float64).reshape(4, 6, 3)
+        X[1, 0, 0] = np.nan
+        groups = np.array(['a', 'b', 'c', 'd'])
+        classifier = Mock(return_value=np.array([1, 0, 1]))
+        monkeypatch.setattr(model.wd, 'predict', classifier)
+        peaks = np.empty(2, dtype=object)
+        peaks[:] = [np.array([0.1]), np.array([0.2, 0.3])]
+        peak_counter = Mock(return_value=(np.array([1.0, 2.0]), peaks))
+        monkeypatch.setattr(models, 'batch_count_peaks', peak_counter)
+
+        prediction = model.predict(
+            X,
+            groups=groups,
+            return_walk=True,
+            return_step_times=True,
+        )
+
+        assert prediction is not None
+        counts, walk, _ = prediction
+        source, source_groups = classifier.call_args.args
+        assert source is X
+        np.testing.assert_array_equal(classifier.call_args.kwargs['indices'], [0, 2, 3])
+        np.testing.assert_array_equal(source_groups, groups)
+        peak_windows = peak_counter.call_args.args[0]
+        assert peak_windows.dtype == np.float64
+        np.testing.assert_array_equal(peak_windows, X[[0, 3]])
+        np.testing.assert_array_equal(counts, [1.0, np.nan, 0.0, 2.0])
+        np.testing.assert_array_equal(walk, [1.0, np.nan, 0.0, 1.0])
+
+    def test_predict_handles_empty_window_tensor(self):
+        model = models.StepCounter(wd_type='ssl', verbose=False)
+        model.find_peaks_params = {'distance': 1.0}
+
+        with pytest.warns(UserWarning, match="No data to predict"):
+            prediction = model.predict(np.empty((0, 300, 3), dtype=np.float32))
+
+        assert prediction is not None
+        assert prediction[0].size == 0
+
+    def test_ssl_predict_integrates_selected_windows_and_scatter(self):
+        class FirstValueModel(torch.nn.Module):
+            def forward(self, x):
+                score = x[:, 0, 0]
+                return torch.stack([-score, score], dim=1)
+
+        model = models.StepCounter(wd_type='ssl', steptol=0, verbose=False)
+        model.find_peaks_params = {'distance': 0.1, 'prominence': 0.1}
+        model.wd.model = FirstValueModel()
+        model.wd.hmms.predict = Mock(side_effect=lambda y, groups=None: y)
+        X = np.zeros((4, 60, 3), dtype=np.float64)
+        X[:, :, 2] = 1.0
+        X[:, 0, 0] = [-1.0, 0.0, 2.0, -3.0]
+        X[1] = np.nan
+
+        prediction = model.predict(X, return_walk=True)
+
+        assert prediction is not None
+        counts, walk, _ = prediction
+        np.testing.assert_array_equal(walk, [0.0, np.nan, 1.0, 0.0])
+        assert np.isnan(counts[1])
+        assert np.isfinite(counts[[0, 2, 3]]).all()
+
+    def test_ssl_predict_handles_nonempty_all_invalid_windows(self):
+        model = models.StepCounter(wd_type='ssl', verbose=False)
+        model.find_peaks_params = {'distance': 0.1, 'prominence': 0.1}
+        X = np.full((2, 60, 3), np.nan)
+
+        with pytest.warns(UserWarning, match="No data to predict"):
+            prediction = model.predict(
+                X,
+                return_walk=True,
+                return_step_times=True,
+            )
+
+        assert prediction is not None
+        counts, walk, step_times = prediction
+        assert np.isnan(counts).all()
+        assert walk is not None and np.isnan(walk).all()
+        assert step_times is not None
+        assert all(value is None for value in step_times)
+
+    def test_predict_rejects_misaligned_groups(self):
+        model = models.StepCounter(wd_type='ssl', verbose=False)
+        model.find_peaks_params = {'distance': 1.0}
+
+        with pytest.raises(ValueError, match="groups must have the same length as X"):
+            model.predict(
+                np.zeros((2, 300, 3), dtype=np.float32),
+                groups=np.array(['only-one']),
+            )
+
 
 class TestWalkDetectorRFBasic:
     """Basic tests for WalkDetectorRF class."""
@@ -508,9 +605,39 @@ class TestWalkDetectorRFBasic:
         detector.hmms.emissionprob = np.eye(2)
         detector.hmms.transmat = np.array([[0.9, 0.1], [0.1, 0.9]])
 
-        result = detector.predict(np.array([]))
+        with pytest.warns(UserWarning, match="No data to predict"):
+            result = detector.predict(np.array([]))
 
         assert len(result) == 0
+
+        with pytest.warns(UserWarning, match="No data to predict"):
+            result = detector.predict(
+                np.zeros((1, 5, 3)),
+                indices=np.array([], dtype=int),
+            )
+
+        assert len(result) == 0
+
+    def test_walk_detector_rf_predict_uses_selected_order(self, monkeypatch, sample_rate):
+        detector = models.WalkDetectorRF(sample_rate=sample_rate, verbose=False)
+        detector.clf.predict_proba = Mock(
+            return_value=np.array([[0.1, 0.9], [0.9, 0.1]])
+        )
+        detector.hmms.predict = Mock(side_effect=lambda y, groups=None: y)
+        feature_extractor = Mock(return_value=np.zeros((2, 4)))
+        monkeypatch.setattr(models, 'batch_extract_features', feature_extractor)
+        X = np.arange(4 * 5 * 3, dtype=float).reshape(4, 5, 3)
+        indices = np.array([3, 0])
+        groups = np.array(['a', 'b', 'c', 'd'])
+
+        result = detector.predict(X, groups=groups, indices=indices)
+
+        np.testing.assert_array_equal(result, [1, 0])
+        np.testing.assert_array_equal(feature_extractor.call_args.args[0], X[indices])
+        np.testing.assert_array_equal(
+            detector.hmms.predict.call_args.kwargs['groups'],
+            groups[indices],
+        )
 
 
 class TestWalkDetectorSSLBasic:
@@ -549,25 +676,52 @@ class TestWalkDetectorSSLBasic:
         with pytest.raises(RuntimeError, match="No fitted SSL model state"):
             detector.load_model()
 
-    @pytest.mark.skip(reason="SSL model requires valid state_dict to be loaded before predict (needs model weights)")
     def test_walk_detector_ssl_predict_empty(self):
-        """Test WalkDetectorSSL handles empty input.
-
-        Note: The SSL model tries to load state_dict on first predict call.
-        Without valid weights, this fails. This test documents the expected
-        behavior but cannot run without model weights.
-        """
+        """Test WalkDetectorSSL handles empty input without loading weights."""
         detector = models.WalkDetectorSSL(device='cpu', verbose=False)
 
-        # Manually set up minimal HMM parameters
-        detector.hmms.labels = np.array([0, 1])
-        detector.hmms.startprob = np.array([0.5, 0.5])
-        detector.hmms.emissionprob = np.eye(2)
-        detector.hmms.transmat = np.array([[0.9, 0.1], [0.1, 0.9]])
-
-        result = detector.predict(np.array([]))
+        with pytest.warns(UserWarning, match="No data to predict"):
+            result = detector.predict(np.empty((0, 300, 3), dtype=np.float32))
 
         assert len(result) == 0
+
+    def test_walk_detector_ssl_predict_uses_selected_order_and_global_hmm(self):
+        class FirstValueModel(torch.nn.Module):
+            def forward(self, x):
+                score = x[:, 0, 0]
+                return torch.stack([-score, score], dim=1)
+
+        detector = models.WalkDetectorSSL(device='cpu', verbose=False)
+        detector.model = FirstValueModel()
+        detector.hmms.predict = Mock(side_effect=lambda y, groups=None: y)
+        X = np.zeros((4, 5, 3), dtype=np.float64)
+        X[:, 0, 0] = [-1.0, 2.0, -3.0, 4.0]
+        indices = np.array([3, 0, 1])
+        groups = np.array(['g2', 'g1', 'g1'])
+
+        result = detector.predict(X, groups=groups, indices=indices)
+
+        np.testing.assert_array_equal(result, [1, 0, 1])
+        raw_predictions = detector.hmms.predict.call_args.args[0]
+        call_groups = detector.hmms.predict.call_args.kwargs['groups']
+        np.testing.assert_array_equal(raw_predictions, [1, 0, 1])
+        np.testing.assert_array_equal(call_groups, groups)
+
+        full_groups = np.array(['g1', 'unused', 'g3', 'g2'])
+        detector.predict(X, groups=full_groups, indices=indices)
+        call_groups = detector.hmms.predict.call_args.kwargs['groups']
+        np.testing.assert_array_equal(call_groups, full_groups[indices])
+
+    def test_walk_detector_ssl_predict_rejects_misaligned_selected_groups(self):
+        detector = models.WalkDetectorSSL(device='cpu', verbose=False)
+        X = np.zeros((4, 5, 3), dtype=np.float32)
+
+        with pytest.raises(ValueError, match="groups must align with X"):
+            detector.predict(
+                X,
+                groups=np.array(['a', 'b', 'c']),
+                indices=np.array([0, 2]),
+            )
 
 
 class TestBatchFindPeaks:

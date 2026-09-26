@@ -147,6 +147,51 @@ class TestNormalDataset:
         assert sample.shape == (100, 3)
 
 
+class TestInferenceDataset:
+    def test_reads_selected_windows_without_copying_source(self):
+        X = np.arange(4 * 5 * 3, dtype=np.float32).reshape(4, 5, 3)
+        dataset = sslmodel.InferenceDataset(X, indices=np.array([3, 1]))
+
+        sample, label, pid = dataset[0]
+
+        assert dataset.X is X
+        assert len(dataset) == 2
+        assert sample.dtype == torch.float32
+        assert sample.shape == (3, 5)
+        assert np.shares_memory(sample.numpy(), X)
+        np.testing.assert_array_equal(sample.numpy(), X[3].T)
+        assert np.isnan(label)
+        assert np.isnan(pid)
+
+    def test_casts_only_requested_float64_sample(self):
+        X = np.arange(3 * 4 * 3, dtype=np.float64).reshape(3, 4, 3)
+        dataset = sslmodel.InferenceDataset(X, indices=np.array([2]))
+
+        sample, _, _ = dataset[0]
+
+        assert dataset.X is X
+        assert X.dtype == np.float64
+        assert sample.dtype == torch.float32
+        np.testing.assert_array_equal(sample.numpy(), X[2].T.astype(np.float32))
+
+    def test_defaults_to_all_windows(self):
+        X = np.arange(2 * 4 * 3, dtype=np.float32).reshape(2, 4, 3)
+        dataset = sslmodel.InferenceDataset(X)
+
+        assert dataset.indices is None
+        assert len(dataset) == 2
+        np.testing.assert_array_equal(dataset[1][0].numpy(), X[1].T)
+
+    def test_supports_negative_stride_input(self):
+        X = np.arange(2 * 4 * 3, dtype=np.float32).reshape(2, 4, 3)[:, ::-1]
+        dataset = sslmodel.InferenceDataset(X)
+
+        sample, _, _ = dataset[0]
+
+        assert dataset.tensor is None
+        np.testing.assert_array_equal(sample.numpy(), X[0].T)
+
+
 class TestEarlyStopping:
     """Tests for EarlyStopping utility."""
 
@@ -308,6 +353,26 @@ class TestPredict:
         assert len(y_true) == 4
         assert len(y_pred) == 4
         assert len(pid_out) == 4
+
+    def test_can_skip_unused_metadata(self):
+        model = nn.Sequential(nn.Flatten(), nn.Linear(30, 2))
+        X = np.random.randn(4, 10, 3).astype('f4')
+        dataset = sslmodel.NormalDataset(
+            X,
+            y=np.array([0, 1, 0, 1]),
+            pid=np.array([1, 2, 3, 4]),
+        )
+
+        y_true, y_pred, pids = sslmodel.predict(
+            model,
+            DataLoader(dataset, batch_size=2),
+            'cpu',
+            collect_metadata=False,
+        )
+
+        assert y_true.size == 0
+        assert y_pred.size == 4
+        assert pids.size == 0
 
     def test_output_logits_flag(self):
         """output_logits=True should return raw logits instead of class predictions."""

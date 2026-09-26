@@ -59,7 +59,7 @@ class RandomSwitchAxis:
 
 class RotationAxis:
     """
-    Rotation along an axis
+    Rotate a sample around a random axis.
     """
 
     def __call__(self, sample: NDArray) -> NDArray:
@@ -73,7 +73,7 @@ class RotationAxis:
 
 class RandomDecimation:
     """
-    Randomly decimate the input along the time axis
+    Randomly decimate and restore the input along the time axis.
     """
 
     def __call__(self, sample: torch.Tensor) -> torch.Tensor:
@@ -149,6 +149,35 @@ class NormalDataset(Dataset[DatasetItem]):
         return sample, y_value, pid_value
 
 
+class InferenceDataset(Dataset[DatasetItem]):
+    """Read selected windows lazily and cast only the current sample."""
+
+    def __init__(
+        self,
+        X: NDArray,
+        indices: Optional[NDArray] = None,
+    ) -> None:
+        self.X = X
+        self.indices = None if indices is None else np.asarray(indices)
+        can_share = X.dtype == np.float32 and all(stride >= 0 for stride in X.strides)
+        self.tensor = torch.from_numpy(X) if can_share else None
+
+    def __len__(self) -> int:
+        return len(self.X) if self.indices is None else len(self.indices)
+
+    def __getitem__(self, idx: Union[int, torch.Tensor]) -> DatasetItem:
+        index: Any = idx.tolist() if isinstance(idx, torch.Tensor) else idx
+        source_index = index if self.indices is None else self.indices[index]
+        if self.tensor is not None:
+            sample = self.tensor[source_index].transpose(0, 1)
+            return sample, np.NaN, np.NaN
+        array = self.X[source_index].astype("f4", copy=False)
+        if any(stride < 0 for stride in array.strides):
+            array = np.ascontiguousarray(array)
+        array = np.transpose(array, (1, 0))
+        return torch.from_numpy(array), np.NaN, np.NaN
+
+
 class EarlyStopping:
     """Early stops the training if validation loss
     doesn't improve after a given patience."""
@@ -165,7 +194,7 @@ class EarlyStopping:
         Args:
             patience (int): How long to wait after last time v
                             alidation loss improved.
-                            Default: 7
+                            Default: 5
             verbose (bool): If True, prints a message for each
                             validation loss improvement.
                             Default: False
@@ -286,6 +315,7 @@ def predict(
     dataloader: DataLoader[Any],
     device: Device,
     output_logits: bool = False,
+    collect_metadata: bool = True,
 ) -> Tuple[NDArray, NDArray, NDArray]:
     """
     Iterate over the dataloader and do prediction with a pytorch model.
@@ -295,6 +325,7 @@ def predict(
     :param str device: pytorch map device
     :param bool output_logits: When True, output the raw outputs (logits) from the last layer (before classification).
                                 When False, argmax the logits and output a classification scalar.
+    :param bool collect_metadata: When False, skip retaining labels and participant IDs during inference.
     :return: true labels, model predictions, pids
     :rtype: (np.ndarray, np.ndarray, np.ndarray)
     """
@@ -312,29 +343,20 @@ def predict(
         for x, y, pid in tqdm(dataloader, total=len(dataloader), mininterval=5, disable=not verbose, bar_format='Classifying segments: {percentage:3.0f}%|{bar}| [{elapsed}<{remaining}]'):
             x = x.to(device, dtype=torch.float)
             logits = cast(torch.Tensor, model(x))
-            true_list.append(y)
+            if collect_metadata:
+                true_list.append(y)
+                pid_list.extend(pid)
             if output_logits:
                 predictions_list.append(logits.cpu())
             else:
                 pred_y = torch.argmax(logits, dim=1)
                 predictions_list.append(pred_y.cpu())
-            pid_list.extend(pid)
 
-    true_tensor = torch.cat(true_list)
     predictions_tensor = torch.cat(predictions_list)
-
-    if output_logits:
-        return (
-            torch.flatten(true_tensor).numpy(),
-            predictions_tensor.numpy(),
-            np.array(pid_list),
-        )
-    else:
-        return (
-            torch.flatten(true_tensor).numpy(),
-            torch.flatten(predictions_tensor).numpy(),
-            np.array(pid_list),
-        )
+    true_values = torch.flatten(torch.cat(true_list)).numpy() if collect_metadata else np.array([])
+    pid_values = np.array(pid_list) if collect_metadata else np.array([])
+    prediction_values = predictions_tensor.numpy() if output_logits else torch.flatten(predictions_tensor).numpy()
+    return true_values, prediction_values, pid_values
 
 
 def train(
@@ -433,7 +455,7 @@ def _validate_model(
     device: Device,
     loss_fn: nn.Module,
 ) -> Tuple[float, float]:
-    """ Iterate over a validation data loader and return mean model loss and accuracy. """
+    """Return mean loss and accuracy over a validation data loader."""
     model.eval()
     losses: list[torch.Tensor] = []
     acces: list[torch.Tensor] = []

@@ -84,10 +84,13 @@ class HMMSmoother:
         if groups is None:
             Y_vit = viterbi(Y, params)
         else:
-            Y_vit = np.concatenate([
-                viterbi(Y[groups == g], params)
-                for g in ordered_unique(groups)
-            ])
+            groups = np.asarray(groups)
+            if len(groups) != len(Y):
+                raise ValueError("groups must have the same length as Y")
+            Y_vit = np.empty(len(Y), dtype=self.labels.dtype)
+            for group in ordered_unique(groups):
+                mask = groups == group
+                Y_vit[mask] = viterbi(Y[mask], params)
         return Y_vit
 
     def hmmlearn_fit_predict(
@@ -118,25 +121,35 @@ class HMMSmoother:
 
         if groups is None:
             groups = np.ones(len(Y))
+        else:
+            groups = np.asarray(groups)
+            if len(groups) != len(Y):
+                raise ValueError("groups must have the same length as Y")
 
         if self.stratify_groups:
             Y_pred_parts: list[NDArray] = []
+            group_masks: list[NDArray] = []
             scores: list[float] = []
             hmms: list[Any] = []
             for g in ordered_unique(groups):
+                mask = groups == g
                 _hmm, _score, _Y_pred = hmmlearn_fit_predict(
-                    Y[groups == g],
+                    Y[mask],
                     groups=None,
                     **hmm_params,
                 )
                 Y_pred_parts.append(_Y_pred)
+                group_masks.append(mask)
                 scores.append(_score)
                 hmms.append(_hmm)
-            Y_pred = np.concatenate(Y_pred_parts)
+            Y_pred = np.empty_like(np.concatenate(Y_pred_parts))
+            for mask, part in zip(group_masks, Y_pred_parts):
+                Y_pred[mask] = part
             score: Any = scores
             hmm: Any = hmms
 
         else:
+            # hmmlearn receives group lengths, so samples from each group must be contiguous.
             hmm, score, Y_pred = hmmlearn_fit_predict(
                 Y,
                 groups=groups,
@@ -166,12 +179,12 @@ def hmmlearn_fit_predict(
 ) -> Tuple[Any, float, NDArray]:
 
     if method == 'predict_proba' and len(np.unique(Y)) < 2:
-        # TODO:
+        # TODO: Support probability output when observations contain one label.
         raise NotImplementedError
 
     np.random.seed(random_state)
 
-    # TODO: it's better to split by group
+    # TODO: Split train and test at group boundaries to avoid leakage.
     if train_test_split:
         n = len(Y)
         Y_train, Y_test = Y[: n // 2], Y[n // 2 :]
@@ -196,9 +209,7 @@ def hmmlearn_fit_predict(
             random_state=idx,
             **kwargs,
         )
-        # Manually set n_features = n_components, otherwise this is set
-        # automatically to np.unique(Y) which can result in a mismatch when Y
-        # doesn't contain all the possible labels.
+        # Explicitly set n_features because Y may omit one of the possible labels.
         # https://github.com/hmmlearn/hmmlearn/issues/423
         hmm.n_features = n_components
 
