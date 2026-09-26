@@ -15,7 +15,7 @@ import pandas as pd
 from pathlib import Path
 import json
 
-from stepcount import utils
+from stepcount import _status, utils
 
 
 class TestInferFreq:
@@ -88,6 +88,93 @@ class TestCalculateWearStats:
         assert stats['EndTime'] is None
         assert stats['WearTime(days)'] == 0.0
         assert stats['NonwearTime(days)'] == 0.0
+
+    def test_summarize_wear_reuses_inputs_and_preserves_values(
+        self,
+        monkeypatch,
+    ):
+        index = pd.date_range('2024-01-01', periods=48, freq='h')
+        data = pd.DataFrame(
+            1.0,
+            index=index,
+            columns=['x', 'y', 'z', 'temperature'],
+        )
+        data.iloc[0] = np.nan
+        data.iloc[5, data.columns.get_loc('temperature')] = np.nan
+        data.iloc[30, data.columns.get_loc('x')] = np.nan
+        data.iloc[-1] = np.nan
+
+        infer_freq = utils.infer_freq
+        infer_freq_calls = 0
+
+        def count_infer_freq(values):
+            nonlocal infer_freq_calls
+            infer_freq_calls += 1
+            return infer_freq(values)
+
+        monkeypatch.setattr(utils, 'infer_freq', count_infer_freq)
+
+        stats, daily, no_data = utils._summarize_wear(data)
+
+        assert infer_freq_calls == 1
+        assert no_data is False
+        assert stats == {
+            'StartTime': '2024-01-01 00:00:00',
+            'EndTime': '2024-01-02 23:00:00',
+            'WearStartTime': '2024-01-01 01:00:00',
+            'WearEndTime': '2024-01-02 22:00:00',
+            'WearTime(days)': 48 * 3600.0 / 86400 - 4 * 3600.0 / 86400,
+            'NonwearTime(days)': 4 * 3600.0 / 86400,
+            'Covers24hOK': 1,
+        }
+        expected_daily = pd.DataFrame(
+            {'WearTime(hours)': [22.0, 22.0]},
+            index=pd.DatetimeIndex(
+                ['2024-01-01', '2024-01-02'],
+                name='Date',
+            ),
+        )
+        pd.testing.assert_frame_equal(daily, expected_daily)
+        assert utils.calculate_wear_stats(data) == stats
+        pd.testing.assert_frame_equal(
+            utils.calculate_daily_wear_stats(data),
+            daily,
+        )
+
+    def test_summarize_wear_empty_data(self):
+        empty = pd.DataFrame(
+            columns=['x', 'y', 'z'],
+            index=pd.DatetimeIndex([], name='time'),
+        )
+
+        stats, daily, no_data = utils._summarize_wear(empty)
+
+        assert stats == utils.calculate_wear_stats(empty)
+        pd.testing.assert_frame_equal(daily, pd.DataFrame())
+        assert no_data is True
+
+    @pytest.mark.parametrize(
+        'xyz, expected_no_data',
+        [
+            ([[1.0, 1.0, 1.0], [np.nan, np.nan, np.nan]], False),
+            ([[np.nan, 1.0, 1.0], [1.0, np.nan, 1.0]], True),
+        ],
+    )
+    def test_summarize_wear_preserves_xyz_no_data_semantics(
+        self,
+        xyz,
+        expected_no_data,
+    ):
+        data = pd.DataFrame(
+            xyz,
+            columns=['x', 'y', 'z'],
+            index=pd.date_range('2024-01-01', periods=2, freq='h'),
+        )
+        data['temperature'] = np.nan
+
+        _, _, no_data = utils._summarize_wear(data)
+
+        assert no_data is expected_no_data
 
 
 class TestCalculateDailyWearStats:
@@ -488,6 +575,43 @@ class TestReadCSV:
         assert 'z' in data.columns
         assert isinstance(data.index, pd.DatetimeIndex)
 
+    @pytest.mark.parametrize('sample_rate', [0, 0.0])
+    def test_zero_sample_rate_is_inferred(
+        self,
+        temp_dir,
+        monkeypatch,
+        sample_rate,
+    ):
+        from unittest.mock import MagicMock
+
+        csv_path = temp_dir / "infer_rate.csv"
+        pd.DataFrame(
+            {
+                'time': pd.date_range(
+                    '2024-01-15',
+                    periods=4,
+                    freq='100ms',
+                ),
+                'x': [0.0] * 4,
+                'y': [0.0] * 4,
+                'z': [1.0] * 4,
+            },
+        ).to_csv(csv_path, index=False)
+        process = MagicMock(side_effect=lambda data, *_args, **_kwargs: (data, {}))
+        monkeypatch.setattr(utils.actipy, 'process', process)
+
+        _, info = utils.read(
+            str(csv_path),
+            sample_rate=sample_rate,
+            resample_hz=None,
+            include_wear_stats=False,
+            verbose=False,
+        )
+
+        assert process.call_args.args[1] == 10
+        assert info['SampleRate'] == 10
+        assert info['ResampleRate'] == 10
+
     def test_read_csv_with_row_limits(self, temp_dir, sample_rate):
         """Test reading CSV with row limits (csv_start_row = header row, csv_end_row = last data row)."""
         # Create a CSV with 3 metadata preamble lines, then header + 1000 data rows
@@ -648,6 +772,63 @@ class TestReadDeviceFiles:
         assert 'x' in data.columns
         assert 'y' in data.columns
         assert 'z' in data.columns
+
+    def test_read_logs_post_resampling_wear_statistics(
+        self,
+        temp_dir,
+        mock_actipy_data,
+        monkeypatch,
+        capsys,
+    ):
+        """Post-read work is visible when verbose output is enabled."""
+        from unittest.mock import MagicMock
+
+        mock_data, mock_info = mock_actipy_data
+        monkeypatch.setattr(
+            'actipy.read_device',
+            MagicMock(return_value=(mock_data, mock_info)),
+        )
+        times = iter([20.0, 20.125])
+        monkeypatch.setattr(_status.time, "perf_counter", lambda: next(times))
+        cwa_file = temp_dir / 'subject_001.cwa'
+        cwa_file.write_bytes(b'')
+
+        utils.read(str(cwa_file), verbose=True)
+
+        assert capsys.readouterr().out == (
+            "Calculating wear statistics...\r"
+            "Calculating wear statistics... Done! (0.12s)\n"
+        )
+
+    def test_read_can_defer_wear_statistics(
+        self,
+        temp_dir,
+        mock_actipy_data,
+        monkeypatch,
+        capsys,
+    ):
+        """CLI callers can calculate filtered wear statistics later."""
+        from unittest.mock import MagicMock
+
+        mock_data, mock_info = mock_actipy_data
+        monkeypatch.setattr(
+            'actipy.read_device',
+            MagicMock(return_value=(mock_data, mock_info)),
+        )
+        calculate_wear_stats = MagicMock()
+        monkeypatch.setattr(utils, 'calculate_wear_stats', calculate_wear_stats)
+        cwa_file = temp_dir / 'subject_001.cwa'
+        cwa_file.write_bytes(b'')
+
+        _, info = utils.read(
+            str(cwa_file),
+            include_wear_stats=False,
+            verbose=True,
+        )
+
+        calculate_wear_stats.assert_not_called()
+        assert 'WearStartTime' not in info
+        assert capsys.readouterr().out == ''
 
     def test_read_gt3x_file(self, temp_dir, mock_actipy_data, monkeypatch):
         """Test reading .gt3x device file via mocked actipy."""

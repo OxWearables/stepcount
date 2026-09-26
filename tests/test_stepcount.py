@@ -845,7 +845,7 @@ print(','.join(loaded))
 
         input_path = tmp_path / "synthetic.cwa"
         output_root = tmp_path / model_type
-        times = pd.date_range("2024-01-15 10:00", periods=120, freq="1min")
+        times = pd.date_range("2024-01-15 23:00", periods=120, freq="1min")
         data = pd.DataFrame(
             {"x": 0.0, "y": 0.0, "z": 1.0},
             index=times,
@@ -857,17 +857,22 @@ print(','.join(loaded))
             "SampleRate": 1,
             "ResampleRate": 1,
         }
-        steps = pd.Series(
-            np.tile([0, 3, 6, 9], 30),
-            index=times,
-            name="Steps",
-        )
-        walking = steps >= 3
-        step_times = pd.DataFrame({"time": times.repeat(steps.to_numpy())})
-
         read = MagicMock(return_value=(data, info))
         monkeypatch.setattr(utils, "read", read)
         monkeypatch.setattr(stepcount, "_ensure_download_ssl_context", MagicMock())
+
+        def predict_from_frame(frame):
+            assert frame.index.equals(times[60:])
+            steps = pd.Series(
+                np.tile([0, 3, 6, 9], 15),
+                index=frame.index,
+                name="Steps",
+            )
+            walking = steps >= 3
+            step_times = pd.DataFrame(
+                {"time": frame.index.repeat(steps.to_numpy())},
+            )
+            return steps, walking, step_times
 
         detector = SimpleNamespace(sample_rate=None, verbose=True)
         model = SimpleNamespace(
@@ -877,7 +882,7 @@ print(','.join(loaded))
             window_len=0,
             verbose=True,
             steptol=3,
-            predict_from_frame=MagicMock(return_value=(steps, walking, step_times)),
+            predict_from_frame=MagicMock(side_effect=predict_from_frame),
         )
         load_model = MagicMock(return_value=model)
         monkeypatch.setattr(stepcount, "load_model", load_model)
@@ -889,6 +894,8 @@ print(','.join(loaded))
             str(output_root),
             "--model-type",
             model_type,
+            "--exclude-first-last",
+            "first",
             "--min-wear-per-day",
             "0",
             "--min-wear-per-hour",
@@ -906,6 +913,7 @@ print(','.join(loaded))
         stepcount.main()
 
         assert read.call_args.kwargs["resample_hz"] == expected_resample
+        assert read.call_args.kwargs["include_wear_stats"] is False
         assert read.call_args.kwargs["verbose"] is False
         assert load_model.call_args.args[1] == model_type
         assert model.sample_rate == 1
@@ -931,8 +939,13 @@ print(','.join(loaded))
         }
         assert {path.name for path in result_dir.iterdir()} == expected_files
         result_info = json.loads((result_dir / "synthetic-Info.json").read_text())
-        assert result_info["TotalSteps"] == 540
+        assert result_info["TotalSteps"] == 270
+        assert result_info["WearTime(days)"] == pytest.approx(1 / 24)
+        assert result_info["WearStartTime"] == "2024-01-16 00:00:00"
         assert result_info["StepCountArgs"]["model_type"] == model_type
+        daily = pd.read_csv(result_dir / "synthetic-Daily.csv.gz")
+        assert daily["Date"].tolist() == ["2024-01-16"]
+        assert daily["WearTime(hours)"].tolist() == [1.0]
 
     def test_cli_empty_input_writes_info_without_loading_model(
         self,
