@@ -40,7 +40,6 @@ else:
 warnings.filterwarnings('ignore', message='Mean of empty slice')  # shut .median() warning when all-NaN
 
 
-
 def main() -> None:
 
     parser = argparse.ArgumentParser(
@@ -127,7 +126,7 @@ def main() -> None:
 
     import numpy as np
     import pandas as pd
-    from stepcount import utils
+    from stepcount import _status, utils
 
     before = time.time()
 
@@ -154,21 +153,22 @@ def main() -> None:
         csv_end_row=args.csv_end_row,
         csv_time_format=args.csv_time_format,
         csv_txyz_idxs=args.csv_txyz_idxs,
+        include_wear_stats=False,
         verbose=verbose
     )
     info.update(info_read)
 
-    if args.exclude_first_last is not None:
-        data = utils.drop_first_last_days(data, args.exclude_first_last)
+    with _status.timed_status("Calculating wear statistics", verbose):
+        if args.exclude_first_last is not None:
+            data = utils.drop_first_last_days(data, args.exclude_first_last)
 
-    if args.exclude_wear_below is not None:
-        data = utils.flag_wear_below_days(data, args.exclude_wear_below)
+        if args.exclude_wear_below is not None:
+            data = utils.flag_wear_below_days(data, args.exclude_wear_below)
 
-    info.update(utils.calculate_wear_stats(data))
+        wear_stats, daily_wear_stats, no_data = utils._summarize_wear(data)
+        info.update(wear_stats)
 
-    daily_wear_stats = utils.calculate_daily_wear_stats(data)
-
-    if len(data) == 0 or data[['x', 'y', 'z']].isna().any(axis=1).all():
+    if no_data:
         with open(f"{outdir}/{basename}-Info.json", 'w') as f:
             json.dump(info, f, indent=4, cls=utils.NpEncoder)
         print("\nSummary\n-------")
@@ -179,11 +179,10 @@ def main() -> None:
         print("No data to process. Exiting early...")
         sys.exit(0)
 
-    if verbose:
-        print("Loading model...")
     model_path = pathlib.Path(__file__).parent / f"{__model_version__[args.model_type]}.joblib.lzma"
     check_md5 = args.model_path is None
-    model = load_model(args.model_path or model_path, args.model_type, check_md5, args.force_download)
+    with _status.timed_status("Loading model", verbose):
+        model = load_model(args.model_path or model_path, args.model_type, check_md5, args.force_download)
     # The nested detectors expose model-specific attributes after joblib restores them.
     wd_runtime: Any = model.wd
     # TODO: implement reset_sample_rate()

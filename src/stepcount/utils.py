@@ -12,6 +12,7 @@ import pandas as pd
 from pandas.tseries.frequencies import to_offset
 import actipy
 
+from stepcount import _status
 from stepcount._types import NDArray
 
 
@@ -25,13 +26,14 @@ def read(
     end_time: Optional[str] = None,
     calibration_stdtol_min: Optional[float] = None,
     sample_rate: Optional[float] = None,
-    resample_hz: Optional[Union[str, float]] = 'uniform',
+    resample_hz: Optional[Union[Literal['uniform'], int, float, bool]] = 'uniform',
     start_first_complete_minute: bool = False,
     csv_start_row: Optional[int] = None,
     csv_end_row: Optional[int] = None,
     csv_time_format: Optional[str] = None,
     csv_txyz_idxs: Optional[str] = None,
-    verbose: bool = True
+    verbose: bool = True,
+    include_wear_stats: bool = True
 ) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Read and preprocess activity data from a file.
@@ -59,6 +61,8 @@ def read(
     - csv_txyz_idxs (str, optional): Column indices for time,x,y,z as comma-separated string (0-indexed, e.g., '0,1,2,3').
       Overrides usecols for CSV files. Default is None (use usecols/csv_txyz).
     - verbose (bool, optional): If True, enables verbose output during processing. Default is True.
+    - include_wear_stats (bool, optional): Whether to add whole-record wear statistics to the returned metadata.
+      Default is True.
 
     Returns:
     - tuple: A tuple containing:
@@ -152,7 +156,7 @@ def read(
         else:
             raise ValueError(f"Unknown file format: {ftype}")
 
-        if sample_rate in (None, False):
+        if sample_rate is None or sample_rate == 0:
             freq = infer_freq(data.index)
             sample_rate = int(np.round(pd.Timedelta('1s') / freq))
 
@@ -205,8 +209,9 @@ def read(
     if end_time is not None:
         data = cast(Any, data).loc[:cast(Any, end_time)]
 
-    # Update wear stats
-    info.update(calculate_wear_stats(data))
+    if include_wear_stats:
+        with _status.timed_status("Calculating wear statistics", verbose):
+            info.update(calculate_wear_stats(data))
 
     return data, info
 
@@ -225,45 +230,11 @@ def calculate_wear_stats(data: pd.DataFrame) -> Dict[str, Any]:
         info = calculate_wear_stats(data)
     """
 
-    TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+    if len(data) == 0:
+        return _empty_wear_stats()
 
-    n_data = len(data)
-
-    if n_data == 0:
-        start_time = None
-        end_time = None
-        wear_start_time = None
-        wear_end_time = None
-        nonwear_duration = 0.0
-        wear_duration = 0.0
-        covers24hok = 0
-
-    else:
-        na = data.isna().any(axis=1)  # TODO: check na only on x,y,z cols?
-        dt = infer_freq(data.index).total_seconds()
-        datetime_index = cast(pd.DatetimeIndex, data.index)
-        start_time = datetime_index[0].strftime(TIME_FORMAT)
-        end_time = datetime_index[-1].strftime(TIME_FORMAT)
-        wear_start_time = data.first_valid_index()
-        if wear_start_time is not None:
-            wear_start_time = pd.Timestamp(cast(Any, wear_start_time)).strftime(TIME_FORMAT)
-        wear_end_time = data.last_valid_index()
-        if wear_end_time is not None:
-            wear_end_time = pd.Timestamp(cast(Any, wear_end_time)).strftime(TIME_FORMAT)
-        nonwear_duration = na.sum() * dt / (60 * 60 * 24)
-        wear_duration = n_data * dt / (60 * 60 * 24) - nonwear_duration 
-        coverage = (~na).groupby(cast(pd.DatetimeIndex, na.index).hour).mean()
-        covers24hok = int(len(coverage) == 24 and coverage.min() >= 0.01)
-
-    return {
-        'StartTime': start_time,
-        'EndTime': end_time,
-        'WearStartTime': wear_start_time,
-        'WearEndTime': wear_end_time,
-        'WearTime(days)': wear_duration,
-        'NonwearTime(days)': nonwear_duration,
-        'Covers24hOK': covers24hok
-    }
+    wear, dt = _wear_inputs(data)
+    return _calculate_wear_stats(data, wear, dt)
 
 
 def calculate_daily_wear_stats(data: pd.DataFrame) -> pd.DataFrame:
@@ -284,44 +255,97 @@ def calculate_daily_wear_stats(data: pd.DataFrame) -> pd.DataFrame:
     if len(data) == 0:
         return pd.DataFrame()
 
-    # Identify non-wear periods (NaN in any of x,y,z columns)
-    na = data.isna().any(axis=1)
+    wear, dt = _wear_inputs(data)
+    return _calculate_daily_wear_stats(wear, dt)
+
+
+def _summarize_wear(
+    data: pd.DataFrame,
+) -> Tuple[Dict[str, Any], pd.DataFrame, bool]:
+    """Calculate wear statistics and the CLI's xyz-only no-data status."""
+    if len(data) == 0:
+        return _empty_wear_stats(), pd.DataFrame(), True
+
+    missing = data.isna()
+    wear = ~missing.any(axis=1)
+    no_data = bool((missing['x'] | missing['y'] | missing['z']).all())
     dt = infer_freq(data.index).total_seconds()
+    return (
+        _calculate_wear_stats(data, wear, dt),
+        _calculate_daily_wear_stats(wear, dt),
+        no_data,
+    )
 
-    # Group by date
+
+def _wear_inputs(data: pd.DataFrame) -> Tuple[pd.Series[Any], float]:
+    wear = ~data.isna().any(axis=1)
+    dt = infer_freq(data.index).total_seconds()
+    return wear, dt
+
+
+def _empty_wear_stats() -> Dict[str, Any]:
+    return {
+        'StartTime': None,
+        'EndTime': None,
+        'WearStartTime': None,
+        'WearEndTime': None,
+        'WearTime(days)': 0.0,
+        'NonwearTime(days)': 0.0,
+        'Covers24hOK': 0,
+    }
+
+
+def _calculate_wear_stats(
+    data: pd.DataFrame,
+    wear: pd.Series[Any],
+    dt: float,
+) -> Dict[str, Any]:
+    TIME_FORMAT = "%Y-%m-%d %H:%M:%S"
     datetime_index = cast(pd.DatetimeIndex, data.index)
-    date_groups = data.groupby(datetime_index.date)
 
-    results: list[Dict[str, Any]] = []
+    wear_start: Any
+    if data.iloc[0].notna().any():
+        wear_start = datetime_index[0]
+    else:
+        wear_start = data.first_valid_index()
+    wear_end: Any
+    if data.iloc[-1].notna().any():
+        wear_end = datetime_index[-1]
+    else:
+        wear_end = data.last_valid_index()
 
-    for date, day_data in date_groups:
-        day_na = na.loc[day_data.index]
-        n_samples = len(day_data)
+    wear_start_time = None
+    if wear_start is not None:
+        wear_start_time = pd.Timestamp(cast(Any, wear_start)).strftime(TIME_FORMAT)
+    wear_end_time = None
+    if wear_end is not None:
+        wear_end_time = pd.Timestamp(cast(Any, wear_end)).strftime(TIME_FORMAT)
 
-        if n_samples == 0:
-            # Skip empty days
-            continue
+    nonwear_duration = (len(wear) - wear.sum()) * dt / (60 * 60 * 24)
+    wear_duration = len(data) * dt / (60 * 60 * 24) - nonwear_duration
+    coverage = wear.groupby(datetime_index.hour).mean()
 
-        # Calculate wear time
-        nonwear_samples = day_na.sum()
-        wear_samples = n_samples - nonwear_samples
+    return {
+        'StartTime': datetime_index[0].strftime(TIME_FORMAT),
+        'EndTime': datetime_index[-1].strftime(TIME_FORMAT),
+        'WearStartTime': wear_start_time,
+        'WearEndTime': wear_end_time,
+        'WearTime(days)': wear_duration,
+        'NonwearTime(days)': nonwear_duration,
+        'Covers24hOK': int(len(coverage) == 24 and coverage.min() >= 0.01),
+    }
 
-        # Convert to hours
-        wear_hours = wear_samples * dt / 3600
 
-        results.append({
-            'Date': pd.to_datetime(cast(Any, date)),
-            'WearTime(hours)': round(wear_hours, 2)
-        })
-
-    if not results:
-        return pd.DataFrame()
-
-    # Create DataFrame and set date as index
-    daily_stats = pd.DataFrame(results)
-    daily_stats.set_index('Date', inplace=True)
+def _calculate_daily_wear_stats(
+    wear: pd.Series[Any],
+    dt: float,
+) -> pd.DataFrame:
+    datetime_index = cast(pd.DatetimeIndex, wear.index)
+    dates = datetime_index.tz_localize(None).normalize()
+    wear_samples = wear.groupby(dates).sum()
+    wear_hours = (wear_samples * dt / 3600).round(2)
+    daily_stats = wear_hours.to_frame('WearTime(hours)')
     daily_stats.index.name = 'Date'
-
     return daily_stats
 
 
