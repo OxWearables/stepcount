@@ -28,11 +28,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .  # install as editable to locate the torch hub cache more easily
 
-      # Perform a run to cache the torch hub repo and download the model files (SSL)
+      - name: Download model artifacts
+        run: stepcount --download-models
+
       - name: Smoke test
         run: stepcount tests/data/nano-sample.csv.gz
 
-      # Perform a run to download the model files (RF)
       - name: Smoke test (RF)
         run: stepcount tests/data/nano-sample.csv.gz -t rf
 
