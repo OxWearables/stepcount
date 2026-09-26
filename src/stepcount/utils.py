@@ -431,37 +431,43 @@ def impute_missing(
       the first and last day have full 24-hour coverage.
     - If `skip_full_missing_days` is True, days with all missing values will be excluded from the imputation process.
     """
-    def fillna(series: pd.Series[Any]) -> pd.Series[Any]:
-        missing = series.isna()
-        if missing.any() and not missing.all():
-            return series.fillna(series.mean())
-        return series
-
     def impute(frame: PandasObject) -> PandasObject:
         datetime_index = cast(pd.DatetimeIndex, frame.index)
-
-        def impute_series(series: pd.Series[Any]) -> pd.Series[Any]:
-            return (
-                series
-                # first attempt imputation using same day of week
-                .groupby([datetime_index.weekday, datetime_index.hour, datetime_index.minute // 5])
-                .transform(fillna)
-                # then try within weekday/weekend
-                .groupby([datetime_index.weekday >= 5, datetime_index.hour, datetime_index.minute // 5])
-                .transform(fillna)
-                # finally, use all other days
-                .groupby([datetime_index.hour, datetime_index.minute // 5])
-                .transform(fillna)
-            )
-
-        if isinstance(frame, pd.Series):
-            return impute_series(frame)
-
-        result = cast(
-            pd.DataFrame,
-            cast(Any, frame).apply(impute_series),
+        weekday = datetime_index.weekday
+        hour = datetime_index.hour
+        slot = datetime_index.minute // 5
+        groupings = (
+            [weekday, hour, slot],
+            [weekday >= 5, hour, slot],
+            [hour, slot],
         )
-        return cast(PandasObject, result)  # type: ignore[redundant-cast]
+        result = frame.copy()
+        if isinstance(result, pd.DataFrame):
+            numeric = result.select_dtypes(include='number').copy()
+        else:
+            numeric = result
+
+        for keys in groupings:
+            missing = numeric.isna()
+            if isinstance(numeric, pd.DataFrame):
+                active = missing.any(axis=0) & ~missing.all(axis=0)
+                if not active.any():
+                    break
+                columns = active.index[active].tolist()
+                values = numeric.loc[:, columns]
+                means = values.groupby(keys).transform('mean')
+                numeric.loc[:, columns] = values.fillna(means)
+            else:
+                if not missing.any() or missing.all():
+                    break
+                means = numeric.groupby(keys).transform('mean')
+                numeric = numeric.fillna(means)
+
+        if isinstance(result, pd.DataFrame):
+            result.loc[:, numeric.columns] = numeric
+        else:
+            result = numeric
+        return result
 
     if skip_full_missing_days:
         # Compute dates where ALL values are NaN (across all columns if DataFrame)
@@ -505,7 +511,7 @@ def impute_missing(
     data = impute(data)
 
     if skip_full_missing_days:
-        # Set rows for fully-missing dates back to NaN
+        # Restore dates that were intentionally excluded from imputation.
         mask = np.isin(cast(pd.DatetimeIndex, data.index).date, full_na_dates)
         data.loc[mask] = np.nan
 

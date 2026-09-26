@@ -268,6 +268,21 @@ class TestHMMSmoother:
 
         assert len(result) == len(Y_test)
 
+    def test_hmm_smoother_preserves_interleaved_group_order(self):
+        Y_true = np.array([0, 0, 1, 1, 0, 0, 1, 1])
+        smoother = hmm_utils.HMMSmoother()
+        smoother.fit(Y_true, Y_true)
+        Y_test = np.array([0, 1, 1, 0, 0, 1])
+        groups = np.array(['A', 'B', 'A', 'B', 'A', 'B'])
+
+        result = smoother.predict(Y_test, groups=groups)
+        expected = np.empty_like(result)
+        for group in np.unique(groups):
+            mask = groups == group
+            expected[mask] = smoother.predict(Y_test[mask])
+
+        np.testing.assert_array_equal(result, expected)
+
     def test_hmm_smoother_custom_params(self):
         """Test HMMSmoother with custom parameters."""
         smoother = hmm_utils.HMMSmoother(
@@ -477,6 +492,31 @@ class TestHMMSmootherHMMLearn:
         assert len(result) == len(Y_test)
         # With stratify_groups=False, hmm is a single object
         assert smoother.hmm is not None
+
+    def test_stratified_predict_proba_preserves_interleaved_order(
+        self,
+        monkeypatch,
+    ):
+        def fake_fit_predict(Y, **kwargs):
+            values = Y[:, 0].astype(float)
+            probabilities = np.column_stack([values, values + 0.5])
+            return object(), 0.0, probabilities
+
+        monkeypatch.setattr(hmm_utils, 'hmmlearn_fit_predict', fake_fit_predict)
+        smoother = hmm_utils.HMMSmoother(
+            use_hmmlearn=True,
+            n_components=2,
+            stratify_groups=True,
+        )
+        Y = np.array([0, 1, 2, 3])
+        groups = np.array(['A', 'B', 'A', 'B'])
+
+        result = smoother.predict_proba(Y, groups=groups)
+
+        np.testing.assert_array_equal(
+            result,
+            np.column_stack([Y.astype(float), Y + 0.5]),
+        )
 
     def test_hmmlearn_predict_proba(self):
         """Test HMMSmoother hmmlearn predict_proba method."""

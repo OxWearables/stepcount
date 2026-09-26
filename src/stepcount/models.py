@@ -205,16 +205,18 @@ class StepCounter:
             print("Model not yet trained. Call .fit() first.")
             return None
 
-        ok = np.flatnonzero(~np.asarray([np.isnan(x).any() for x in X]))
+        invalid = np.isnan(X).any(axis=tuple(range(1, X.ndim)))
+        ok = np.flatnonzero(~invalid)
+        if groups is not None and len(groups) != len(X):
+            raise ValueError("groups must have the same length as X")
 
-        X_ = X[ok]
-        W_ = self.wd.predict(X_, groups).astype('bool')
+        W_ = self.wd.predict(X, groups, indices=ok).astype('bool')
         Y_ = np.zeros_like(W_, dtype='float')
         Z_ = np.full_like(W_, fill_value=None, dtype=np.ndarray)
 
         w_ = np.flatnonzero(W_)
         (Y_[w_], Z_[w_]) = batch_count_peaks(
-            X_[w_],
+            X[ok[w_]],
             self.sample_rate,
             self.lowpass_hz,
             self.find_peaks_params,
@@ -283,6 +285,24 @@ class StepCounter:
         T_steps = pd.Series(step_times, name='time')
 
         return Y, W, T_steps
+
+
+def _select_prediction_groups(
+    groups: Optional[NDArray],
+    source_count: int,
+    indices: Optional[NDArray],
+) -> Optional[NDArray]:
+    """Resolve group labels for selected windows, preferring source alignment."""
+    if groups is None:
+        return None
+
+    groups = np.asarray(groups)
+    selected_count = source_count if indices is None else len(indices)
+    if indices is not None and len(groups) == source_count:
+        return cast(NDArray, groups[np.asarray(indices)])
+    if len(groups) == selected_count:
+        return groups
+    raise ValueError("groups must align with X or with the selected indices")
 
 
 class WalkDetectorRF:
@@ -384,18 +404,26 @@ class WalkDetectorRF:
 
         return self
 
-    def predict(self, X: NDArray, groups: Optional[NDArray] = None) -> NDArray:
+    def predict(
+        self,
+        X: NDArray,
+        groups: Optional[NDArray] = None,
+        indices: Optional[NDArray] = None,
+    ) -> NDArray:
 
-        if len(X) == 0:
-            warnings.warn("No data to predict")
+        sample_count = len(X) if indices is None else len(indices)
+        if sample_count == 0:
+            warnings.warn("No data to predict", stacklevel=2)
             return np.array([], dtype='int')
 
-        W = np.zeros(len(X), dtype='int')  # nan defaults to non-walk
-        X_feats = batch_extract_features(X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
+        selected_groups = _select_prediction_groups(groups, len(X), indices)
+        selected_X = X if indices is None else X[np.asarray(indices)]
+        W = np.zeros(sample_count, dtype='int')  # nan defaults to non-walk
+        X_feats = batch_extract_features(selected_X, self.sample_rate, n_jobs=self.n_jobs, verbose=self.verbose)
         ok = ~(np.isnan(X_feats).any(1))
         if ok.any():
             W[ok] = (self.clf.predict_proba(X_feats[ok])[:, 1] > self.thresh).astype('int')
-        W = self.hmms.predict(W, groups=groups)
+        W = self.hmms.predict(W, groups=selected_groups)
 
         return W
 
@@ -498,19 +526,32 @@ class WalkDetectorSSL:
 
         return self
 
-    def predict(self, X: NDArray, groups: Optional[NDArray] = None) -> NDArray:
+    def predict(
+        self,
+        X: NDArray,
+        groups: Optional[NDArray] = None,
+        indices: Optional[NDArray] = None,
+    ) -> NDArray:
+        """Predict windows, optionally selecting them by source-array index.
+
+        With ``indices``, groups may align with either the full source array or
+        the selected windows. Full-source alignment takes precedence when both
+        lengths are equal.
+        """
 
         sslmodel.verbose = self.verbose
 
-        if not hasattr(self, 'model') or self.model is None:
-            # warnings.warn("Model not loaded. Loading model...")
-            self.model = self.load_model()
-
-        if len(X) == 0:
-            warnings.warn("No data to predict")
+        sample_count = len(X) if indices is None else len(indices)
+        if sample_count == 0:
+            warnings.warn("No data to predict", stacklevel=2)
             return np.array([], dtype='int')
 
-        dataset = sslmodel.NormalDataset(X, name='prediction')
+        selected_groups = _select_prediction_groups(groups, len(X), indices)
+
+        if not hasattr(self, 'model') or self.model is None:
+            self.model = self.load_model()
+
+        dataset = sslmodel.InferenceDataset(X, indices=indices)
         dataloader = DataLoader(
             dataset,
             batch_size=512,
@@ -518,8 +559,14 @@ class WalkDetectorSSL:
             num_workers=0,
         )
 
-        _, y_pred, _ = sslmodel.predict(self.model, dataloader, self.device, output_logits=False)
-        y_pred = self.hmms.predict(y_pred, groups=groups)
+        _, y_pred, _ = sslmodel.predict(
+            self.model,
+            dataloader,
+            self.device,
+            output_logits=False,
+            collect_metadata=False,
+        )
+        y_pred = self.hmms.predict(y_pred, groups=selected_groups)
 
         return y_pred
 
@@ -886,7 +933,7 @@ def calibrate(
     f1 = stats.hmean(np.asarray([precision, recall]), axis=0)
     balanced_accuracy = (tpr + (1 - fpr)) / 2
 
-    # optimize for balanced accuracy
+    # Select the threshold that maximizes balanced accuracy.
     balanced_accuracy_idx = np.argmax(balanced_accuracy)
     balanced_accuracy_thresh = thresh_roc[balanced_accuracy_idx]
     best_balanced_accuracy = {
@@ -897,7 +944,7 @@ def calibrate(
         'predicted': (yp >= balanced_accuracy_thresh).astype('int'),
     }
 
-    # optimize for F1
+    # Select the threshold that maximizes F1.
     f1_idx = np.argmax(f1[:-1])
     f1_thresh = thresh_pr[f1_idx]
     best_f1 = {
@@ -908,7 +955,7 @@ def calibrate(
         'predicted': (yp > f1_thresh).astype('int'),
     }
 
-    # optimize for precision
+    # Select the first threshold meeting the precision target.
     precision_idx = np.argmax(precision[:-1] > precision_tol)
     precision_thresh = thresh_pr[precision_idx]
     best_precision = {
@@ -919,7 +966,7 @@ def calibrate(
         'predicted': (yp > precision_thresh).astype('int'),
     }
 
-    # optimize for recall
+    # Select the first threshold meeting the recall target.
     recall_idx = np.argmax(recall[:-1] > recall_tol)
     recall_thresh = thresh_pr[recall_idx]
     best_recall = {
