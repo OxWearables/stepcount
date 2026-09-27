@@ -2,7 +2,6 @@
 Tests for stepcount.models module.
 
 Tests cover:
-- make_windows function
 - Peak counting functions
 - toV (vector magnitude) computation
 - Sample weight calculation
@@ -22,97 +21,104 @@ from stepcount import models
 
 
 class TestMakeWindows:
-    """Tests for make_windows function."""
-
-    def test_make_windows_basic(self, sample_rate):
-        """Test basic window creation with evenly divisible data."""
-        window_sec = 10
-        n_windows = 100
-        n_samples = n_windows * sample_rate * window_sec
-
-        times = pd.date_range('2024-01-15', periods=n_samples, freq=f'{1000000//sample_rate}us')
+    def test_handles_full_padded_invalid_and_truncated_windows(self):
+        offsets = [0, 1, 2, 3, 4, 5, 6, 8, 9, 12, 13, 14, 15, 15.5]
+        values = np.arange(len(offsets) * 3, dtype=np.float32).reshape(-1, 3)
         data = pd.DataFrame(
-            np.random.randn(n_samples, 3) * 0.1,
+            values,
             columns=['x', 'y', 'z'],
-            index=times
+            index=pd.DatetimeIndex(
+                [pd.Timestamp('2024-01-01') + pd.Timedelta(seconds=offset) for offset in offsets],
+                name='time',
+            ),
         )
-        data.index.name = 'time'
 
-        def fn(chunk):
-            return chunk[['x', 'y', 'z']].to_numpy()
+        expected = np.stack(
+            [
+                values[0:4],
+                values[[4, 5, 6, 4]],
+                np.full((4, 3), np.nan),
+                values[9:13],
+            ]
+        )
+        expected_times = pd.date_range('2024-01-01', periods=4, freq='4s', name='time')
+        actual, actual_times = models.make_windows(data, window_sec=4, window_len=4)
 
-        X = models.make_windows(data, window_sec, fn=fn, verbose=False)
+        np.testing.assert_allclose(actual, expected, equal_nan=True)
+        pd.testing.assert_index_equal(actual_times, expected_times)
+        assert actual.dtype == np.float32
 
-        assert len(X) == n_windows
-        for window in X:
-            assert window.ndim == 2
-            assert window.shape[1] == 3
-
-    def test_make_windows_with_index(self, sample_rate):
-        """Test window creation returns timestamps."""
-        window_sec = 10
-        n_windows = 50
-        n_samples = n_windows * sample_rate * window_sec
-
-        times = pd.date_range('2024-01-15', periods=n_samples, freq=f'{1000000//sample_rate}us')
+    def test_bulk_path_preserves_regular_data(self):
+        values = np.arange(24, dtype=np.float32).reshape(8, 3)
         data = pd.DataFrame(
-            np.random.randn(n_samples, 3) * 0.1,
+            values,
             columns=['x', 'y', 'z'],
-            index=times
+            index=pd.date_range('2024-01-01', periods=8, freq='500ms', name='time'),
         )
-        data.index.name = 'time'
 
-        def fn(chunk):
-            return chunk[['x', 'y', 'z']].to_numpy()
+        actual, times = models.make_windows(data, window_sec=2, window_len=4)
 
-        X, T = models.make_windows(data, window_sec, fn=fn, return_index=True, verbose=False)
+        np.testing.assert_array_equal(actual, values.reshape(2, 4, 3))
+        pd.testing.assert_index_equal(
+            times,
+            pd.date_range('2024-01-01', periods=2, freq='2s', name='time'),
+        )
 
-        assert len(X) == len(T)
-        assert isinstance(T, pd.DatetimeIndex)
-        assert len(X) == n_windows
-
-    def test_make_windows_custom_fn(self, sample_rate):
-        """Test window creation with custom function that returns fixed-size output."""
-        window_sec = 10
-        n_windows = 20
-        n_samples = n_windows * sample_rate * window_sec
-
-        times = pd.date_range('2024-01-15', periods=n_samples, freq=f'{1000000//sample_rate}us')
+    def test_empty_frame_retains_shape_and_index_name(self):
         data = pd.DataFrame(
-            np.random.randn(n_samples, 3) * 0.1,
-            columns=['x', 'y', 'z'],
-            index=times
+            {column: pd.Series(dtype='float32') for column in ['x', 'y', 'z']},
+            index=pd.DatetimeIndex([], name='time'),
         )
-        data.index.name = 'time'
 
-        def extract_mean(chunk):
-            # Returns fixed-size output (3 values) regardless of input size
-            return chunk[['x', 'y', 'z']].mean().to_numpy()
+        actual, times = models.make_windows(data, window_sec=10, window_len=300)
 
-        X = models.make_windows(data, window_sec, fn=extract_mean, verbose=False)
+        assert actual.shape == (0, 300, 3)
+        assert actual.dtype == np.float32
+        assert times.empty
+        assert times.name == 'time'
 
-        # Each window result should have 3 values
-        assert X.shape == (n_windows, 3)
+    @pytest.mark.parametrize(
+        ('data', 'error', 'message'),
+        [
+            (
+                pd.DataFrame(
+                    {'x': [0.0], 'y': [0.0]},
+                    index=pd.date_range('2024-01-01', periods=1, freq='s'),
+                ),
+                ValueError,
+                'missing accelerometer columns',
+            ),
+            (
+                pd.DataFrame({'x': [0.0], 'y': [0.0], 'z': [1.0]}),
+                TypeError,
+                'DatetimeIndex',
+            ),
+            (
+                pd.DataFrame(
+                    {'x': [0.0, 0.0], 'y': [0.0, 0.0], 'z': [1.0, 1.0]},
+                    index=pd.to_datetime(['2024-01-02', '2024-01-01']),
+                ),
+                ValueError,
+                'sorted',
+            ),
+        ],
+    )
+    def test_rejects_invalid_frames(self, data, error, message):
+        with pytest.raises(error, match=message):
+            models.make_windows(data, window_sec=10, window_len=300)
 
-    def test_make_windows_different_sizes(self, sample_rate):
-        """Test window creation with different window sizes."""
-        for window_sec in [5, 10, 30]:
-            n_windows = 10
-            n_samples = n_windows * sample_rate * window_sec
+    @pytest.mark.parametrize(
+        ('window_sec', 'window_len', 'message'),
+        [(0, 300, 'positive'), (10, 0, 'positive'), (1e-12, 300, 'nanosecond')],
+    )
+    def test_rejects_invalid_window_sizes(self, window_sec, window_len, message):
+        data = pd.DataFrame(
+            {'x': [0.0], 'y': [0.0], 'z': [1.0]},
+            index=pd.date_range('2024-01-01', periods=1, freq='s'),
+        )
 
-            times = pd.date_range('2024-01-15', periods=n_samples, freq=f'{1000000//sample_rate}us')
-            data = pd.DataFrame(
-                np.random.randn(n_samples, 3) * 0.1,
-                columns=['x', 'y', 'z'],
-                index=times
-            )
-            data.index.name = 'time'
-
-            def fn(chunk):
-                return chunk[['x', 'y', 'z']].to_numpy()
-
-            X = models.make_windows(data, window_sec, fn=fn, verbose=False)
-            assert len(X) == n_windows
+        with pytest.raises(ValueError, match=message):
+            models.make_windows(data, window_sec=window_sec, window_len=window_len)
 
 
 class TestToV:
@@ -1031,6 +1037,34 @@ class TestPredictFromFrame:
 
         with pytest.raises(RuntimeError, match="outputs were not produced"):
             model.predict_from_frame(data)
+
+    def test_predict_from_frame_reports_window_timing(self, monkeypatch, capsys):
+        model = models.StepCounter(
+            wd_type="rf",
+            sample_rate=1,
+            window_sec=1,
+            verbose=True,
+        )
+        monkeypatch.setattr(
+            model,
+            "predict",
+            lambda *args, **kwargs: (
+                np.array([0.0]),
+                np.array([0.0]),
+                np.array([None], dtype=object),
+            ),
+        )
+        data = pd.DataFrame(
+            [[0.0, 0.0, 1.0]],
+            columns=["x", "y", "z"],
+            index=pd.date_range("2024-01-01", periods=1, freq="s"),
+        )
+
+        model.predict_from_frame(data)
+
+        output = capsys.readouterr().out
+        assert "Defining segments...\r" in output
+        assert "Defining segments... Done! (" in output
 
 
 class TestStepCounterFit:
