@@ -4,7 +4,7 @@ import warnings
 from copy import deepcopy
 from collections import defaultdict, Counter
 from os import PathLike
-from typing import Any, Callable, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast, overload
+from typing import Any, Dict, Iterator, List, Literal, Mapping, Optional, Sequence, Tuple, Union, cast, overload
 
 import torch
 import torch.nn as nn
@@ -18,6 +18,7 @@ from joblib import Parallel, delayed
 from sklearn import metrics
 from sklearn.model_selection import GroupShuffleSplit
 from imblearn.ensemble import BalancedRandomForestClassifier
+from stepcount import _status
 from stepcount import hmm_utils
 from stepcount import features
 from stepcount import sslmodel
@@ -245,23 +246,8 @@ class StepCounter:
         self,
         data: pd.DataFrame,
     ) -> Tuple[pd.Series[Any], pd.Series[Any], pd.Series[Any]]:
-
-        def fn(chunk: pd.DataFrame) -> NDArray:
-            """ Process the chunk. Apply padding if length is not enough. """
-            n = len(chunk)
-            x = chunk[['x', 'y', 'z']].to_numpy()
-            if n == self.window_len:
-                x = x
-            elif n > self.window_len:
-                x = x[:self.window_len]
-            elif n < self.window_len and n > self.window_len / 2:
-                m = self.window_len - n
-                x = np.pad(x, ((0, m), (0, 0)), mode='wrap')
-            else:
-                x = np.full((self.window_len, 3), fill_value=np.nan)
-            return x
-
-        X, T = make_windows(data, self.window_sec, fn=fn, return_index=True, verbose=self.verbose)
+        with _status.timed_status("Defining segments", self.verbose):
+            X, T = make_windows(data, self.window_sec, self.window_len)
 
         prediction = self.predict(
             X,
@@ -586,65 +572,92 @@ class WalkDetectorSSL:
         return model
 
 
-@overload
 def make_windows(
     data: pd.DataFrame,
     window_sec: float,
-    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
-    return_index: Literal[False] = False,
-    verbose: bool = True,
-) -> NDArray:
-    ...
-
-
-@overload
-def make_windows(
-    data: pd.DataFrame,
-    window_sec: float,
-    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
-    return_index: Literal[True] = True,
-    verbose: bool = True,
+    window_len: int,
 ) -> Tuple[NDArray, pd.DatetimeIndex]:
-    ...
+    """Build fixed-size XYZ windows without materializing pandas groups."""
+    window_ns = validate_window_inputs(data, window_sec, window_len)
+    columns = (
+        cast(NDArray, data['x'].to_numpy(copy=False)),
+        cast(NDArray, data['y'].to_numpy(copy=False)),
+        cast(NDArray, data['z'].to_numpy(copy=False)),
+    )
+    dtype = np.result_type(*(column.dtype for column in columns), np.float32)
+    if len(data) == 0:
+        empty = np.empty((0, window_len, 3), dtype=dtype)
+        return empty, pd.DatetimeIndex([], name=data.index.name)
+
+    index_ns = data.index.asi8
+    origin_ns = int(index_ns[0])
+    window_count = int((int(index_ns[-1]) - origin_ns) // window_ns) + 1
+    edge_ns = origin_ns + np.arange(window_count + 1, dtype=np.int64) * window_ns
+    boundaries = np.searchsorted(index_ns, edge_ns, side='left')
+    counts = np.diff(boundaries)
+
+    # Resampled device data normally consists of a long prefix of complete,
+    # contiguous windows. Copy that prefix in bulk, then handle gaps and the
+    # final partial window individually.
+    incomplete = np.flatnonzero(counts != window_len)
+    complete_prefix = int(incomplete[0]) if incomplete.size else window_count
+    X = np.empty((window_count, window_len, 3), dtype=dtype)
+    X[complete_prefix:] = np.nan
+    prefix_samples = complete_prefix * window_len
+    if prefix_samples:
+        for axis, column in enumerate(columns):
+            X[:complete_prefix, :, axis] = column[:prefix_samples].reshape(complete_prefix, window_len)
+
+    for window_idx in range(complete_prefix, window_count):
+        fill_window(X, columns, boundaries, counts, window_idx, window_len)
+
+    frequency = pd.Timedelta(seconds=window_sec)
+    times = pd.date_range(
+        start=cast(pd.Timestamp, data.index[0]),
+        periods=window_count,
+        freq=frequency,
+        name=data.index.name,
+    )
+    return X, times
 
 
-def make_windows(
-    data: pd.DataFrame,
-    window_sec: float,
-    fn: Optional[Callable[[pd.DataFrame], Any]] = None,
-    return_index: bool = False,
-    verbose: bool = True,
-) -> Union[NDArray, Tuple[NDArray, pd.DatetimeIndex]]:
-    """ Split data into windows """
+def validate_window_inputs(data: pd.DataFrame, window_sec: float, window_len: int) -> int:
+    missing = {'x', 'y', 'z'}.difference(data.columns)
+    if missing:
+        raise ValueError(f"data is missing accelerometer columns: {sorted(missing)}")
+    if not isinstance(data.index, pd.DatetimeIndex):
+        raise TypeError("data must have a DatetimeIndex")
+    if not data.index.is_monotonic_increasing:
+        raise ValueError("data index must be sorted in increasing time order")
+    if window_sec <= 0:
+        raise ValueError("window_sec must be positive")
+    if window_len <= 0:
+        raise ValueError("window_len must be positive")
 
-    if verbose:
-        print("Defining segments...")
+    window_ns = pd.Timedelta(seconds=window_sec).value
+    if window_ns <= 0:
+        raise ValueError("window_sec is too small for nanosecond resolution")
+    return window_ns
 
-    transform = fn
-    if transform is None:
-        def transform(x: pd.DataFrame) -> pd.DataFrame:
-            return x
 
-    windows: list[Any] = []
-    times: list[Any] = []
-    for t, x in data.resample(f"{window_sec}s", origin="start"):
-        transformed = transform(x)
-        windows.append(transformed)
-        times.append(t)
+def fill_window(
+    X: NDArray,
+    columns: Tuple[NDArray, NDArray, NDArray],
+    boundaries: NDArray,
+    counts: NDArray,
+    window_idx: int,
+    window_len: int,
+) -> None:
+    sample_count = int(counts[window_idx])
+    if sample_count * 2 <= window_len:
+        return
 
-    # Handle potentially inhomogeneous window sizes gracefully
-    # (pandas resample can produce windows with different sample counts)
-    try:
-        X = cast(NDArray, np.stack(windows, axis=0))
-    except ValueError:
-        # Windows have different shapes - use object array for compatibility
-        X = cast(NDArray, np.array(windows, dtype=object))
-
-    if return_index:
-        T = pd.DatetimeIndex(times, name=data.index.name)
-        return X, T
-
-    return X
+    start = int(boundaries[window_idx])
+    copy_count = min(sample_count, window_len)
+    for axis, column in enumerate(columns):
+        source = column[start:start + copy_count]
+        X[window_idx, :copy_count, axis] = source
+        X[window_idx, copy_count:, axis] = source[:window_len - copy_count]
 
 
 @overload
