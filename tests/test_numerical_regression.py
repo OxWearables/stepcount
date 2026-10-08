@@ -130,8 +130,8 @@ def test_adjusted_step_summary_imputes_a_known_gap():
 
 
 def test_cadence_summary_matches_hand_calculated_values():
-    times = pd.date_range("2024-01-15", periods=5, freq="1min")
-    steps = pd.Series([0, 30, 60, 90, 120], index=times, name="Steps")
+    times = pd.date_range("2024-01-15", periods=30, freq="1min")
+    steps = pd.Series(range(3, 33), index=times, name="Steps")
 
     result = stepcount.summarize_cadence(
         steps,
@@ -139,14 +139,34 @@ def test_cadence_summary_matches_hand_calculated_values():
         min_walk_per_day=1,
     )
 
-    assert result["cadence_peak1"] == 120
-    assert result["cadence_peak30"] == 75
-    assert result["cadence_p95"] == 115
+    assert result["cadence_peak1"] == 32
+    assert result["cadence_peak5"] == 30
+    assert result["cadence_peak10"] == 28
+    assert result["cadence_peak30"] == 18
+    assert result["cadence_p95"] == 31
     assert result["daily"].iloc[0].to_dict() == {
-        "CadencePeak1(steps/min)": 120,
-        "CadencePeak30(steps/min)": 75,
-        "Cadence95th(steps/min)": 115,
+        "CadencePeak1(steps/min)": 32,
+        "CadencePeak5(steps/min)": 30,
+        "CadencePeak10(steps/min)": 28,
+        "CadencePeak30(steps/min)": 18,
+        "Cadence95th(steps/min)": 31,
     }
+
+
+def test_cadence_peaks_include_every_epoch_tied_at_the_cutoff():
+    times = pd.date_range("2024-01-15", periods=21, freq="1min")
+    steps = pd.Series([200] + [10] * 20, index=times, name="Steps")
+
+    result = stepcount.summarize_cadence(
+        steps,
+        steptol=3,
+        min_walk_per_day=1,
+    )
+
+    assert result["cadence_peak1"] == 200
+    assert result["cadence_peak5"] == 19
+    assert result["cadence_peak10"] == 19
+    assert result["cadence_peak30"] == 19
 
 
 def test_bout_summary_matches_hand_calculated_values():
