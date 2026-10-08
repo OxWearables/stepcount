@@ -31,6 +31,8 @@
         "Steps75thAt": "14:34:14",
         "Steps95thAt": "14:58:59",
         "CadencePeak1(steps/min)": 91,
+        "CadencePeak5(steps/min)": 86,
+        "CadencePeak10(steps/min)": 65,
         "CadencePeak30(steps/min)": 65,
         "Cadence95th(steps/min)": 90
       },
@@ -60,14 +62,14 @@
           "sha256": "a13982f8788cbbb82ff589aaaecdbed67c15517ecd1b3e66d189696fef20ca3b"
         },
         "daily": {
-          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak5(steps/min)", "CadencePeak10(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
           "rows": 1,
-          "sha256": "dee5da633ae9a747ca5bc32cd8d8566664551057d7ad89a323667b99b0bec869"
+          "sha256": "f761c365839834620d98e092120adf5fa108a9daba61e068445a6f358e203db7"
         },
         "daily_adjusted": {
-          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak5(steps/min)", "CadencePeak10(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
           "rows": 1,
-          "sha256": "23c206d18217208a60267593437e9ca9d7a8423bc42b963bf67bd5b432730770"
+          "sha256": "7ab860f1feb8e909a25ecef35190c0f572a1fb3a327f2ab9657a3a1c8bffdaf5"
         },
         "hourly": {
           "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],
@@ -105,6 +107,8 @@
         "Steps75thAt": "14:33:24",
         "Steps95thAt": "14:58:34",
         "CadencePeak1(steps/min)": 100,
+        "CadencePeak5(steps/min)": 83,
+        "CadencePeak10(steps/min)": 66,
         "CadencePeak30(steps/min)": 66,
         "Cadence95th(steps/min)": 95
       },
@@ -135,14 +139,14 @@
           "sha256": "88bc28ee864ffd69e734c6cba406209a5aa3ca5fa7ffc383c7266c647c2eb23b"
         },
         "daily": {
-          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak5(steps/min)", "CadencePeak10(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)", "WearTime(hours)"],
           "rows": 1,
-          "sha256": "52cf6c9f189d891e9b69391e2178f5ee046a8a5305a78520c61a24253918b651"
+          "sha256": "7821881badd7c2483426463cbcd0cfeff38020fe35a82a9b1907512939128225"
         },
         "daily_adjusted": {
-          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
+          "columns": ["Filename", "Date", "Walk(mins)", "Steps", "Steps5thAt", "Steps25thAt", "Steps50thAt", "Steps75thAt", "Steps95thAt", "CadencePeak1(steps/min)", "CadencePeak5(steps/min)", "CadencePeak10(steps/min)", "CadencePeak30(steps/min)", "Cadence95th(steps/min)", "ENMO(mg)"],
           "rows": 1,
-          "sha256": "71cf7320ea72bfbe8e88f64d465481a4ca97e7c2b7be5b390ee5d6e24a682d4b"
+          "sha256": "a9a79615c8e497751f21ab0d97828c7586870e47ad35f08165b6317335df57d0"
         },
         "hourly": {
           "columns": ["Filename", "Time", "Steps", "ENMO(mg)"],

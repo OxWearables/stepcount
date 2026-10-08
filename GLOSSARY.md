@@ -75,9 +75,13 @@
 ## Cadence
 
 - **CadencePeak1(steps/min)**: Highest cadence per day.
+- **CadencePeak5(steps/min)**: Mean cadence of the five most active one-minute epochs per day.
+- **CadencePeak10(steps/min)**: Mean cadence of the ten most active one-minute epochs per day.
 - **CadencePeak30(steps/min)**: Mean cadence of the thirty most active one-minute epochs per day.
 - **Cadence95th(steps/min)**: 95th percentile of cadence per day.
   - Note: Cadence metrics are computed from minutes classified as walking; if fewer than a minimum threshold (default 5) are present in a day, values will be NaN.
+  - Peak metrics include every epoch tied with the Nth-highest cadence, so a PeakN calculation can average more than N epochs.
+  - Once that threshold is met, a peak longer than the available walking time uses all qualifying minutes.
 
 *(Weekend and Weekday subsections analogous to Steps above.)*
 
@@ -119,7 +123,8 @@ All CSV files are gzipped (`.csv.gz`). Column schemas:
 - `Daily.csv.gz` / `DailyAdjusted.csv.gz`
   - `Filename`, `Date`, `Walk(mins)`, `Steps`,
     `Steps5thAt`, `Steps25thAt`, `Steps50thAt`, `Steps75thAt`, `Steps95thAt`,
-    `CadencePeak1(steps/min)`, `CadencePeak30(steps/min)`, `Cadence95th(steps/min)`, `ENMO(mg)`.
+    `CadencePeak1(steps/min)`, `CadencePeak5(steps/min)`, `CadencePeak10(steps/min)`,
+    `CadencePeak30(steps/min)`, `Cadence95th(steps/min)`, `ENMO(mg)`.
 - `Bouts.csv.gz`
   - `Filename`, `StartTime`, `EndTime`, `Duration(mins)`, `TimeSinceLast(mins)`, `Steps`,
     `Cadence(steps/min)`, `CadenceSD(steps/min)`, `Cadence25th(steps/min)`, `Cadence50th(steps/min)`,
