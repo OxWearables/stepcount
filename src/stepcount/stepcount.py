@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import warnings
+import math
 import os
 import sys
 import pathlib
@@ -83,6 +84,14 @@ def main() -> None:
     parser.add_argument("--min-walk-per-day",
                         help="The minimum required walking time (in minutes) in a day for metrics calculation.",
                         type=float, default=5)
+    parser.add_argument("--min-cadence",
+                        help=("Minimum instantaneous inter-step cadence retained for cadence metrics, "
+                              "in steps/min. Default: 50."),
+                        type=float, default=50.0)
+    parser.add_argument("--max-cadence",
+                        help=("Maximum instantaneous inter-step cadence retained for cadence metrics, "
+                              "in steps/min. Default: 150."),
+                        type=float, default=150.0)
     parser.add_argument("--bouts-min-walk", help="Minimum percentage of walking for a bout to be considered valid.",
                         type=float, default=0.8)
     parser.add_argument("--bouts-max-idle", help="Maximum idle (in windows) before a bout is considered to have ended.",
@@ -115,6 +124,13 @@ def main() -> None:
                         help="Download all model files and exit. No input file needed.")
     parser.add_argument('--quiet', '-q', action='store_true', help='Suppress output')
     args = parser.parse_args()
+
+    if not (
+        math.isfinite(args.min_cadence)
+        and math.isfinite(args.max_cadence)
+        and 0 < args.min_cadence < args.max_cadence
+    ):
+        parser.error("--min-cadence must be positive and lower than --max-cadence")
 
     # Arm the certificate fallback before any model download can run.
     _ensure_download_ssl_context(verbose=not args.quiet)
@@ -335,8 +351,19 @@ def main() -> None:
     info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekend': steps_summary_adj['weekend_hour_walks'].loc[h] for h in range(24)})
     info.update({f'WalkingAdjusted(mins)_Hour{h:02}_Weekday': steps_summary_adj['weekday_hour_walks'].loc[h] for h in range(24)})
 
-    cadence_summary = summarize_cadence(Y, model.steptol, min_walk_per_day=args.min_walk_per_day)
-    cadence_summary_adj = summarize_cadence(Y, model.steptol, min_walk_per_day=args.min_walk_per_day, adjust_estimates=True)
+    cadence_summary = summarize_cadence(
+        T_steps,
+        min_walk_per_day=args.min_walk_per_day,
+        min_cadence=args.min_cadence,
+        max_cadence=args.max_cadence,
+    )
+    cadence_summary_adj = summarize_cadence(
+        T_steps,
+        min_walk_per_day=args.min_walk_per_day,
+        min_cadence=args.min_cadence,
+        max_cadence=args.max_cadence,
+        adjust_estimates=True,
+    )
     for adjusted, summary in (('', cadence_summary), ('Adjusted', cadence_summary_adj)):
         for cohort, key_prefix in (('', ''), ('_Weekend', 'weekend_'), ('_Weekday', 'weekday_')):
             for peak_minutes in _CADENCE_PEAK_MINUTES:
@@ -1018,25 +1045,29 @@ def summarize_steps(
 
 
 def summarize_cadence(
-    Y: _Series,
-    steptol: int = 3,
+    T_steps: _Series,
     min_walk_per_day: int = 5,
+    min_cadence: float = 50.0,
+    max_cadence: float = 150.0,
+    rolling_min_periods: int = 10,
     adjust_estimates: bool = False
 ) -> Dict[str, Any]:
     """
-    Summarize cadence information from a series of step counts.
+    Summarize cadence information from a series of step timestamps.
 
     Parameters:
-    - Y (pd.Series): A pandas Series of step counts.
-    - steptol (int, optional): The minimum number of steps per window for the window to be considered valid for calculation. Defaults to 3 steps per window.
+    - T_steps (pd.Series): A pandas Series of timestamps of the steps.
     - min_walk_per_day (int, optional): The minimum number of walking minutes per day for cadence calculation. Defaults to 5 minutes.
+    - min_cadence (float, optional): The minimum cadence to consider. Defaults to 50 steps per minute.
+    - max_cadence (float, optional): The maximum cadence to consider. Defaults to 150 steps per minute.
+    - rolling_min_periods (int, optional): The minimum number of observations needed for the rolling mean cadence. Defaults to 10 observations.
     - adjust_estimates (bool, optional): Whether to adjust estimates to account for missing data. Defaults to False.
 
     Returns:
     - dict: A dictionary containing various summary cadence statistics.
 
     Example:
-        summary = summarize_cadence(Y, steptol=3, adjust_estimates=True)
+        summary = summarize_cadence(T_steps, adjust_estimates=True)
     """
 
     import numpy as np
@@ -1045,33 +1076,43 @@ def summarize_cadence(
 
     # TODO: split walking and running cadence?
 
-    dt = utils.infer_freq(Y.index).total_seconds()
-    min_steps_per_min = steptol * 60 / dt  # rescale steptol to steps/min
-
     cadence_columns = [
         *(f'CadencePeak{n}(steps/min)' for n in _CADENCE_PEAK_MINUTES),
         'Cadence95th(steps/min)',
     ]
 
+    if len(T_steps) == 0:
+        summary: Dict[str, Any] = {'daily': pd.DataFrame(columns=cadence_columns)}
+        for key_prefix in ('', 'weekend_', 'weekday_'):
+            summary.update({f'{key_prefix}cadence_peak{n}': np.nan for n in _CADENCE_PEAK_MINUTES})
+            summary[f'{key_prefix}cadence_p95'] = np.nan
+        return summary
+
     def _summarize_day(
         x: Any,
-        min_steps_per_min: float = min_steps_per_min,
         min_walk_per_day: int = min_walk_per_day,
     ) -> Tuple[Any, ...]:
-        y = x[x >= min_steps_per_min]
         # if not enough walking time, return NA.
         # note: min_walk_per_day in minutes, x must be minutely
-        if len(y) < min_walk_per_day:
+        if x.count() < min_walk_per_day:
             return (np.nan,) * len(cadence_columns)
 
-        descending = y.sort_values(ascending=False)
+        descending = x.dropna().sort_values(ascending=False)
         cadence_peaks = tuple(
             descending[descending >= descending.iloc[min(n, len(descending)) - 1]].mean()
             for n in _CADENCE_PEAK_MINUTES
         )
-        return (*cadence_peaks, y.quantile(.95))
+        return (*cadence_peaks, x.quantile(.95))
 
-    minutely = cast(Any, Y).resample('T').sum().rename('Steps')  # steps/min
+    step_times = cast(Any, T_steps.copy())
+    step_times.index = step_times
+    cad = 60 / step_times.diff().dt.total_seconds()  # steps/min
+    # set very low and very high cadences to NA
+    cad = cad.where(cad.between(min_cadence, max_cadence))
+    # 1min moving average
+    cad = cad.rolling('T', min_periods=rolling_min_periods).mean()
+    # resample to minutely
+    minutely = cad.resample('T').mean().rename('Cadence(steps/min)')
 
     # cadence https://jamanetwork.com/journals/jama/fullarticle/2763292
 
@@ -1126,7 +1167,7 @@ def summarize_cadence(
         daily_cadence_p95.round().astype(pd.Int64Dtype()),
     ], axis=1)
 
-    summary: Dict[str, Any] = {'daily': daily}
+    summary = {'daily': daily}
     for key_prefix, peaks, p95 in (
         ('', cadence_peaks, cadence_p95),
         ('weekend_', weekend_cadence_peaks, weekend_cadence_p95),

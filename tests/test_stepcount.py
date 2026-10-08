@@ -182,17 +182,17 @@ class TestSummarizeSteps:
 class TestSummarizeCadence:
     """Tests for cadence summarization."""
 
-    def test_summarize_cadence_basic(self, step_counts_series):
+    def test_summarize_cadence_basic(self, step_times_series):
         """Test basic cadence summarization."""
-        summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
+        summary = stepcount.summarize_cadence(step_times_series)
 
         for peak_minutes in CADENCE_PEAK_MINUTES:
             assert f'cadence_peak{peak_minutes}' in summary
         assert 'cadence_p95' in summary
 
-    def test_summarize_cadence_daily(self, step_counts_series):
+    def test_summarize_cadence_daily(self, step_times_series):
         """Test daily cadence values."""
-        summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
+        summary = stepcount.summarize_cadence(step_times_series)
 
         assert 'daily' in summary
         daily = summary['daily']
@@ -205,9 +205,9 @@ class TestSummarizeCadence:
             'Cadence95th(steps/min)',
         ]
 
-    def test_summarize_cadence_peaks_are_monotonic(self, step_counts_series):
+    def test_summarize_cadence_peaks_are_monotonic(self, step_times_series):
         """Test that averages cannot increase as more peak minutes are included."""
-        summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
+        summary = stepcount.summarize_cadence(step_times_series)
 
         peaks = [summary[f'cadence_peak{minutes}'] for minutes in CADENCE_PEAK_MINUTES]
         if not any(np.isnan(peak) for peak in peaks):
@@ -215,66 +215,97 @@ class TestSummarizeCadence:
 
     def test_summarize_cadence_longer_peaks_use_available_minutes(self):
         """Test that eligible short days retain the established peak30 behavior."""
-        times = pd.date_range('2024-01-15', periods=5, freq='1min')
-        steps = pd.Series([0, 30, 60, 90, 120], index=times, name='Steps')
+        step_times = pd.Series(
+            pd.date_range('2024-01-15', periods=601, freq='500ms'),
+            name='time',
+        )
 
-        summary = stepcount.summarize_cadence(steps, steptol=3, min_walk_per_day=1)
+        summary = stepcount.summarize_cadence(
+            step_times,
+            min_walk_per_day=1,
+            rolling_min_periods=1,
+        )
 
         assert summary['cadence_peak1'] == 120
-        assert summary['cadence_peak5'] == 75
-        assert summary['cadence_peak10'] == 75
-        assert summary['cadence_peak30'] == 75
+        assert summary['cadence_peak5'] == 120
+        assert summary['cadence_peak10'] == 120
+        assert summary['cadence_peak30'] == 120
+
+    def test_summarize_cadence_default_min_walk_is_five(self):
+        """The public API uses the same five-minute threshold as the CLI."""
+        step_times = pd.Series(
+            pd.date_range('2024-01-15', periods=721, freq='500ms'),
+            name='time',
+        )
+
+        summary = stepcount.summarize_cadence(step_times)
+
+        for peak_minutes in CADENCE_PEAK_MINUTES:
+            assert summary[f'cadence_peak{peak_minutes}'] == 120
+        assert summary['cadence_p95'] == 120
 
     def test_summarize_cadence_min_walk_filter(self):
         """Test exact behavior immediately below and at the walking threshold."""
-        times = pd.date_range('2024-01-15', periods=5, freq='1min')
-        below_threshold = pd.Series([30, 30, 30, 30, 0], index=times, name='Steps')
-        at_threshold = pd.Series([30] * 5, index=times, name='Steps')
+        below_threshold = pd.Series(
+            pd.date_range('2024-01-15', periods=480, freq='500ms'),
+            name='time',
+        )
+        at_threshold = pd.Series(
+            pd.date_range('2024-01-15', periods=600, freq='500ms'),
+            name='time',
+        )
 
         below_summary = stepcount.summarize_cadence(
-            below_threshold, steptol=3, min_walk_per_day=5
+            below_threshold, min_walk_per_day=5, rolling_min_periods=1
         )
         at_summary = stepcount.summarize_cadence(
-            at_threshold, steptol=3, min_walk_per_day=5
+            at_threshold, min_walk_per_day=5, rolling_min_periods=1
         )
 
         for peak_minutes in CADENCE_PEAK_MINUTES:
             assert np.isnan(below_summary[f'cadence_peak{peak_minutes}'])
-            assert at_summary[f'cadence_peak{peak_minutes}'] == 30
+            assert at_summary[f'cadence_peak{peak_minutes}'] == 120
         assert np.isnan(below_summary['cadence_p95'])
-        assert at_summary['cadence_p95'] == 30
+        assert at_summary['cadence_p95'] == 120
 
     def test_summarize_cadence_weekend_weekday_and_adjusted_values(self):
-        """Test exact split values and weekend imputation for adjusted estimates."""
+        """Test exact overall, weekend, weekday, and adjusted values."""
         daily_cadences = {
-            '2024-01-15': 10,
-            '2024-01-16': 20,
-            '2024-01-17': 30,
-            '2024-01-18': 40,
-            '2024-01-19': 50,
-            # Saturday is deliberately missing and is imputed from Sunday.
-            '2024-01-21': 70,
+            '2024-01-15': 60,
+            '2024-01-16': 70,
+            '2024-01-17': 80,
+            '2024-01-18': 90,
+            '2024-01-19': 100,
+            '2024-01-20': 110,
+            '2024-01-21': 120,
         }
-        steps = pd.concat([
+        step_times = pd.concat([
             pd.Series(
-                [cadence] * 5,
-                index=pd.date_range(f'{date} 12:00', periods=5, freq='1min'),
+                pd.date_range(
+                    f'{date} 12:00',
+                    periods=5 * cadence + 1,
+                    freq=pd.Timedelta(seconds=60 / cadence),
+                ),
+                name='time',
             )
             for date, cadence in daily_cadences.items()
-        ]).rename('Steps')
+        ], ignore_index=True)
 
         summary = stepcount.summarize_cadence(
-            steps, steptol=3, min_walk_per_day=1
+            step_times, min_walk_per_day=1, rolling_min_periods=1
         )
         adjusted = stepcount.summarize_cadence(
-            steps, steptol=3, min_walk_per_day=1, adjust_estimates=True
+            step_times,
+            min_walk_per_day=1,
+            rolling_min_periods=1,
+            adjust_estimates=True,
         )
 
-        for cadence_summary, expected_overall in ((summary, 35), (adjusted, 40)):
+        for cadence_summary in (summary, adjusted):
             for peak_minutes in CADENCE_PEAK_MINUTES:
-                assert cadence_summary[f'cadence_peak{peak_minutes}'] == expected_overall
-                assert cadence_summary[f'weekday_cadence_peak{peak_minutes}'] == 30
-                assert cadence_summary[f'weekend_cadence_peak{peak_minutes}'] == 70
+                assert cadence_summary[f'cadence_peak{peak_minutes}'] == 90
+                assert cadence_summary[f'weekday_cadence_peak{peak_minutes}'] == 80
+                assert cadence_summary[f'weekend_cadence_peak{peak_minutes}'] == 115
 
 
 class TestNumbaDetectBouts:
@@ -712,7 +743,7 @@ class TestENMOCalculation:
 class TestIntegration:
     """Integration tests for summary functions."""
 
-    def test_full_summary_pipeline(self, step_counts_series, accel_data_1_5_days):
+    def test_full_summary_pipeline(self, step_counts_series, step_times_series, accel_data_1_5_days):
         """Test running all summary functions together."""
         enmo_summary = stepcount.summarize_enmo(accel_data_1_5_days)
         assert 'avg' in enmo_summary
@@ -720,7 +751,7 @@ class TestIntegration:
         steps_summary = stepcount.summarize_steps(step_counts_series, steptol=3)
         assert 'total_steps' in steps_summary
 
-        cadence_summary = stepcount.summarize_cadence(step_counts_series, steptol=3)
+        cadence_summary = stepcount.summarize_cadence(step_times_series)
         assert 'cadence_peak1' in cadence_summary
 
         bouts_summary = stepcount.summarize_bouts(
@@ -835,6 +866,49 @@ print(','.join(loaded))
         assert result.returncode == 0
         assert '--ssl-repo-path' in result.stdout
 
+    def test_cli_cadence_bounds_in_help(self):
+        """Test that cadence filtering options are documented."""
+        result = subprocess.run(
+            [sys.executable, '-m', 'stepcount.stepcount', '--help'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+
+        assert result.returncode == 0
+        assert '--min-cadence' in result.stdout
+        assert '--max-cadence' in result.stdout
+
+    @pytest.mark.parametrize(
+        ("min_cadence", "max_cadence"),
+        [
+            ("0", "150"),
+            ("150", "150"),
+            ("nan", "150"),
+            ("50", "inf"),
+        ],
+    )
+    def test_cli_rejects_invalid_cadence_bounds(self, min_cadence, max_cadence):
+        """Cadence bounds must be finite, positive, and ordered."""
+        result = subprocess.run(
+            [
+                sys.executable,
+                '-m',
+                'stepcount.stepcount',
+                'recording.cwa',
+                '--min-cadence',
+                min_cadence,
+                '--max-cadence',
+                max_cadence,
+            ],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        assert result.returncode != 0
+        assert '--min-cadence must be positive and lower than --max-cadence' in result.stderr
+
     def test_cli_download_models_in_help(self):
         """Test that --download-models appears in --help output."""
         result = subprocess.run(
@@ -905,8 +979,9 @@ print(','.join(loaded))
                 name="Steps",
             )
             walking = steps >= 3
-            step_times = pd.DataFrame(
-                {"time": frame.index.repeat(steps.to_numpy())},
+            step_times = pd.Series(
+                frame.index.repeat(steps.to_numpy()),
+                name="time",
             )
             return steps, walking, step_times
 
@@ -922,6 +997,8 @@ print(','.join(loaded))
         )
         load_model = MagicMock(return_value=model)
         monkeypatch.setattr(stepcount, "load_model", load_model)
+        summarize_cadence = MagicMock(wraps=stepcount.summarize_cadence)
+        monkeypatch.setattr(stepcount, "summarize_cadence", summarize_cadence)
 
         argv = [
             "stepcount",
@@ -940,6 +1017,10 @@ print(','.join(loaded))
             "0",
             "--min-walk-per-day",
             "1",
+            "--min-cadence",
+            "45.5",
+            "--max-cadence",
+            "175.5",
             "--quiet",
         ]
         if model_type == "ssl":
@@ -956,6 +1037,10 @@ print(','.join(loaded))
         assert model.window_len == 60
         assert detector.sample_rate == 1
         assert detector.verbose is False
+        assert summarize_cadence.call_count == 2
+        for call in summarize_cadence.call_args_list:
+            assert call.kwargs["min_cadence"] == 45.5
+            assert call.kwargs["max_cadence"] == 175.5
         if model_type == "ssl":
             assert detector.device == "cpu"
 
@@ -983,6 +1068,8 @@ print(','.join(loaded))
             for adjusted in ("", "Adjusted"):
                 for cohort in ("", "_Weekend", "_Weekday"):
                     assert f"CadencePeak{peak_minutes}{adjusted}(steps/min){cohort}" in result_info
+        assert result_info["StepCountArgs"]["min_cadence"] == 45.5
+        assert result_info["StepCountArgs"]["max_cadence"] == 175.5
         daily = pd.read_csv(result_dir / "synthetic-Daily.csv.gz")
         assert daily["Date"].tolist() == ["2024-01-16"]
         assert daily["WearTime(hours)"].tolist() == [1.0]
