@@ -126,6 +126,36 @@ This writes ``collated-outputs/`` containing:
 - ``Info.csv.gz`` from all ``*-Info.json`` files
 - ``Daily.csv.gz``, ``Hourly.csv.gz``, ``Minutely.csv.gz``, and ``Bouts.csv.gz`` collated from matching files
 
+CSV columns are aligned by name. The default ``union`` schema policy retains
+every column found across the inputs and leaves unavailable values blank. To
+reject inputs with different column sets, use strict schema validation:
+
+.. code-block:: console
+
+    $ stepcount-collate-outputs outputs/ --schema-policy strict
+
+Collation locks each output directory before discovering inputs and stages the
+requested output set before publishing it through one transaction. Invalid or
+corrupt inputs therefore leave existing collated outputs unchanged, and a
+failed publication restores the previous files. A durable journal recovers an
+interrupted publication before the next read or write. Multi-file readers must
+hold the same lock so every file comes from one publication:
+
+.. code-block:: python
+
+    import pandas
+
+    from stepcount.cli_utils import collated_outputs_snapshot
+
+    with collated_outputs_snapshot("collated-outputs/") as snapshot:
+        info = pandas.read_csv(snapshot / "Info.csv.gz")
+        daily = pandas.read_csv(snapshot / "Daily.csv.gz")
+
+Open every related output inside one context; direct reads outside it do not
+provide a cross-file consistency guarantee. If no result files are found, the
+command fails without creating collated CSVs. When one requested output type
+has no inputs, its stale collated CSV is removed.
+
 Processing CSV files
 ..................
 If a CSV file is provided, it must have the following header: :code:`time`, :code:`x`, :code:`y`, :code:`z`. 
