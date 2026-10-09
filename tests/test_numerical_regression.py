@@ -130,43 +130,47 @@ def test_adjusted_step_summary_imputes_a_known_gap():
 
 
 def test_cadence_summary_matches_hand_calculated_values():
-    times = pd.date_range("2024-01-15", periods=30, freq="1min")
-    steps = pd.Series(range(3, 33), index=times, name="Steps")
-
-    result = stepcount.summarize_cadence(
-        steps,
-        steptol=3,
-        min_walk_per_day=1,
+    step_times = pd.Series(
+        pd.date_range("2024-01-15", periods=241, freq="500ms"),
+        name="time",
     )
 
-    assert result["cadence_peak1"] == 32
-    assert result["cadence_peak5"] == 30
-    assert result["cadence_peak10"] == 28
-    assert result["cadence_peak30"] == 18
-    assert result["cadence_p95"] == 31
+    result = stepcount.summarize_cadence(
+        step_times,
+        min_walk_per_day=1,
+        rolling_min_periods=1,
+    )
+
+    assert result["cadence_peak1"] == 120
+    assert result["cadence_peak5"] == 120
+    assert result["cadence_peak10"] == 120
+    assert result["cadence_peak30"] == 120
+    assert result["cadence_p95"] == 120
     assert result["daily"].iloc[0].to_dict() == {
-        "CadencePeak1(steps/min)": 32,
-        "CadencePeak5(steps/min)": 30,
-        "CadencePeak10(steps/min)": 28,
-        "CadencePeak30(steps/min)": 18,
-        "Cadence95th(steps/min)": 31,
+        "CadencePeak1(steps/min)": 120,
+        "CadencePeak5(steps/min)": 120,
+        "CadencePeak10(steps/min)": 120,
+        "CadencePeak30(steps/min)": 120,
+        "Cadence95th(steps/min)": 120,
     }
 
 
 def test_cadence_peaks_include_every_epoch_tied_at_the_cutoff():
-    times = pd.date_range("2024-01-15", periods=21, freq="1min")
-    steps = pd.Series([200] + [10] * 20, index=times, name="Steps")
-
-    result = stepcount.summarize_cadence(
-        steps,
-        steptol=3,
-        min_walk_per_day=1,
+    step_times = pd.Series(
+        pd.date_range("2024-01-15", periods=2401, freq="500ms"),
+        name="time",
     )
 
-    assert result["cadence_peak1"] == 200
-    assert result["cadence_peak5"] == 19
-    assert result["cadence_peak10"] == 19
-    assert result["cadence_peak30"] == 19
+    result = stepcount.summarize_cadence(
+        step_times,
+        min_walk_per_day=1,
+        rolling_min_periods=1,
+    )
+
+    assert result["cadence_peak1"] == 120
+    assert result["cadence_peak5"] == 120
+    assert result["cadence_peak10"] == 120
+    assert result["cadence_peak30"] == 120
 
 
 def test_bout_summary_matches_hand_calculated_values():
