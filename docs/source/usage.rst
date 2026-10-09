@@ -140,6 +140,10 @@ corrupt inputs therefore leave existing collated outputs unchanged, and a
 failed publication restores the previous files. A durable journal recovers an
 interrupted publication before the next read or write. Multi-file readers must
 hold the same lock so every file comes from one publication:
+Existing output symlinks are rejected rather than replaced; use regular files
+for collated destinations.
+Matching input symlinks and files resolving outside the results directory are
+ignored.
 
 .. code-block:: python
 
