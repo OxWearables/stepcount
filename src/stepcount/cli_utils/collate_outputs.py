@@ -225,7 +225,10 @@ def _discover_output_files(
                 continue
 
             file = root / file_name
-            if not _is_regular_output_file(file):
+            if not (
+                _is_regular_output_file(file)
+                and _is_contained_output_file(file, resolved_results_dir)
+            ):
                 continue
             if is_info_file:
                 info_files.append(file)
@@ -261,9 +264,18 @@ def _raise_walk_error(error: OSError) -> None:
 
 def _is_regular_output_file(file: Path) -> bool:
     try:
-        return stat.S_ISREG(file.stat().st_mode)
+        file.stat()
+        return stat.S_ISREG(file.lstat().st_mode)
     except FileNotFoundError:
         return False
+
+
+def _is_contained_output_file(file: Path, results_dir: Path) -> bool:
+    try:
+        resolved_file = file.resolve(strict=True)
+    except FileNotFoundError:
+        return False
+    return _is_relative_to(resolved_file, results_dir)
 
 
 def _write_csv_collation(
@@ -506,7 +518,9 @@ def _validate_publication(staged_outputs: Sequence[_StagedOutput]) -> Path:
             output_mode = outfile.lstat().st_mode
         except FileNotFoundError:
             continue
-        if not (stat.S_ISREG(output_mode) or stat.S_ISLNK(output_mode)):
+        if stat.S_ISLNK(output_mode):
+            raise OSError(f"Output path must not be a symlink: {outfile}")
+        if not stat.S_ISREG(output_mode):
             raise OSError(f"Output path is not a regular file or symlink: {outfile}")
     return next(iter(output_directories))
 

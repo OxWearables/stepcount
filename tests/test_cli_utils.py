@@ -1355,11 +1355,10 @@ class TestCollateOutputs:
         ]
         assert not list(output_dir.glob(".*.bak"))
 
-    def test_rollback_restores_symlink_output(
+    def test_symlink_output_is_rejected_without_modifying_target(
         self,
         temp_dir,
         mock_info_json,
-        monkeypatch,
     ):
         results_dir = temp_dir / "results"
         output_dir = temp_dir / "collated"
@@ -1374,20 +1373,7 @@ class TestCollateOutputs:
         pd.DataFrame({"sentinel": [42]}).to_csv(target, index=False)
         info_outfile = output_dir / "Info.csv.gz"
         info_outfile.symlink_to(target.name)
-        original_replace = os.replace
-
-        def fail_daily_publication(source, destination):
-            if (
-                Path(destination).name == "Daily.csv.gz"
-                and Path(source).parent.name.endswith(".tmp")
-                and not Path(source).parent.name.startswith(".stepcount-publish-")
-            ):
-                raise OSError("simulated publication failure")
-            original_replace(source, destination)
-
-        monkeypatch.setattr(collate_mod.os, "replace", fail_daily_publication)
-
-        with pytest.raises(OSError, match="simulated publication failure"):
+        with pytest.raises(OSError, match="must not be a symlink"):
             collate_mod.collate_outputs(results_dir, output_dir, included=["daily"])
 
         assert info_outfile.is_symlink()
