@@ -329,6 +329,19 @@ def step_counts_series(accel_data_1_5_days):
     return pd.Series(step_counts, index=window_times, name='Steps')
 
 
+@pytest.fixture(scope="session")
+def step_times_series(step_counts_series):
+    """Expand window-level counts into evenly spaced step timestamps."""
+    step_times = []
+    window_seconds = 10
+    for window_start, count in step_counts_series.items():
+        if count > 0:
+            offsets = np.arange(1, int(count) + 1) * (window_seconds / count)
+            step_times.extend(window_start + pd.to_timedelta(offsets, unit="s"))
+
+    return pd.Series(step_times, name="time")
+
+
 @pytest.fixture(scope="function")
 def temp_dir():
     """Create a temporary directory for test outputs, cleaned up after test."""
